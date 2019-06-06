@@ -26,6 +26,7 @@
 
 #include "../tests.h"
 #include "dof_tools_common.h"
+#include "dof_tools_fake_hp.h"
 
 // check
 //   DoFTools::
@@ -44,9 +45,9 @@
 
 
 
-template <int dim>
+template <int dim, typename DoFHandlerType>
 void
-check_this(const DoFHandler<dim> &dof_handler)
+check_this(const DoFHandlerType &dof_handler)
 {
   // there's presently a crash in the
   // Raviart-Thomas element. don't

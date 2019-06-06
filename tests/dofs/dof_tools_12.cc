@@ -16,15 +16,16 @@
 
 #include "../tests.h"
 #include "dof_tools_common.h"
+#include "dof_tools_fake_hp.h"
 
 // check
 //   DoFTools::extract_dofs
 
 
 
-template <int dim>
+template <int dim, typename DoFHandlerType>
 void
-check_this(const DoFHandler<dim> &dof_handler)
+check_this(const DoFHandlerType &dof_handler)
 {
   std::vector<bool> selected_dofs(dof_handler.n_dofs());
   std::vector<bool> mask(dof_handler.get_fe().n_components(), false);

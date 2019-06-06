@@ -18,15 +18,16 @@
 
 #include "../tests.h"
 #include "dof_tools_common.h"
+#include "dof_tools_fake_hp.h"
 
 // check
 //   DoFTools::count_boundary_dofs
 
 
 
-template <int dim>
+template <int dim, typename DoFHandlerType>
 void
-check_this(const DoFHandler<dim> &dof_handler)
+check_this(const DoFHandlerType &dof_handler)
 {
   // no other args
   deallog << dof_handler.n_boundary_dofs() << std::endl;

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2018 by the deal.II authors
+// Copyright (C) 2004 - 2019 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,24 +13,17 @@
 //
 // ---------------------------------------------------------------------
 
-
-#include "../tests.h"
-#include "dof_tools_common.h"
-#include "dof_tools_fake_hp.h"
-
-// check
-//   DoFTools::count_dofs_per_component
+#ifndef dealii_dof_tools_fake_hp_h
+#define dealii_dof_tools_fake_hp_h
+// fake hp check_this function that does nothing
 
 
-
-template <int dim, typename DoFHandlerType>
+template <int dim>
 void
-check_this(const DoFHandlerType &dof_handler)
+check_this(const hp::DoFHandler<dim> &dof_handler)
 {
-  std::vector<types::global_dof_index> n_dofs(
-    dof_handler.get_fe().n_components());
-  DoFTools::count_dofs_per_component(dof_handler, n_dofs);
-  for (unsigned int i = 0; i < n_dofs.size(); ++i)
-    deallog << n_dofs[i] << " ";
-  deallog << std::endl;
+	// nothing to do here
 }
+
+
+#endif // dealii_dof_tools_fake_hp_h

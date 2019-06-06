@@ -34,6 +34,7 @@
 #include <string>
 
 #include "../tests.h"
+#include "dof_tools_fake_hp.h"
 
 // check
 //   DoFTools::
@@ -52,9 +53,9 @@
 
 
 
-template <int dim>
+template <int dim, typename DoFHandlerType>
 void
-check_this(const DoFHandler<dim> &dof_handler)
+check_this(const DoFHandlerType &dof_handler)
 {
   // create sparsity pattern
   SparsityPattern sp(dof_handler.n_dofs(),
@@ -110,7 +111,7 @@ check_this()
   DoFHandler<dim> dof_handler(tr);
   dof_handler.distribute_dofs(fe);
 
-  check_this(dof_handler);
+  check_this<dim, DoFHandler<dim> >(dof_handler);
 }
 
 

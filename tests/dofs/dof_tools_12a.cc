@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2019 by the deal.II authors
+// Copyright (C) 2003 - 2018 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -12,14 +12,6 @@
 // the top level directory of deal.II.
 //
 // ---------------------------------------------------------------------
-
-
-// Similar to dof_tools_04 but for a parallel::distributed::Triangulation
-// instead of a (serial) Triangulation:
-// check
-//   DoFTools::extract_hanging_node_constraints
-// using a slightly different refinement and less different FiniteElements
-
 #include <deal.II/base/logstream.h>
 
 #include <deal.II/distributed/tria.h>
@@ -42,36 +34,44 @@
 
 #include "../tests.h"
 
+// check
+//   DoFTools::extract_dofs as in dof_tools_12 in parallel for fewer elements
+
+void
+output_bool_vector(std::vector<bool> &v)
+{
+  for (unsigned int i = 0; i < v.size(); ++i)
+    deallog << (v[i] ? '1' : '0');
+  deallog << std::endl;
+}
 
 
 template <int dim, typename DoFHandlerType>
 void
 check_this(const DoFHandlerType &dof_handler)
 {
-  const types::global_dof_index n_dofs = dof_handler.n_dofs();
-
   IndexSet locally_relevant_dofs;
   DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant_dofs);
 
-  std::vector<bool> is_hanging_node_constrained(n_dofs);
-  DoFTools::extract_hanging_node_dofs(dof_handler, is_hanging_node_constrained);
+  std::vector<bool> selected_dofs(dof_handler.n_locally_owned_dofs());
+  std::vector<bool> mask(dof_handler.get_fe().n_components(), false);
 
-  AffineConstraints<double> constraints(locally_relevant_dofs);
-  DoFTools::make_hanging_node_constraints(dof_handler, constraints);
-  constraints.close();
+  // only select first component
+  mask[0] = true;
+  DoFTools::extract_dofs(dof_handler, ComponentMask(mask), selected_dofs);
+  if (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0)
+    {
+      output_bool_vector(selected_dofs);
+    }
 
-  for (const auto &dof : locally_relevant_dofs)
-    if (is_hanging_node_constrained[dof])
-      AssertThrow(constraints.is_constrained(dof), ExcInternalError());
-
-  AssertThrow((unsigned int)(std::count(is_hanging_node_constrained.begin(),
-                                        is_hanging_node_constrained.end(),
-                                        true)) == constraints.n_constraints(),
-              ExcInternalError());
-
-  deallog << "OK" << std::endl;
+  // also select last component
+  mask.back() = true;
+  DoFTools::extract_dofs(dof_handler, ComponentMask(mask), selected_dofs);
+  if (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0)
+    {
+      output_bool_vector(selected_dofs);
+    }
 }
-
 
 
 template <int dim>
@@ -98,8 +98,15 @@ check(const FiniteElement<dim> &fe, const std::string &name)
   DoFHandler<dim> dof_handler(tria);
   dof_handler.distribute_dofs(fe);
 
+  // setup hp DoFHandler
+  hp::FECollection<dim> fe_collection(fe);
+  hp::DoFHandler<dim> hp_dof_handler(tria);
+  hp_dof_handler.distribute_dofs(fe_collection);
+
   check_this<dim, DoFHandler<dim> >(dof_handler);
+  check_this<dim, hp::DoFHandler<dim> >(hp_dof_handler);
 }
+
 
 #define CHECK(EL, deg, dim) \
   {                         \
@@ -124,3 +131,4 @@ main(int argc, char **argv)
 
   return 0;
 }
+

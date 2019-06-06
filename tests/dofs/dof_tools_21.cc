@@ -29,6 +29,7 @@
 
 #include "../tests.h"
 #include "dof_tools_periodic.h"
+#include "dof_tools_fake_hp.h"
 
 // A simple test for
 //   DoFTools::
@@ -44,9 +45,9 @@
 
 
 
-template <int dim>
+template <int dim, typename DoFHandlerType>
 void
-check_this(const DoFHandler<dim> &dof_handler)
+check_this(const DoFHandlerType &dof_handler)
 {
   Functions::CosineFunction<dim> test_func(dof_handler.get_fe().n_components());
 

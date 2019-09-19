@@ -69,10 +69,13 @@ namespace
     const std::size_t bytes_per_entry = sizeof(value_type) * dofs_per_cell;
 
     std::vector<char> buffer(dof_values.size() * bytes_per_entry);
-    for (unsigned int i = 0; i < dof_values.size(); ++i)
-      std::memcpy(&buffer[i * bytes_per_entry],
-                  &dof_values[i](0),
-                  bytes_per_entry);
+    if (dofs_per_cell > 0)
+    {
+        for (unsigned int i = 0; i < dof_values.size(); ++i)
+            std::memcpy(&buffer[i * bytes_per_entry],
+                    &dof_values[i](0),
+                    bytes_per_entry);
+    }
 
     return buffer;
   }
@@ -359,18 +362,34 @@ namespace parallel
                 Assert(false, ExcInternalError());
                 break;
             }
+
         }
 
-      const unsigned int dofs_per_cell =
-        dof_handler->get_fe(fe_index).dofs_per_cell;
-
+      unsigned int dofs_per_cell {0};
       auto it_input  = input_vectors.cbegin();
       auto it_output = dof_values.begin();
-      for (; it_input != input_vectors.cend(); ++it_input, ++it_output)
-        {
-          it_output->reinit(dofs_per_cell);
-          cell->get_interpolated_dof_values(*(*it_input), *it_output, fe_index);
-        }
+
+      // if cell is flagged as being changed from FE_Nothing to a "real" FE
+      if (cell->user_flag_set() == true)
+      {
+          dofs_per_cell = dof_handler->get_fe(0).dofs_per_cell;
+
+          for (; it_output != dof_values.end(); ++it_output)
+          {
+              it_output->reinit(cell->get_dof_handler().get_fe(0).dofs_per_cell);
+          }
+
+      }
+      else
+      {
+          dofs_per_cell = dof_handler->get_fe(fe_index).dofs_per_cell;
+
+          for (; it_input != input_vectors.cend(); ++it_input, ++it_output)
+            {
+              it_output->reinit(dofs_per_cell);
+              cell->get_interpolated_dof_values(*(*it_input), *it_output, fe_index);
+            }
+      }
 
       return pack_dof_values<typename VectorType::value_type>(dof_values,
                                                               dofs_per_cell);
@@ -436,32 +455,37 @@ namespace parallel
       const unsigned int dofs_per_cell =
         dof_handler->get_fe(fe_index).dofs_per_cell;
 
-      const std::vector<::dealii::Vector<typename VectorType::value_type>>
-        dof_values =
-          unpack_dof_values<typename VectorType::value_type>(data_range,
-                                                             dofs_per_cell);
+      // just go on if we have are not on a FE_Nothing cell (dofs_per_cell == 0)
+      // and if we are not on a cell that changes from FE_Nothing to a real FE
+      if ((dofs_per_cell > 0) && (cell->user_flag_set() == false))
+      {
+          const std::vector<::dealii::Vector<typename VectorType::value_type>>
+                  dof_values =
+                  unpack_dof_values<typename VectorType::value_type>(data_range,
+                                                                     dofs_per_cell);
 
-      // check if sizes match
-      Assert(dof_values.size() == all_out.size(), ExcInternalError());
+          // check if sizes match
+          Assert(dof_values.size() == all_out.size(), ExcInternalError());
 
-      // check if we have enough dofs provided by the FE object
-      // to interpolate the transferred data correctly
-      for (auto it_dof_values = dof_values.begin();
-           it_dof_values != dof_values.end();
-           ++it_dof_values)
-        Assert(
-          dofs_per_cell == it_dof_values->size(),
-          ExcMessage(
-            "The transferred data was packed with a different number of dofs than the "
-            "currently registered FE object assigned to the DoFHandler has."));
+          // check if we have enough dofs provided by the FE object
+          // to interpolate the transferred data correctly
+          for (auto it_dof_values = dof_values.begin();
+               it_dof_values != dof_values.end();
+               ++it_dof_values)
+              Assert(
+                          dofs_per_cell == it_dof_values->size(),
+                          ExcMessage(
+                              "The transferred data was packed with a different number of dofs than the "
+                              "currently registered FE object assigned to the DoFHandler has."));
 
-      // distribute data for each registered vector on mesh
-      auto it_input  = dof_values.cbegin();
-      auto it_output = all_out.begin();
-      for (; it_input != dof_values.cend(); ++it_input, ++it_output)
-        cell->set_dof_values_by_interpolation(*it_input,
-                                              *(*it_output),
-                                              fe_index);
+          // distribute data for each registered vector on mesh
+          auto it_input  = dof_values.cbegin();
+          auto it_output = all_out.begin();
+          for (; it_input != dof_values.cend(); ++it_input, ++it_output)
+              cell->set_dof_values_by_interpolation(*it_input,
+                                                    *(*it_output),
+                                                    fe_index);
+      }
     }
   } // namespace distributed
 } // namespace parallel

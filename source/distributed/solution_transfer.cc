@@ -69,6 +69,8 @@ namespace
     const std::size_t bytes_per_entry = sizeof(value_type) * dofs_per_cell;
 
     std::vector<char> buffer(dof_values.size() * bytes_per_entry);
+
+    // if we have a FE_Nothing element, we have nothing to unpack and no dofs_per_cell
     if (dofs_per_cell > 0)
     {
         for (unsigned int i = 0; i < dof_values.size(); ++i)

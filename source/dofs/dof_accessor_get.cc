@@ -48,7 +48,8 @@ void
 DoFCellAccessor<dim, spacedim, lda>::get_interpolated_dof_values(
   const InputVector &values,
   Vector<number> &   interpolated_values,
-  const unsigned int fe_index_) const
+  const unsigned int fe_index_,
+  const unsigned int level) const
 {
   const unsigned int fe_index =
     (this->dof_handler->hp_capability_enabled == false &&
@@ -56,7 +57,7 @@ DoFCellAccessor<dim, spacedim, lda>::get_interpolated_dof_values(
       DoFHandler<dim, spacedim>::default_fe_index :
       fe_index_;
 
-  if (this->is_active())
+  if ((this->is_active()) || (level != numbers::invalid_unsigned_int))
     // If this cell is active: simply return the exact values on this
     // cell unless the finite element we need to interpolate to is different
     // than the one we have on the current cell

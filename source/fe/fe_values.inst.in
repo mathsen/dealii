@@ -142,7 +142,8 @@ for (VEC : VECTOR_TYPES; deal_II_dimension : DIMENSIONS;
         const dealii::VEC &,
         std::vector<
           ProductType<dealii::VEC::value_type,
-                      dealii::Tensor<1, deal_II_space_dimension>>::type> &)
+                      dealii::Tensor<1, deal_II_space_dimension>>::type> &,
+        const unsigned int)
         const;
     template void
     FEValuesViews::Vector<deal_II_dimension, deal_II_space_dimension>::

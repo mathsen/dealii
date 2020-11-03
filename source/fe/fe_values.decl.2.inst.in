@@ -25,6 +25,7 @@ for (VEC : VECTOR_TYPES)
     /// of the iterator with the
     /// given arguments.
     virtual void get_interpolated_dof_values(const VEC &              in,
-                                             Vector<VEC::value_type> &out)
+                                             Vector<VEC::value_type> &out,
+                                             const unsigned int level =  numbers::invalid_unsigned_int)
       const override;
   }

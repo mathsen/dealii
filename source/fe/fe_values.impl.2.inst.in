@@ -19,7 +19,8 @@ for (VEC : VECTOR_TYPES)
     template <int dim, int spacedim>
     void
     FEValuesBase<dim, spacedim>::TriaCellIterator::get_interpolated_dof_values(
-      const VEC &, Vector<VEC::value_type> &) const
+      const VEC &, Vector<VEC::value_type> &,
+      const unsigned int level) const
     { //
       Assert(false, ExcMessage(message_string));
     \}

@@ -1652,7 +1652,8 @@ public:
     const InputVector &values,
     Vector<number> &   interpolated_values,
     const unsigned int fe_index =
-      DoFHandler<dimension_, space_dimension_>::invalid_fe_index) const;
+      DoFHandler<dimension_, space_dimension_>::invalid_fe_index,
+    const unsigned int level = numbers::invalid_unsigned_int) const;
 
   /**
    * This function is the counterpart to get_interpolated_dof_values(): you

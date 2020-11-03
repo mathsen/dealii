@@ -916,7 +916,8 @@ namespace FEValuesViews
       const InputVector &fe_function,
       std::vector<typename ProductType<value_type,
                                        typename InputVector::value_type>::type>
-        &values) const;
+        &values,
+       const unsigned int level = numbers::invalid_unsigned_int) const;
 
     /**
      * Same as above, but using a vector of local degree-of-freedom values.

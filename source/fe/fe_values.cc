@@ -1850,21 +1850,24 @@ namespace FEValuesViews
     const InputVector &fe_function,
     std::vector<
       typename ProductType<value_type, typename InputVector::value_type>::type>
-      &values) const
+      &values,
+    const unsigned int level) const
   {
     Assert(fe_values->update_flags & update_values,
            (typename FEValuesBase<dim, spacedim>::ExcAccessToUninitializedField(
              "update_values")));
     Assert(fe_values->present_cell.get() != nullptr,
            ExcMessage("FEValues object is not reinit'ed to any cell"));
-    AssertDimension(fe_function.size(),
-                    fe_values->present_cell->n_dofs_for_dof_handler());
+    //AssertDimension(fe_function.size(),
+    //                fe_values->present_cell->n_dofs_for_dof_handler());
 
     // get function values of dofs on this cell
     dealii::Vector<typename InputVector::value_type> dof_values(
       fe_values->dofs_per_cell);
     fe_values->present_cell->get_interpolated_dof_values(fe_function,
-                                                         dof_values);
+                                                         dof_values,
+                                                         level
+                                                         );
     internal::do_function_values<dim, spacedim>(
       make_array_view(dof_values.begin(), dof_values.end()),
       fe_values->finite_element_output.shape_values,
@@ -2667,7 +2670,8 @@ public:
    */
   virtual void
   get_interpolated_dof_values(const IndexSet &              in,
-                              Vector<IndexSet::value_type> &out) const = 0;
+                              Vector<IndexSet::value_type> &out,
+                              const unsigned int level = numbers::invalid_unsigned_int) const = 0;
 };
 
 /* --- classes derived from FEValuesBase<dim,spacedim>::CellIteratorBase --- */
@@ -2712,7 +2716,8 @@ public:
    */
   virtual void
   get_interpolated_dof_values(const IndexSet &              in,
-                              Vector<IndexSet::value_type> &out) const override;
+                              Vector<IndexSet::value_type> &out,
+                              const unsigned int level = numbers::invalid_unsigned_int) const override;
 
 private:
   /**
@@ -2776,7 +2781,8 @@ public:
    */
   virtual void
   get_interpolated_dof_values(const IndexSet &              in,
-                              Vector<IndexSet::value_type> &out) const override;
+                              Vector<IndexSet::value_type> &out,
+                              const unsigned int level = numbers::invalid_unsigned_int) const override;
 
 private:
   /**
@@ -2834,9 +2840,10 @@ template <typename CI>
 void
 FEValuesBase<dim, spacedim>::CellIterator<CI>::get_interpolated_dof_values(
   const IndexSet &              in,
-  Vector<IndexSet::value_type> &out) const
+  Vector<IndexSet::value_type> &out,
+  const unsigned int level) const
 {
-  Assert(cell->is_active(), ExcNotImplemented());
+  //Assert(cell->is_active(), ExcNotImplemented());
 
   std::vector<types::global_dof_index> dof_indices(
     cell->get_fe().n_dofs_per_cell());
@@ -2897,7 +2904,8 @@ template <int dim, int spacedim>
 void
 FEValuesBase<dim, spacedim>::TriaCellIterator::get_interpolated_dof_values(
   const IndexSet &,
-  Vector<IndexSet::value_type> &) const
+  Vector<IndexSet::value_type> &,
+  const unsigned int level) const
 {
   Assert(false, ExcMessage(message_string));
 }

@@ -2652,16 +2652,16 @@ DoFCellAccessor<dimension_, space_dimension_, level_dof_access>::get_dof_values(
   ForwardIterator    local_values_end) const
 {
   (void)local_values_end;
-  Assert(this->is_artificial() == false,
-         ExcMessage("Can't ask for DoF indices on artificial cells."));
-  Assert(this->is_active(), ExcMessage("Cell must be active."));
+  //Assert(this->is_artificial() == false,
+  //       ExcMessage("Can't ask for DoF indices on artificial cells."));
+  //Assert(this->is_active(), ExcMessage("Cell must be active."));
   Assert(this->dof_handler != nullptr, typename BaseClass::ExcInvalidObject());
 
   Assert(static_cast<unsigned int>(local_values_end - local_values_begin) ==
            this->get_fe().n_dofs_per_cell(),
          typename DoFCellAccessor::ExcVectorDoesNotMatch());
-  Assert(values.size() == this->get_dof_handler().n_dofs(),
-         typename DoFCellAccessor::ExcVectorDoesNotMatch());
+  //Assert(values.size() == this->get_dof_handler().n_dofs(),
+  //       typename DoFCellAccessor::ExcVectorDoesNotMatch());
 
   const types::global_dof_index *cache =
     dealii::internal::DoFAccessorImplementation::Implementation::get_cache_ptr(

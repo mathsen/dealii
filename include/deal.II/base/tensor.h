@@ -170,25 +170,25 @@ public:
    * Copy constructor
    */
   constexpr DEAL_II_CUDA_HOST_DEV
-  Tensor(const Tensor<0, dim, Number> &other);
+  Tensor(const Tensor<0, dim, Number> &other) =default;
 
   /**
    * Copy assignment operator
    */
   constexpr DEAL_II_CUDA_HOST_DEV Tensor<0, dim, Number> &
-                                  operator=(const Tensor<0, dim, Number> &other);
+                                  operator=(const Tensor<0, dim, Number> &other) =default;
 
   /**
    * Move constructor
    */
   constexpr DEAL_II_CUDA_HOST_DEV
-    Tensor(Tensor<0, dim, Number> &&other) noexcept;
+    Tensor(Tensor<0, dim, Number> &&other) =default;
 
   /**
    * Move assignment operator
    */
   constexpr DEAL_II_CUDA_HOST_DEV Tensor<0, dim, Number> &
-                                  operator=(Tensor<0, dim, Number> &&other) noexcept;
+                                  operator=(Tensor<0, dim, Number> &&other) =default;
 
   /**
    * Return a pointer to the first element of the underlying storage.
@@ -561,24 +561,24 @@ public:
   /**
    * Copy constructor
    */
-  constexpr Tensor(const Tensor<rank_, dim, Number> &);
+  constexpr Tensor(const Tensor<rank_, dim, Number> &) =default;
 
   /**
    * Copy assignment operator
    */
   constexpr Tensor<rank_, dim, Number> &
-  operator=(const Tensor<rank_, dim, Number> &);
+  operator=(const Tensor<rank_, dim, Number> &) =default;
 
   /**
    * Move constructor
    */
-  constexpr Tensor(Tensor<rank_, dim, Number> &&) noexcept;
+  constexpr Tensor(Tensor<rank_, dim, Number> &&) =default;
 
   /**
    * Move assignment operator
    */
   constexpr Tensor<rank_, dim, Number> &
-  operator=(Tensor<rank_, dim, Number> &&) noexcept;
+  operator=(Tensor<rank_, dim, Number> &&) =default;
 
   /**
    * Read-Write access operator.
@@ -920,44 +920,6 @@ constexpr DEAL_II_ALWAYS_INLINE DEAL_II_CUDA_HOST_DEV
 
 
 template <int dim, typename Number>
-constexpr DEAL_II_ALWAYS_INLINE DEAL_II_CUDA_HOST_DEV
-                                Tensor<0, dim, Number>::Tensor(const Tensor<0, dim, Number> &other)
-{
-  value = other.value;
-}
-
-
-
-template <int dim, typename Number>
-constexpr DEAL_II_ALWAYS_INLINE DEAL_II_CUDA_HOST_DEV Tensor<0, dim, Number> &
-Tensor<0, dim, Number>::operator=(const Tensor<0, dim, Number> &other)
-{
-  value = other.value;
-  return *this;
-}
-
-
-
-template <int dim, typename Number>
-constexpr DEAL_II_ALWAYS_INLINE DEAL_II_CUDA_HOST_DEV
-                                Tensor<0, dim, Number>::Tensor(Tensor<0, dim, Number> &&other) noexcept
-{
-  value = std::move(other.value);
-}
-
-
-
-template <int dim, typename Number>
-constexpr DEAL_II_ALWAYS_INLINE DEAL_II_CUDA_HOST_DEV Tensor<0, dim, Number> &
-  Tensor<0, dim, Number>::operator=(Tensor<0, dim, Number> &&other) noexcept
-{
-  value = std::move(other.value);
-  return *this;
-}
-
-
-
-template <int dim, typename Number>
 inline Number *
 Tensor<0, dim, Number>::begin_raw()
 {
@@ -1275,45 +1237,6 @@ constexpr DEAL_II_ALWAYS_INLINE Tensor<rank_, dim, Number>::
                                 operator Tensor<1, dim, Tensor<rank_ - 1, dim, OtherNumber>>() const
 {
   return Tensor<1, dim, Tensor<rank_ - 1, dim, Number>>(values);
-}
-
-
-template <int rank_, int dim, typename Number>
-constexpr DEAL_II_ALWAYS_INLINE
-Tensor<rank_, dim, Number>::Tensor(const Tensor<rank_, dim, Number> &other)
-{
-  for (unsigned int i = 0; i < dim; ++i)
-    values[i] = other.values[i];
-}
-
-
-template <int rank_, int dim, typename Number>
-constexpr DEAL_II_ALWAYS_INLINE Tensor<rank_, dim, Number> &
-Tensor<rank_, dim, Number>::operator=(const Tensor<rank_, dim, Number> &other)
-{
-  for (unsigned int i = 0; i < dim; ++i)
-    values[i] = other.values[i];
-  return *this;
-}
-
-
-template <int rank_, int dim, typename Number>
-constexpr DEAL_II_ALWAYS_INLINE
-Tensor<rank_, dim, Number>::Tensor(Tensor<rank_, dim, Number> &&other) noexcept
-{
-  for (unsigned int i = 0; i < dim; ++i)
-    values[i] = other.values[i];
-}
-
-
-template <int rank_, int dim, typename Number>
-constexpr DEAL_II_ALWAYS_INLINE Tensor<rank_, dim, Number> &
-                                Tensor<rank_, dim, Number>::
-                                operator=(Tensor<rank_, dim, Number> &&other) noexcept
-{
-  for (unsigned int i = 0; i < dim; ++i)
-    values[i] = other.values[i];
-  return *this;
 }
 
 

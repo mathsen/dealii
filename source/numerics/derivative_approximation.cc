@@ -801,7 +801,7 @@ namespace DerivativeApproximation
                                                           solution,
                                                           component);
       // ...and the place where it lives
-      const Point<dim> this_center = fe_midpoint_value.quadrature_point(0);
+      const Point<dim> &this_center = fe_midpoint_value.quadrature_point(0);
 
       // loop over all neighbors and
       // accumulate the difference
@@ -839,7 +839,7 @@ namespace DerivativeApproximation
                 neighbor_fe_midpoint_value, solution, component);
 
           // ...and the place where it lives
-          const Point<dim> neighbor_center =
+          const Point<dim> &neighbor_center =
             neighbor_fe_midpoint_value.quadrature_point(0);
 
 

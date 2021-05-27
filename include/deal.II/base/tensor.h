@@ -166,6 +166,10 @@ public:
   constexpr DEAL_II_CUDA_HOST_DEV
   Tensor(const OtherNumber &initializer);
 
+// GCC 11 and Intel compiler implicitly delete certain operators
+// with Sacado::Rad::ADvar<> for unknown reason.
+// We manually define them as a workaround, see:
+// https://github.com/dealii/dealii/pull/12246
 #if __GNUC__ >= 11 || defined __INTEL_COMPILER
   /**
    * Copy constructor

@@ -32,6 +32,20 @@ template <typename Number>
 void
 test()
 {
+#if __GNUC__ >= 11 || defined __INTEL_COMPILER
+  deallog << "DerivativeForm<1, 2, 2> is trivially copyable: "
+          << !boost::has_trivial_copy<DerivativeForm<1, 2, 2, Number>>::value
+          << std::endl;
+  deallog << "DerivativeForm<2, 2, 2> is trivially copyable: "
+          << !boost::has_trivial_copy<DerivativeForm<2, 2, 2, Number>>::value
+          << std::endl;
+  deallog << "DerivativeForm<2, 2, 3> is trivially copyable: "
+          << !boost::has_trivial_copy<DerivativeForm<2, 2, 3, Number>>::value
+          << std::endl;
+  deallog << "DerivativeForm<2, 3, 3> is trivially copyable: "
+          << !boost::has_trivial_copy<DerivativeForm<2, 3, 3, Number>>::value
+          << std::endl;
+#elif
   deallog << "DerivativeForm<1, 2, 2> is trivially copyable: "
           << boost::has_trivial_copy<DerivativeForm<1, 2, 2, Number>>::value
           << std::endl;
@@ -44,6 +58,7 @@ test()
   deallog << "DerivativeForm<2, 3, 3> is trivially copyable: "
           << boost::has_trivial_copy<DerivativeForm<2, 3, 3, Number>>::value
           << std::endl;
+#endif
 }
 
 int

@@ -32,6 +32,27 @@ template <typename Number>
 void
 test()
 {
+#if __GNUC__ >= 11 || defined __INTEL_COMPILER
+  deallog << "SymmetricTensor<2, 1> is trivially copyable: "
+          << !boost::has_trivial_copy<SymmetricTensor<2, 1, Number>>::value
+          << std::endl;
+  deallog << "SymmetricTensor<2, 2> is trivially copyable: "
+          << !boost::has_trivial_copy<SymmetricTensor<2, 2, Number>>::value
+          << std::endl;
+  deallog << "SymmetricTensor<2, 3> is trivially copyable: "
+          << !boost::has_trivial_copy<SymmetricTensor<2, 3, Number>>::value
+          << std::endl;
+
+  deallog << "SymmetricTensor<4, 1> is trivially copyable: "
+          << !boost::has_trivial_copy<SymmetricTensor<4, 1, Number>>::value
+          << std::endl;
+  deallog << "SymmetricTensor<4, 2> is trivially copyable: "
+          << !boost::has_trivial_copy<SymmetricTensor<4, 2, Number>>::value
+          << std::endl;
+  deallog << "SymmetricTensor<4, 3> is trivially copyable: "
+          << !boost::has_trivial_copy<SymmetricTensor<4, 3, Number>>::value
+          << std::endl;
+#elif
   deallog << "SymmetricTensor<2, 1> is trivially copyable: "
           << boost::has_trivial_copy<SymmetricTensor<2, 1, Number>>::value
           << std::endl;
@@ -51,6 +72,7 @@ test()
   deallog << "SymmetricTensor<4, 3> is trivially copyable: "
           << boost::has_trivial_copy<SymmetricTensor<4, 3, Number>>::value
           << std::endl;
+#endif
 }
 
 int

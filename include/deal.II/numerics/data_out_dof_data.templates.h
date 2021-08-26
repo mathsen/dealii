@@ -555,6 +555,32 @@ namespace internal
   namespace DataOutImplementation
   {
     /**
+     * Test if T has reinit member with three parameters, so that a reinit
+     * function with ghost cells is available for T.
+     */
+    template <typename T, typename = void>
+    struct has_ghost_init : std::false_type
+    {};
+
+    template <typename T>
+    struct has_ghost_init<T,
+                          decltype(
+                            void(std::declval<T &>().reinit(dealii::IndexSet(),
+                                                            dealii::IndexSet(),
+                                                            MPI_COMM_WORLD)))>
+      : std::true_type
+    {};
+
+    template <typename T>
+    struct has_ghost_init<
+      T,
+      decltype(void(std::declval<T &>().reinit(std::vector<dealii::IndexSet>(),
+                                               std::vector<dealii::IndexSet>(),
+                                               MPI_COMM_WORLD)))>
+      : std::true_type
+    {};
+
+    /**
      * Extract the specified component of a number. This template is used when
      * the given value is assumed to be a real scalar, so asking for the real
      * part is the only valid choice for the second argument.
@@ -772,39 +798,35 @@ namespace internal
     {
       /**
        * Copy the data from an arbitrary non-block vector to a
-       * LinearAlgebra::distributed::Vector.
+       * LinearAlgebra::ReadWriteVector.
        */
       template <typename VectorType, typename Number>
       void
-      copy_locally_owned_data_from(
-        const VectorType &                          src,
-        LinearAlgebra::distributed::Vector<Number> &dst)
+      copy_locally_owned_data_from(const VectorType &                      src,
+                                   LinearAlgebra::ReadWriteVector<Number> &dst)
       {
         LinearAlgebra::ReadWriteVector<typename VectorType::value_type> temp;
         temp.reinit(src.locally_owned_elements());
         temp.import(src, VectorOperation::insert);
 
-        LinearAlgebra::ReadWriteVector<Number> temp2;
-        temp2.reinit(temp, true);
-        temp2 = temp;
-
-        dst.import(temp2, VectorOperation::insert);
+        dst.reinit(temp, true);
+        dst = temp;
       }
 
 #ifdef DEAL_II_WITH_TRILINOS
       template <typename Number>
       void
-      copy_locally_owned_data_from(
-        const TrilinosWrappers::MPI::Vector &       src,
-        LinearAlgebra::distributed::Vector<Number> &dst)
+      copy_locally_owned_data_from(const TrilinosWrappers::MPI::Vector &   src,
+                                   LinearAlgebra::ReadWriteVector<Number> &dst)
       {
         // ReadWriteVector does not work for ghosted
         // TrilinosWrappers::MPI::Vector objects. Fall back to copy the
         // entries manually.
-        for (const auto i : dst.locally_owned_elements())
+        for (const auto i : dst.get_stored_elements())
           dst[i] = src[i];
       }
 #endif
+
 
       /**
        * Create a ghosted-copy of a block dof vector.
@@ -813,18 +835,19 @@ namespace internal
                 int spacedim,
                 typename VectorType,
                 typename Number,
-                typename std::enable_if<IsBlockVector<VectorType>::value,
+                typename std::enable_if<IsBlockVector<VectorType>::value &&
+                                          has_ghost_init<VectorType>::value,
                                         VectorType>::type * = nullptr>
       void
-      create_dof_vector(const DoFHandler<dim, spacedim> &dof_handler,
-                        const VectorType &               src,
-                        LinearAlgebra::distributed::BlockVector<Number> &dst)
+      create_vector(const DoFHandler<dim, spacedim> &       dof_handler,
+                    const VectorType &                      src,
+                    LinearAlgebra::ReadWriteVector<Number> &dst)
       {
-        IndexSet locally_relevant_dofs;
+        const IndexSet &locally_owned_dofs = dof_handler.locally_owned_dofs();
+        IndexSet        locally_relevant_dofs;
         DoFTools::extract_locally_relevant_dofs(dof_handler,
                                                 locally_relevant_dofs);
-
-        const IndexSet &locally_owned_dofs = dof_handler.locally_owned_dofs();
+        dst.reinit(locally_relevant_dofs);
 
         std::vector<types::global_dof_index> n_indices_per_block(
           src.n_blocks());
@@ -837,20 +860,57 @@ namespace internal
         const auto locally_relevant_dofs_b =
           locally_relevant_dofs.split_by_block(n_indices_per_block);
 
-        dst.reinit(src.n_blocks());
+        VectorType temp_ghosted;
+        temp_ghosted.reinit(locally_owned_dofs_b,
+                            locally_relevant_dofs_b,
+                            dof_handler.get_communicator());
+        temp_ghosted = src;
 
-        for (unsigned int b = 0; b < src.n_blocks(); ++b)
-          {
-            dst.block(b).reinit(locally_owned_dofs_b[b],
-                                locally_relevant_dofs_b[b],
-                                dof_handler.get_communicator());
-            copy_locally_owned_data_from(src.block(b), dst.block(b));
-          }
-
-        dst.collect_sizes();
-
-        dst.update_ghost_values();
+        for (const auto i : dst.get_stored_elements())
+          dst[i] = temp_ghosted[i];
       }
+
+
+      /**
+       * Create a copy of a non ghostable block dof vector.
+       */
+      template <int dim,
+                int spacedim,
+                typename VectorType,
+                typename Number,
+                typename std::enable_if<IsBlockVector<VectorType>::value &&
+                                          !has_ghost_init<VectorType>::value,
+                                        VectorType>::type * = nullptr>
+      void
+      create_vector(const DoFHandler<dim, spacedim> & /*dof_handler*/,
+                    const VectorType &                      src,
+                    LinearAlgebra::ReadWriteVector<Number> &dst)
+      {
+        dst.reinit(src.locally_owned_elements());
+        for (const auto i : dst.get_stored_elements())
+          dst[i] = src[i];
+      }
+
+
+      /**
+       * Create a copy of a non ghostable and non-block dof vector.
+       */
+      template <int dim,
+                int spacedim,
+                typename VectorType,
+                typename Number,
+                typename std::enable_if<!IsBlockVector<VectorType>::value &&
+                                          !has_ghost_init<VectorType>::value,
+                                        VectorType>::type * = nullptr>
+      void
+      create_vector(const DoFHandler<dim, spacedim> & /*dof_handler*/,
+                    const VectorType &                      src,
+                    LinearAlgebra::ReadWriteVector<Number> &dst)
+      {
+        dst.reinit(src.locally_owned_elements());
+        copy_locally_owned_data_from(src, dst);
+      }
+
 
       /**
        * Create a ghosted-copy of a non-block dof vector.
@@ -859,77 +919,28 @@ namespace internal
                 int spacedim,
                 typename VectorType,
                 typename Number,
-                typename std::enable_if<!IsBlockVector<VectorType>::value,
+                typename std::enable_if<!IsBlockVector<VectorType>::value &&
+                                          has_ghost_init<VectorType>::value,
                                         VectorType>::type * = nullptr>
       void
-      create_dof_vector(const DoFHandler<dim, spacedim> &dof_handler,
-                        const VectorType &               src,
-                        LinearAlgebra::distributed::BlockVector<Number> &dst)
+      create_vector(const DoFHandler<dim, spacedim> &       dof_handler,
+                    const VectorType &                      src,
+                    LinearAlgebra::ReadWriteVector<Number> &dst)
       {
-        Assert(dof_handler.locally_owned_dofs().is_contiguous(),
-               ExcMessage(
-                 "You are trying to add a non-block vector with non-contiguous "
-                 "locally-owned index sets. This is not possible. Please "
-                 "consider to use an adequate block vector!"));
-
-        IndexSet locally_relevant_dofs;
+        IndexSet        locally_relevant_dofs;
+        const IndexSet &locally_owned_dofs = dof_handler.locally_owned_dofs();
         DoFTools::extract_locally_relevant_dofs(dof_handler,
                                                 locally_relevant_dofs);
 
-        dst.reinit(1);
-
-        dst.block(0).reinit(dof_handler.locally_owned_dofs(),
+        VectorType temp_ghosted;
+        temp_ghosted.reinit(locally_owned_dofs,
                             locally_relevant_dofs,
                             dof_handler.get_communicator());
-        copy_locally_owned_data_from(src, dst.block(0));
+        temp_ghosted = src;
+        dst.reinit(locally_relevant_dofs);
 
-        dst.collect_sizes();
-
-        dst.update_ghost_values();
-      }
-
-      /**
-       * Create a ghosted-copy of a block cell vector.
-       */
-      template <typename VectorType,
-                typename Number,
-                typename std::enable_if<IsBlockVector<VectorType>::value,
-                                        VectorType>::type * = nullptr>
-      void
-      create_cell_vector(const VectorType &                               src,
-                         LinearAlgebra::distributed::BlockVector<Number> &dst)
-      {
-        dst.reinit(src.n_blocks());
-
-        for (unsigned int b = 0; b < src.n_blocks(); ++b)
-          {
-            dst.block(b).reinit(src.get_block_indices().block_size(b));
-            copy_locally_owned_data_from(src.block(b), dst.block(b));
-          }
-
-        dst.collect_sizes();
-      }
-
-
-      /**
-       * Create a ghosted-copy of a non-block cell vector.
-       */
-      template <typename VectorType,
-                typename Number,
-                typename std::enable_if<!IsBlockVector<VectorType>::value,
-                                        VectorType>::type * = nullptr>
-      void
-      create_cell_vector(const VectorType &                               src,
-                         LinearAlgebra::distributed::BlockVector<Number> &dst)
-      {
-        dst.reinit(1);
-
-        dst.block(0).reinit(src.size());
-        copy_locally_owned_data_from(src, dst.block(0));
-
-        dst.collect_sizes();
-
-        dst.update_ghost_values();
+        for (const auto i : dst.get_stored_elements())
+          dst[i] = temp_ghosted[i];
       }
     } // namespace
 
@@ -1064,7 +1075,7 @@ namespace internal
        * source vector and stores it until we no longer need it. No reference
        * to the original source vector is necessary nor stored.
        */
-      LinearAlgebra::distributed::BlockVector<ScalarType> vector;
+      LinearAlgebra::ReadWriteVector<ScalarType> vector;
     };
 
 
@@ -1082,9 +1093,9 @@ namespace internal
       : DataEntryBase<dim, spacedim>(dofs, names, data_component_interpretation)
     {
       if (actual_type == DataVectorType::type_dof_data)
-        create_dof_vector(*dofs, *data, vector);
+        create_vector(*dofs, *data, vector);
       else if (actual_type == DataVectorType::type_cell_data)
-        create_cell_vector(*data, vector);
+        create_vector(*dofs, *data, vector);
       else
         Assert(false, ExcInternalError());
     }
@@ -1099,7 +1110,7 @@ namespace internal
       const DataPostprocessor<spacedim> *data_postprocessor)
       : DataEntryBase<dim, spacedim>(dofs, data_postprocessor)
     {
-      create_dof_vector(*dofs, *data, vector);
+      create_vector(*dofs, *data, vector);
     }
 
 
@@ -1111,8 +1122,8 @@ namespace internal
       const ComponentExtractor extract_component) const
     {
       return get_component(
-        internal::ElementAccess<LinearAlgebra::distributed::BlockVector<
-          ScalarType>>::get(vector, cell_number),
+        internal::ElementAccess<
+          LinearAlgebra::ReadWriteVector<ScalarType>>::get(vector, cell_number),
         extract_component);
     }
 

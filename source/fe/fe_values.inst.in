@@ -95,7 +95,7 @@ for (deal_II_dimension : DIMENSIONS; deal_II_space_dimension : SPACE_DIMENSIONS;
 
 
 
-for (VEC : VECTOR_TYPES; deal_II_dimension : DIMENSIONS;
+for (VEC : VECTOR_TYPES_MY; deal_II_dimension : DIMENSIONS;
      deal_II_space_dimension : SPACE_DIMENSIONS)
   {
 #if deal_II_dimension <= deal_II_space_dimension
@@ -357,7 +357,7 @@ for (VEC : GENERAL_CONTAINER_TYPES; Number : ALL_SCALAR_TYPES;
   }
 
 
-for (VEC : VECTOR_TYPES; deal_II_dimension : DIMENSIONS;
+for (VEC : VECTOR_TYPES_MY; deal_II_dimension : DIMENSIONS;
      deal_II_space_dimension : SPACE_DIMENSIONS)
   {
 #if deal_II_dimension <= deal_II_space_dimension

@@ -111,6 +111,46 @@ VECTOR_TYPES := {   Vector<double>;
                     @DEAL_II_EXPAND_PETSC_MPI_BLOCKVECTOR@;
                   }
 
+// All vector types, based on real or complex scalars
+VECTOR_TYPES_MY := {   Vector<double>;
+                    Vector<float> ;
+
+                    BlockVector<double>;
+                    BlockVector<float>;
+
+                    LinearAlgebra::Vector<double>;
+                    LinearAlgebra::Vector<float> ;
+
+                    LinearAlgebra::distributed::Vector<double>;
+                    LinearAlgebra::distributed::Vector<float> ;
+
+                    LinearAlgebra::distributed::BlockVector<double>;
+                    LinearAlgebra::distributed::BlockVector<float> ;
+
+                    LinearAlgebra::ReadWriteVector<double>;
+                    LinearAlgebra::ReadWriteVector<float>;
+                    LinearAlgebra::ReadWriteVector<std::complex<double> >;
+                    LinearAlgebra::ReadWriteVector<std::complex<float> >;
+
+
+                    @DEAL_II_EXPAND_COMPLEX_VECTORS@;
+                    @DEAL_II_EXPAND_COMPLEX_BLOCK_VECTORS@;
+                    @DEAL_II_EXPAND_COMPLEX_LA_VECTORS@;
+                    @DEAL_II_EXPAND_COMPLEX_LA_PARALLEL_VECTORS@;
+                    @DEAL_II_EXPAND_COMPLEX_LA_PARALLEL_BLOCK_VECTORS@;
+
+                    @DEAL_II_EXPAND_TRILINOS_MPI_VECTOR@;
+                    @DEAL_II_EXPAND_EPETRA_VECTOR@;
+                    @DEAL_II_EXPAND_TPETRA_VECTOR_DOUBLE@;
+                    @DEAL_II_EXPAND_TPETRA_VECTOR_FLOAT@;
+                    @DEAL_II_EXPAND_TPETRA_VECTOR_COMPLEX_DOUBLE@;
+                    @DEAL_II_EXPAND_TPETRA_VECTOR_COMPLEX_FLOAT@;
+                    @DEAL_II_EXPAND_PETSC_MPI_VECTOR@;
+
+                    @DEAL_II_EXPAND_TRILINOS_MPI_BLOCKVECTOR@;
+                    @DEAL_II_EXPAND_PETSC_MPI_BLOCKVECTOR@;
+                  }
+
 // same as VECTOR_TYPES but only real-valued vectors (and only with PETSc
 // vectors if the PETScScalar data type is real-valued)
 REAL_VECTOR_TYPES  := {  Vector<double>;

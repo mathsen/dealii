@@ -367,7 +367,7 @@ namespace Step72
 
               cell_rhs(i) -= (fe_values.shape_grad(i, q)  // \nabla \phi_i
                               * coeff                     // * a_n
-                              * old_solution_gradients[q] // * u_n
+                              * old_solution_gradients[q] // * \nabla u_n
                               * fe_values.JxW(q));        // * dx
             }
         }
@@ -587,7 +587,7 @@ namespace Step72
             {
               residual_ad[i] += (fe_values.shape_grad(i, q)   // \nabla \phi_i
                                  * coeff                      // * a_n
-                                 * old_solution_gradients[q]) // * u_n
+                                 * old_solution_gradients[q]) // * \nabla u_n
                                 * fe_values.JxW(q);           // * dx
             }
         }
@@ -920,8 +920,7 @@ namespace Step72
     evaluation_point = current_solution;
     evaluation_point.add(alpha, newton_update);
 
-    const QGauss<dim> quadrature_formula(fe.degree + 1);
-    FEValues<dim>     fe_values(fe,
+    FEValues<dim> fe_values(fe,
                             quadrature_formula,
                             update_gradients | update_quadrature_points |
                               update_JxW_values);
@@ -949,7 +948,7 @@ namespace Step72
             for (unsigned int i = 0; i < dofs_per_cell; ++i)
               cell_residual(i) -= (fe_values.shape_grad(i, q) // \nabla \phi_i
                                    * coeff                    // * a_n
-                                   * gradients[q]             // * u_n
+                                   * gradients[q]             // * \nabla u_n
                                    * fe_values.JxW(q));       // * dx
           }
 

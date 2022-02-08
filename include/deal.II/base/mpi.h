@@ -44,6 +44,9 @@ using MPI_Op       = int;
 #  ifndef MPI_COMM_SELF
 #    define MPI_COMM_SELF 0
 #  endif
+#  ifndef MPI_COMM_NULL
+#    define MPI_COMM_NULL 0
+#  endif
 #  ifndef MPI_REQUEST_NULL
 #    define MPI_REQUEST_NULL 0
 #  endif
@@ -497,6 +500,57 @@ namespace Utilities
                                 const Iterator  end,
                                 const MPI_Comm &comm);
 #endif
+
+
+    /**
+     * Create a object that contains an `MPI_Datatype` that represents @p n_bytes bytes.
+     *
+     * The resulting data type can be used in MPI send/receive or MPI IO to
+     * process messages of sizes larger than 2 GB with MPI_Byte as the
+     * underlying data type. This helper is required for MPI versions before 4.0
+     * because routines like `MPI_Send`
+     * use a signed interger for the @p count variable. Instead, you can use this
+     * data type with the appropriate size set to the size of your message and
+     * by passing
+     * 1 as the @p count.
+     *
+     * @note The function does not just return an object of type `MPI_Datatype`
+     *   because such objects need to be destroyed by a call to `MPI_Type_free`
+     *   and it is easy to forget to do so (thereby creating a resource leak).
+     *   Rather, the function returns an object that *points* to such an
+     *   `MPI_Datatype` object, but also has a "deleter" function that ensures
+     *   that `MPI_Type_free` is called whenever the object returned by this
+     *   function goes out of scope.
+     *
+     * Usage example:
+     * <code>
+     * std::vector<char> buffer;
+     * [...]
+     * if (buffer.size()<(1U<<31))
+     * {                               // less than 2GB of data
+     *   MPI_Send(buffer.data(), buffer.size(), MPI_BYTE, dest, tag, comm);
+     * }
+     * else
+     * {                               // more than 2GB of data
+     *   const auto bigtype =
+     *     Utilities::MPI::create_mpi_data_type_n_bytes(buffer.size());
+     *   MPI_Send(buffer.data(), 1, *bigtype, dest, tag, comm);
+     * }
+     * </code>
+     * Alternatively, the code in the `else` branch can be simplified to
+     * the following:
+     * <code>
+     * [...]
+     * else
+     * {                               // more than 2GB of data
+     *   MPI_Send(buffer.data(), 1,
+     *            *Utilities::MPI::create_mpi_data_type_n_bytes(buffer.size()),
+     *            dest, tag, comm);
+     * }
+     * </code>
+     */
+    std::unique_ptr<MPI_Datatype, void (*)(MPI_Datatype *)>
+    create_mpi_data_type_n_bytes(const std::size_t n_bytes);
 
     /**
      * Return the sum over all processors of the value @p t. This function is

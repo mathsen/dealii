@@ -790,11 +790,10 @@ namespace Euler_DG
                                                      VectorizedArrayType>::
                   template interpolate_quadrature<true, false>(
                     dim + 2,
+                    EvaluationFlags::values,
                     data.get_shape_info(),
                     buffer.data(),
                     phi_m.begin_values(),
-                    false,
-                    false,
                     face);
 
                 // Check if the face is an internal or a boundary face and
@@ -893,11 +892,10 @@ namespace Euler_DG
                                                      VectorizedArrayType>::
                   template interpolate_quadrature<false, true>(
                     dim + 2,
+                    EvaluationFlags::values,
                     data.get_shape_info(),
                     phi_m.begin_values(),
                     phi.begin_values(),
-                    false,
-                    false,
                     face);
               }
 
@@ -1524,10 +1522,10 @@ namespace Euler_DG
       pcout << "Running with "
             << Utilities::MPI::n_mpi_processes(MPI_COMM_WORLD)
             << " MPI processes" << std::endl;
-      pcout << "Vectorization over " << n_vect_number << " "
+      pcout << "Vectorization over " << n_vect_number << ' '
             << (std::is_same<Number, double>::value ? "doubles" : "floats")
             << " = " << n_vect_bits << " bits ("
-            << Utilities::System::get_current_vectorization_level() << ")"
+            << Utilities::System::get_current_vectorization_level() << ')'
             << std::endl;
     }
 

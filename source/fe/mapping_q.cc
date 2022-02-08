@@ -851,18 +851,18 @@ MappingQ<dim, spacedim>::requires_update_flags(const UpdateFlags in) const
       // update_boundary_forms is simply
       // ignored for the interior of a
       // cell.
-      if (out & (update_JxW_values | update_normal_vectors))
+      if ((out & (update_JxW_values | update_normal_vectors)) != 0u)
         out |= update_boundary_forms;
 
-      if (out & (update_covariant_transformation | update_JxW_values |
-                 update_jacobians | update_jacobian_grads |
-                 update_boundary_forms | update_normal_vectors))
+      if ((out & (update_covariant_transformation | update_JxW_values |
+                  update_jacobians | update_jacobian_grads |
+                  update_boundary_forms | update_normal_vectors)) != 0u)
         out |= update_contravariant_transformation;
 
-      if (out &
-          (update_inverse_jacobians | update_jacobian_pushed_forward_grads |
-           update_jacobian_pushed_forward_2nd_derivatives |
-           update_jacobian_pushed_forward_3rd_derivatives))
+      if ((out &
+           (update_inverse_jacobians | update_jacobian_pushed_forward_grads |
+            update_jacobian_pushed_forward_2nd_derivatives |
+            update_jacobian_pushed_forward_3rd_derivatives)) != 0u)
         out |= update_covariant_transformation;
 
       // The contravariant transformation is used in the Piola
@@ -871,12 +871,12 @@ MappingQ<dim, spacedim>::requires_update_flags(const UpdateFlags in) const
       // knowing here whether the finite element wants to use the
       // contravariant or the Piola transforms, we add the JxW values
       // to the list of flags to be updated for each cell.
-      if (out & update_contravariant_transformation)
+      if ((out & update_contravariant_transformation) != 0u)
         out |= update_volume_elements;
 
       // the same is true when computing normal vectors: they require
       // the determinant of the Jacobian
-      if (out & update_normal_vectors)
+      if ((out & update_normal_vectors) != 0u)
         out |= update_volume_elements;
     }
 
@@ -1047,7 +1047,7 @@ MappingQ<dim, spacedim>::fill_fe_values(
   // Multiply quadrature weights by absolute value of Jacobian determinants or
   // the area element g=sqrt(DX^t DX) in case of codim > 0
 
-  if (update_flags & (update_normal_vectors | update_JxW_values))
+  if ((update_flags & (update_normal_vectors | update_JxW_values)) != 0u)
     {
       AssertDimension(output_data.JxW_values.size(), n_q_points);
 
@@ -1099,12 +1099,12 @@ MappingQ<dim, spacedim>::fill_fe_values(
                     CellSimilarity::inverted_translation)
                   {
                     // we only need to flip the normal
-                    if (update_flags & update_normal_vectors)
+                    if ((update_flags & update_normal_vectors) != 0u)
                       output_data.normal_vectors[point] *= -1.;
                   }
                 else
                   {
-                    if (update_flags & update_normal_vectors)
+                    if ((update_flags & update_normal_vectors) != 0u)
                       {
                         Assert(spacedim == dim + 1,
                                ExcMessage(
@@ -1137,7 +1137,7 @@ MappingQ<dim, spacedim>::fill_fe_values(
 
 
   // copy values from InternalData to vector given by reference
-  if (update_flags & update_jacobians)
+  if ((update_flags & update_jacobians) != 0u)
     {
       AssertDimension(output_data.jacobians.size(), n_q_points);
       if (computed_cell_similarity != CellSimilarity::translation)
@@ -1146,7 +1146,7 @@ MappingQ<dim, spacedim>::fill_fe_values(
     }
 
   // copy values from InternalData to vector given by reference
-  if (update_flags & update_inverse_jacobians)
+  if ((update_flags & update_inverse_jacobians) != 0u)
     {
       AssertDimension(output_data.inverse_jacobians.size(), n_q_points);
       if (computed_cell_similarity != CellSimilarity::translation)
@@ -1261,6 +1261,139 @@ MappingQ<dim, spacedim>::fill_fe_subface_values(
 
 template <int dim, int spacedim>
 void
+MappingQ<dim, spacedim>::fill_fe_immersed_surface_values(
+  const typename Triangulation<dim, spacedim>::cell_iterator &cell,
+  const NonMatching::ImmersedSurfaceQuadrature<dim> &         quadrature,
+  const typename Mapping<dim, spacedim>::InternalDataBase &   internal_data,
+  dealii::internal::FEValuesImplementation::MappingRelatedData<dim, spacedim>
+    &output_data) const
+{
+  Assert(dim == spacedim, ExcNotImplemented());
+
+  // ensure that the following static_cast is really correct:
+  Assert(dynamic_cast<const InternalData *>(&internal_data) != nullptr,
+         ExcInternalError());
+  const InternalData &data = static_cast<const InternalData &>(internal_data);
+
+  const unsigned int n_q_points = quadrature.size();
+
+  data.mapping_support_points = this->compute_mapping_support_points(cell);
+  data.cell_of_current_support_points = cell;
+
+  internal::MappingQImplementation::maybe_compute_q_points<dim, spacedim>(
+    QProjector<dim>::DataSetDescriptor::cell(),
+    data,
+    output_data.quadrature_points);
+
+  internal::MappingQImplementation::maybe_update_Jacobians<dim, spacedim>(
+    CellSimilarity::none, QProjector<dim>::DataSetDescriptor::cell(), data);
+
+  internal::MappingQImplementation::maybe_update_jacobian_grads<dim, spacedim>(
+    CellSimilarity::none,
+    QProjector<dim>::DataSetDescriptor::cell(),
+    data,
+    output_data.jacobian_grads);
+
+  internal::MappingQImplementation::maybe_update_jacobian_pushed_forward_grads<
+    dim,
+    spacedim>(CellSimilarity::none,
+              QProjector<dim>::DataSetDescriptor::cell(),
+              data,
+              output_data.jacobian_pushed_forward_grads);
+
+  internal::MappingQImplementation::maybe_update_jacobian_2nd_derivatives<
+    dim,
+    spacedim>(CellSimilarity::none,
+              QProjector<dim>::DataSetDescriptor::cell(),
+              data,
+              output_data.jacobian_2nd_derivatives);
+
+  internal::MappingQImplementation::
+    maybe_update_jacobian_pushed_forward_2nd_derivatives<dim, spacedim>(
+      CellSimilarity::none,
+      QProjector<dim>::DataSetDescriptor::cell(),
+      data,
+      output_data.jacobian_pushed_forward_2nd_derivatives);
+
+  internal::MappingQImplementation::maybe_update_jacobian_3rd_derivatives<
+    dim,
+    spacedim>(CellSimilarity::none,
+              QProjector<dim>::DataSetDescriptor::cell(),
+              data,
+              output_data.jacobian_3rd_derivatives);
+
+  internal::MappingQImplementation::
+    maybe_update_jacobian_pushed_forward_3rd_derivatives<dim, spacedim>(
+      CellSimilarity::none,
+      QProjector<dim>::DataSetDescriptor::cell(),
+      data,
+      output_data.jacobian_pushed_forward_3rd_derivatives);
+
+  const UpdateFlags          update_flags = data.update_each;
+  const std::vector<double> &weights      = quadrature.get_weights();
+
+  if ((update_flags & (update_normal_vectors | update_JxW_values)) != 0u)
+    {
+      AssertDimension(output_data.JxW_values.size(), n_q_points);
+
+      Assert(!(update_flags & update_normal_vectors) ||
+               (output_data.normal_vectors.size() == n_q_points),
+             ExcDimensionMismatch(output_data.normal_vectors.size(),
+                                  n_q_points));
+
+
+      for (unsigned int point = 0; point < n_q_points; ++point)
+        {
+          const double det = data.contravariant[point].determinant();
+
+          // check for distorted cells.
+
+          // TODO: this allows for anisotropies of up to 1e6 in 3D and
+          // 1e12 in 2D. might want to find a finer
+          // (dimension-independent) criterion
+          Assert(det > 1e-12 * Utilities::fixed_power<dim>(
+                                 cell->diameter() / std::sqrt(double(dim))),
+                 (typename Mapping<dim, spacedim>::ExcDistortedMappedCell(
+                   cell->center(), det, point)));
+
+          // The normals are n = J^{-T} * \hat{n} before normalizing.
+          Tensor<1, spacedim> normal;
+          for (unsigned int d = 0; d < spacedim; d++)
+            normal[d] =
+              data.covariant[point][d] * quadrature.normal_vector(point);
+
+          output_data.JxW_values[point] = weights[point] * det * normal.norm();
+
+          if ((update_flags & update_normal_vectors) != 0u)
+            {
+              normal /= normal.norm();
+              output_data.normal_vectors[point] = normal;
+            }
+        }
+    }
+
+  // copy values from InternalData to vector given by reference
+  if ((update_flags & update_jacobians) != 0u)
+    {
+      AssertDimension(output_data.jacobians.size(), n_q_points);
+      for (unsigned int point = 0; point < n_q_points; ++point)
+        output_data.jacobians[point] = data.contravariant[point];
+    }
+
+  // copy values from InternalData to vector given by reference
+  if ((update_flags & update_inverse_jacobians) != 0u)
+    {
+      AssertDimension(output_data.inverse_jacobians.size(), n_q_points);
+      for (unsigned int point = 0; point < n_q_points; ++point)
+        output_data.inverse_jacobians[point] =
+          data.covariant[point].transpose();
+    }
+}
+
+
+
+template <int dim, int spacedim>
+void
 MappingQ<dim, spacedim>::fill_mapping_data_for_generic_points(
   const typename Triangulation<dim, spacedim>::cell_iterator &cell,
   const ArrayView<const Point<dim>> &                         unit_points,
@@ -1305,18 +1438,18 @@ MappingQ<dim, spacedim>::fill_mapping_data_for_generic_points(
             polynomial_degree == 1,
             renumber_lexicographic_to_hierarchic);
 
-        if (update_flags & update_quadrature_points)
+        if ((update_flags & update_quadrature_points) != 0u)
           for (unsigned int j = 0; j < n_lanes && i + j < n_points; ++j)
             for (unsigned int d = 0; d < spacedim; ++d)
               output_data.quadrature_points[i + j][d] = result.first[d][j];
 
-        if (update_flags & update_jacobians)
+        if ((update_flags & update_jacobians) != 0u)
           for (unsigned int j = 0; j < n_lanes && i + j < n_points; ++j)
             for (unsigned int d = 0; d < spacedim; ++d)
               for (unsigned int e = 0; e < dim; ++e)
                 output_data.jacobians[i + j][d][e] = result.second[e][d][j];
 
-        if (update_flags & update_inverse_jacobians)
+        if ((update_flags & update_inverse_jacobians) != 0u)
           {
             DerivativeForm<1, spacedim, dim, VectorizedArray<double>> jac(
               result.second);
@@ -1338,16 +1471,16 @@ MappingQ<dim, spacedim>::fill_mapping_data_for_generic_points(
             polynomial_degree == 1,
             renumber_lexicographic_to_hierarchic);
 
-        if (update_flags & update_quadrature_points)
+        if ((update_flags & update_quadrature_points) != 0u)
           output_data.quadrature_points[i] = result.first;
 
-        if (update_flags & update_jacobians)
+        if ((update_flags & update_jacobians) != 0u)
           {
             DerivativeForm<1, spacedim, dim> jac = result.second;
             output_data.jacobians[i]             = jac.transpose();
           }
 
-        if (update_flags & update_inverse_jacobians)
+        if ((update_flags & update_inverse_jacobians) != 0u)
           {
             DerivativeForm<1, spacedim, dim> jac(result.second);
             DerivativeForm<1, spacedim, dim> inv_jac = jac.covariant_form();

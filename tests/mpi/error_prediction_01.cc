@@ -26,6 +26,8 @@
 
 #include <deal.II/fe/fe_q.h>
 
+#include <deal.II/grid/filtered_iterator.h>
+
 #include <deal.II/hp/refinement.h>
 
 #include <deal.II/lac/vector.h>
@@ -100,23 +102,23 @@ test()
 
   // ----- verify ------
   deallog << "pre_adaptation" << std::endl;
-  for (const auto &cell : dh.active_cell_iterators())
-    if (cell->is_locally_owned())
-      {
-        deallog << " cell:" << cell->id().to_string()
-                << " fe_deg:" << cell->get_fe().degree
-                << " error:" << error_indicators[cell->active_cell_index()];
+  for (const auto &cell :
+       dh.active_cell_iterators() | IteratorFilters::LocallyOwnedCell())
+    {
+      deallog << " cell:" << cell->id().to_string()
+              << " fe_deg:" << cell->get_fe().degree
+              << " error:" << error_indicators[cell->active_cell_index()];
 
-        if (cell->coarsen_flag_set())
-          deallog << " coarsening";
-        else if (cell->refine_flag_set())
-          deallog << " refining";
+      if (cell->coarsen_flag_set())
+        deallog << " coarsening";
+      else if (cell->refine_flag_set())
+        deallog << " refining";
 
-        if (cell->future_fe_index_set())
-          deallog << " future_fe_deg:" << fes[cell->future_fe_index()].degree;
+      if (cell->future_fe_index_set())
+        deallog << " future_fe_deg:" << fes[cell->future_fe_index()].degree;
 
-        deallog << std::endl;
-      }
+      deallog << std::endl;
+    }
 
   // ----- execute adaptation -----
   parallel::distributed::CellDataTransfer<dim, dim, Vector<float>>
@@ -133,11 +135,11 @@ test()
 
   // ------ verify ------
   deallog << "post_adaptation" << std::endl;
-  for (const auto &cell : dh.active_cell_iterators())
-    if (cell->is_locally_owned())
-      deallog << " cell:" << cell->id().to_string()
-              << " predicted:" << predicted_errors(cell->active_cell_index())
-              << std::endl;
+  for (const auto &cell :
+       dh.active_cell_iterators() | IteratorFilters::LocallyOwnedCell())
+    deallog << " cell:" << cell->id().to_string()
+            << " predicted:" << predicted_errors(cell->active_cell_index())
+            << std::endl;
 
   // make sure no processor is hanging
   MPI_Barrier(MPI_COMM_WORLD);

@@ -1956,10 +1956,17 @@ namespace TrilinosWrappers
                                 const TrilinosWrappers::MPI::Vector &out)
       {
         Assert(in.trilinos_partitioner().SameAs(m.DomainMap()) == true,
-               ExcMessage(
-                 "Column map of matrix does not fit with vector map!"));
+               ExcMessage("The column partitioning of a matrix does not match "
+                          "the partitioning of a vector you are trying to "
+                          "multiply it with. Are you multiplying the "
+                          "matrix with a vector that has ghost elements?"));
         Assert(out.trilinos_partitioner().SameAs(m.RangeMap()) == true,
-               ExcMessage("Row map of matrix does not fit with vector map!"));
+               ExcMessage("The row partitioning of a matrix does not match "
+                          "the partitioning of a vector you are trying to "
+                          "put the result of a matrix-vector product in. "
+                          "Are you trying to put the product of the "
+                          "matrix with a vector into a vector that has "
+                          "ghost elements?"));
         (void)m;
         (void)in;
         (void)out;
@@ -2354,300 +2361,69 @@ namespace TrilinosWrappers
       TrilinosPayload::TrilinosPayload(
         const TrilinosWrappers::SparseMatrix &matrix_exemplar,
         const TrilinosWrappers::SparseMatrix &matrix)
-        : use_transpose(matrix_exemplar.trilinos_matrix().UseTranspose())
-        , communicator(matrix_exemplar.get_mpi_communicator())
-        , domain_map(
-            matrix_exemplar.locally_owned_domain_indices().make_trilinos_map(
-              communicator.Comm()))
-        , range_map(
-            matrix_exemplar.locally_owned_range_indices().make_trilinos_map(
-              communicator.Comm()))
-      {
-        vmult = [&matrix_exemplar, &matrix](Range &       tril_dst,
-                                            const Domain &tril_src) {
-          // Duplicated from TrilinosWrappers::SparseMatrix::vmult
-          Assert(&tril_src != &tril_dst,
-                 TrilinosWrappers::SparseMatrix::ExcSourceEqualsDestination());
-          Assert(matrix.trilinos_matrix().Filled(),
-                 TrilinosWrappers::SparseMatrix::ExcMatrixNotCompressed());
-          internal::check_vector_map_equality(
-            matrix_exemplar.trilinos_matrix(),
-            tril_src,
-            tril_dst,
-            matrix_exemplar.trilinos_matrix().UseTranspose());
-          internal::check_vector_map_equality(
-            matrix.trilinos_matrix(),
-            tril_src,
-            tril_dst,
-            matrix.trilinos_matrix().UseTranspose());
+        : TrilinosPayload(const_cast<Epetra_CrsMatrix &>(
+                            matrix.trilinos_matrix()),
+                          /*op_supports_inverse_operations = */ false,
+                          matrix_exemplar.trilinos_matrix().UseTranspose(),
+                          matrix_exemplar.get_mpi_communicator(),
+                          matrix_exemplar.locally_owned_domain_indices(),
+                          matrix_exemplar.locally_owned_range_indices())
+      {}
 
-          const int ierr = matrix.trilinos_matrix().Apply(tril_src, tril_dst);
-          AssertThrow(ierr == 0, ExcTrilinosError(ierr));
-        };
 
-        Tvmult = [&matrix_exemplar, &matrix](Domain &     tril_dst,
-                                             const Range &tril_src) {
-          // Duplicated from TrilinosWrappers::SparseMatrix::Tvmult
-          Assert(&tril_src != &tril_dst,
-                 TrilinosWrappers::SparseMatrix::ExcSourceEqualsDestination());
-          Assert(matrix.trilinos_matrix().Filled(),
-                 TrilinosWrappers::SparseMatrix::ExcMatrixNotCompressed());
-          internal::check_vector_map_equality(
-            matrix_exemplar.trilinos_matrix(),
-            tril_src,
-            tril_dst,
-            !matrix_exemplar.trilinos_matrix().UseTranspose());
-          internal::check_vector_map_equality(
-            matrix.trilinos_matrix(),
-            tril_src,
-            tril_dst,
-            !matrix.trilinos_matrix().UseTranspose());
 
-          Epetra_CrsMatrix &tril_mtrx_non_const =
-            const_cast<Epetra_CrsMatrix &>(matrix.trilinos_matrix());
-          tril_mtrx_non_const.SetUseTranspose(
-            !matrix.trilinos_matrix().UseTranspose());
-          const int ierr = matrix.trilinos_matrix().Apply(tril_src, tril_dst);
-          AssertThrow(ierr == 0, ExcTrilinosError(ierr));
-          tril_mtrx_non_const.SetUseTranspose(
-            !matrix.trilinos_matrix().UseTranspose());
-        };
+      TrilinosPayload::TrilinosPayload(
+        const TrilinosPayload &               payload_exemplar,
+        const TrilinosWrappers::SparseMatrix &matrix)
 
-        inv_vmult = [](Domain &, const Range &) {
-          Assert(false,
-                 ExcMessage("Uninitialized TrilinosPayload::inv_vmult called "
-                            "(Matrix constructor with matrix exemplar)"));
-        };
-
-        inv_Tvmult = [](Range &, const Domain &) {
-          Assert(false,
-                 ExcMessage("Uninitialized TrilinosPayload::inv_Tvmult called "
-                            "(Matrix constructor with matrix exemplar)"));
-        };
-      }
+        : TrilinosPayload(const_cast<Epetra_CrsMatrix &>(
+                            matrix.trilinos_matrix()),
+                          /*op_supports_inverse_operations = */ false,
+                          payload_exemplar.UseTranspose(),
+                          payload_exemplar.get_mpi_communicator(),
+                          payload_exemplar.locally_owned_domain_indices(),
+                          payload_exemplar.locally_owned_range_indices())
+      {}
 
 
 
       TrilinosPayload::TrilinosPayload(
         const TrilinosWrappers::SparseMatrix &    matrix_exemplar,
         const TrilinosWrappers::PreconditionBase &preconditioner)
-        : use_transpose(matrix_exemplar.trilinos_matrix().UseTranspose())
-        , communicator(matrix_exemplar.get_mpi_communicator())
-        , domain_map(
-            matrix_exemplar.locally_owned_domain_indices().make_trilinos_map(
-              communicator.Comm()))
-        , range_map(
-            matrix_exemplar.locally_owned_range_indices().make_trilinos_map(
-              communicator.Comm()))
-      {
-        vmult = [&matrix_exemplar, &preconditioner](Range &       tril_dst,
-                                                    const Domain &tril_src) {
-          // Duplicated from TrilinosWrappers::PreconditionBase::vmult
-          // as well as from TrilinosWrappers::SparseMatrix::Tvmult
-          Assert(&tril_src != &tril_dst,
-                 TrilinosWrappers::SparseMatrix::ExcSourceEqualsDestination());
-          internal::check_vector_map_equality(
-            matrix_exemplar.trilinos_matrix(),
-            tril_src,
-            tril_dst,
-            matrix_exemplar.trilinos_matrix().UseTranspose());
-          internal::check_vector_map_equality(
-            preconditioner.trilinos_operator(),
-            tril_src,
-            tril_dst,
-            preconditioner.trilinos_operator().UseTranspose());
-
-          const int ierr =
-            preconditioner.trilinos_operator().ApplyInverse(tril_src, tril_dst);
-          AssertThrow(ierr == 0, ExcTrilinosError(ierr));
-        };
-
-        Tvmult = [&matrix_exemplar, &preconditioner](Domain &     tril_dst,
-                                                     const Range &tril_src) {
-          // Duplicated from TrilinosWrappers::PreconditionBase::vmult
-          // as well as from TrilinosWrappers::SparseMatrix::Tvmult
-          Assert(&tril_src != &tril_dst,
-                 TrilinosWrappers::SparseMatrix::ExcSourceEqualsDestination());
-          internal::check_vector_map_equality(
-            matrix_exemplar.trilinos_matrix(),
-            tril_src,
-            tril_dst,
-            !matrix_exemplar.trilinos_matrix().UseTranspose());
-          internal::check_vector_map_equality(
-            preconditioner.trilinos_operator(),
-            tril_src,
-            tril_dst,
-            !preconditioner.trilinos_operator().UseTranspose());
-
-          preconditioner.trilinos_operator().SetUseTranspose(
-            !preconditioner.trilinos_operator().UseTranspose());
-          const int ierr =
-            preconditioner.trilinos_operator().ApplyInverse(tril_src, tril_dst);
-          AssertThrow(ierr == 0, ExcTrilinosError(ierr));
-          preconditioner.trilinos_operator().SetUseTranspose(
-            !preconditioner.trilinos_operator().UseTranspose());
-        };
-
-        inv_vmult = [&matrix_exemplar, &preconditioner](Domain &     tril_dst,
-                                                        const Range &tril_src) {
-          // Duplicated from TrilinosWrappers::PreconditionBase::vmult
-          // as well as from TrilinosWrappers::SparseMatrix::Tvmult
-          Assert(&tril_src != &tril_dst,
-                 TrilinosWrappers::SparseMatrix::ExcSourceEqualsDestination());
-          internal::check_vector_map_equality(
-            matrix_exemplar.trilinos_matrix(),
-            tril_src,
-            tril_dst,
-            !matrix_exemplar.trilinos_matrix().UseTranspose());
-          internal::check_vector_map_equality(
-            preconditioner.trilinos_operator(),
-            tril_src,
-            tril_dst,
-            !preconditioner.trilinos_operator().UseTranspose());
-
-          const int ierr =
-            preconditioner.trilinos_operator().ApplyInverse(tril_src, tril_dst);
-          AssertThrow(ierr == 0, ExcTrilinosError(ierr));
-        };
-
-        inv_Tvmult = [&matrix_exemplar,
-                      &preconditioner](Range &       tril_dst,
-                                       const Domain &tril_src) {
-          // Duplicated from TrilinosWrappers::PreconditionBase::vmult
-          // as well as from TrilinosWrappers::SparseMatrix::Tvmult
-          Assert(&tril_src != &tril_dst,
-                 TrilinosWrappers::SparseMatrix::ExcSourceEqualsDestination());
-          internal::check_vector_map_equality(
-            matrix_exemplar.trilinos_matrix(),
-            tril_src,
-            tril_dst,
-            matrix_exemplar.trilinos_matrix().UseTranspose());
-          internal::check_vector_map_equality(
-            preconditioner.trilinos_operator(),
-            tril_src,
-            tril_dst,
-            preconditioner.trilinos_operator().UseTranspose());
-
-          preconditioner.trilinos_operator().SetUseTranspose(
-            !preconditioner.trilinos_operator().UseTranspose());
-          const int ierr =
-            preconditioner.trilinos_operator().ApplyInverse(tril_src, tril_dst);
-          AssertThrow(ierr == 0, ExcTrilinosError(ierr));
-          preconditioner.trilinos_operator().SetUseTranspose(
-            !preconditioner.trilinos_operator().UseTranspose());
-        };
-      }
+        : TrilinosPayload(preconditioner.trilinos_operator(),
+                          /*op_supports_inverse_operations = */ true,
+                          matrix_exemplar.trilinos_matrix().UseTranspose(),
+                          matrix_exemplar.get_mpi_communicator(),
+                          matrix_exemplar.locally_owned_domain_indices(),
+                          matrix_exemplar.locally_owned_range_indices())
+      {}
 
 
 
       TrilinosPayload::TrilinosPayload(
         const TrilinosWrappers::PreconditionBase &preconditioner_exemplar,
         const TrilinosWrappers::PreconditionBase &preconditioner)
-        : use_transpose(
-            preconditioner_exemplar.trilinos_operator().UseTranspose())
-        , communicator(preconditioner_exemplar.get_mpi_communicator())
-        , domain_map(preconditioner_exemplar.locally_owned_domain_indices()
-                       .make_trilinos_map(communicator.Comm()))
-        , range_map(preconditioner_exemplar.locally_owned_range_indices()
-                      .make_trilinos_map(communicator.Comm()))
-      {
-        vmult = [&preconditioner_exemplar,
-                 &preconditioner](Range &tril_dst, const Domain &tril_src) {
-          // Duplicated from TrilinosWrappers::PreconditionBase::vmult
-          // as well as from TrilinosWrappers::SparseMatrix::Tvmult
-          Assert(&tril_src != &tril_dst,
-                 TrilinosWrappers::SparseMatrix::ExcSourceEqualsDestination());
-          internal::check_vector_map_equality(
-            preconditioner_exemplar.trilinos_operator(),
-            tril_src,
-            tril_dst,
-            preconditioner_exemplar.trilinos_operator().UseTranspose());
-          internal::check_vector_map_equality(
+        : TrilinosPayload(
             preconditioner.trilinos_operator(),
-            tril_src,
-            tril_dst,
-            preconditioner.trilinos_operator().UseTranspose());
+            /*op_supports_inverse_operations = */ true,
+            preconditioner_exemplar.trilinos_operator().UseTranspose(),
+            preconditioner_exemplar.get_mpi_communicator(),
+            preconditioner_exemplar.locally_owned_domain_indices(),
+            preconditioner_exemplar.locally_owned_range_indices())
+      {}
 
-          const int ierr =
-            preconditioner.trilinos_operator().Apply(tril_src, tril_dst);
-          AssertThrow(ierr == 0, ExcTrilinosError(ierr));
-        };
 
-        Tvmult = [&preconditioner_exemplar,
-                  &preconditioner](Domain &tril_dst, const Range &tril_src) {
-          // Duplicated from TrilinosWrappers::PreconditionBase::vmult
-          // as well as from TrilinosWrappers::SparseMatrix::Tvmult
-          Assert(&tril_src != &tril_dst,
-                 TrilinosWrappers::SparseMatrix::ExcSourceEqualsDestination());
-          internal::check_vector_map_equality(
-            preconditioner_exemplar.trilinos_operator(),
-            tril_src,
-            tril_dst,
-            !preconditioner_exemplar.trilinos_operator().UseTranspose());
-          internal::check_vector_map_equality(
-            preconditioner.trilinos_operator(),
-            tril_src,
-            tril_dst,
-            !preconditioner.trilinos_operator().UseTranspose());
 
-          preconditioner.trilinos_operator().SetUseTranspose(
-            !preconditioner.trilinos_operator().UseTranspose());
-          const int ierr =
-            preconditioner.trilinos_operator().Apply(tril_src, tril_dst);
-          AssertThrow(ierr == 0, ExcTrilinosError(ierr));
-          preconditioner.trilinos_operator().SetUseTranspose(
-            !preconditioner.trilinos_operator().UseTranspose());
-        };
-
-        inv_vmult = [&preconditioner_exemplar,
-                     &preconditioner](Domain &tril_dst, const Range &tril_src) {
-          // Duplicated from TrilinosWrappers::PreconditionBase::vmult
-          // as well as from TrilinosWrappers::SparseMatrix::Tvmult
-          Assert(&tril_src != &tril_dst,
-                 TrilinosWrappers::SparseMatrix::ExcSourceEqualsDestination());
-          internal::check_vector_map_equality(
-            preconditioner_exemplar.trilinos_operator(),
-            tril_src,
-            tril_dst,
-            !preconditioner_exemplar.trilinos_operator().UseTranspose());
-          internal::check_vector_map_equality(
-            preconditioner.trilinos_operator(),
-            tril_src,
-            tril_dst,
-            !preconditioner.trilinos_operator().UseTranspose());
-
-          const int ierr =
-            preconditioner.trilinos_operator().ApplyInverse(tril_src, tril_dst);
-          AssertThrow(ierr == 0, ExcTrilinosError(ierr));
-        };
-
-        inv_Tvmult = [&preconditioner_exemplar,
-                      &preconditioner](Range &       tril_dst,
-                                       const Domain &tril_src) {
-          // Duplicated from TrilinosWrappers::PreconditionBase::vmult
-          // as well as from TrilinosWrappers::SparseMatrix::Tvmult
-          Assert(&tril_src != &tril_dst,
-                 TrilinosWrappers::SparseMatrix::ExcSourceEqualsDestination());
-          internal::check_vector_map_equality(
-            preconditioner_exemplar.trilinos_operator(),
-            tril_src,
-            tril_dst,
-            preconditioner_exemplar.trilinos_operator().UseTranspose());
-          internal::check_vector_map_equality(
-            preconditioner.trilinos_operator(),
-            tril_src,
-            tril_dst,
-            preconditioner.trilinos_operator().UseTranspose());
-
-          preconditioner.trilinos_operator().SetUseTranspose(
-            !preconditioner.trilinos_operator().UseTranspose());
-          const int ierr =
-            preconditioner.trilinos_operator().ApplyInverse(tril_src, tril_dst);
-          AssertThrow(ierr == 0, ExcTrilinosError(ierr));
-          preconditioner.trilinos_operator().SetUseTranspose(
-            !preconditioner.trilinos_operator().UseTranspose());
-        };
-      }
+      TrilinosPayload::TrilinosPayload(
+        const TrilinosPayload &                   payload_exemplar,
+        const TrilinosWrappers::PreconditionBase &preconditioner)
+        : TrilinosPayload(preconditioner.trilinos_operator(),
+                          /*op_supports_inverse_operations = */ true,
+                          payload_exemplar.UseTranspose(),
+                          payload_exemplar.get_mpi_communicator(),
+                          payload_exemplar.locally_owned_domain_indices(),
+                          payload_exemplar.locally_owned_range_indices())
+      {}
 
 
 

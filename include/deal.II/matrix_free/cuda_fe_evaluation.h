@@ -26,10 +26,10 @@
 #  include <deal.II/lac/cuda_atomic.h>
 #  include <deal.II/lac/cuda_vector.h>
 
+#  include <deal.II/matrix_free/cuda_hanging_nodes_internal.h>
 #  include <deal.II/matrix_free/cuda_matrix_free.h>
 #  include <deal.II/matrix_free/cuda_matrix_free.templates.h>
 #  include <deal.II/matrix_free/cuda_tensor_product_kernels.h>
-#  include <deal.II/matrix_free/hanging_nodes_internal.h>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -494,10 +494,10 @@ namespace CUDAWrappers
     const unsigned int q_point = internal::compute_index<dim, n_q_points_1d>();
     const Number *     inv_jacobian = &inv_jac[q_point];
     gradient_type      grad;
-    for (int d_1 = 0; d_1 < dim; ++d_1)
+    for (unsigned int d_1 = 0; d_1 < dim; ++d_1)
       {
         Number tmp = 0.;
-        for (int d_2 = 0; d_2 < dim; ++d_2)
+        for (unsigned int d_2 = 0; d_2 < dim; ++d_2)
           tmp += inv_jacobian[padding_length * n_cells * (dim * d_2 + d_1)] *
                  gradients[d_2][q_point];
         grad[d_1] = tmp;
@@ -520,10 +520,10 @@ namespace CUDAWrappers
     // TODO optimize if the mesh is uniform
     const unsigned int q_point = internal::compute_index<dim, n_q_points_1d>();
     const Number *     inv_jacobian = &inv_jac[q_point];
-    for (int d_1 = 0; d_1 < dim; ++d_1)
+    for (unsigned int d_1 = 0; d_1 < dim; ++d_1)
       {
         Number tmp = 0.;
-        for (int d_2 = 0; d_2 < dim; ++d_2)
+        for (unsigned int d_2 = 0; d_2 < dim; ++d_2)
           tmp += inv_jacobian[n_cells * padding_length * (dim * d_1 + d_2)] *
                  grad_in[d_2];
         gradients[d_1][q_point] = tmp * JxW[q_point];

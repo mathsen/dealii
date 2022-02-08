@@ -1569,6 +1569,9 @@ DoFAccessor<structdim, dim, spacedim, level_dof_access>::mg_vertex_dof_index(
       fe_index_;
   (void)fe_index;
   Assert(this->dof_handler != nullptr, ExcInvalidObject());
+  Assert(this->dof_handler->mg_vertex_dofs.size() > 0,
+         ExcMessage("Multigrid DoF indices can only be accessed after "
+                    "DoFHandler::distribute_mg_dofs() has been called!"));
   AssertIndexRange(vertex, this->n_vertices());
   AssertIndexRange(i, this->dof_handler->get_fe(fe_index).n_dofs_per_vertex());
 
@@ -1580,30 +1583,6 @@ DoFAccessor<structdim, dim, spacedim, level_dof_access>::mg_vertex_dof_index(
     .get_index(level, i, this->dof_handler->get_fe().n_dofs_per_vertex());
 }
 
-
-template <int structdim, int dim, int spacedim, bool level_dof_access>
-inline void
-DoFAccessor<structdim, dim, spacedim, level_dof_access>::set_vertex_dof_index(
-  const unsigned int            vertex,
-  const unsigned int            i,
-  const types::global_dof_index index,
-  const unsigned int            fe_index_) const
-{
-  const unsigned int fe_index =
-    (this->dof_handler->hp_capability_enabled == false &&
-     fe_index_ == DoFHandler<dim, spacedim>::invalid_fe_index) ?
-      DoFHandler<dim, spacedim>::default_fe_index :
-      fe_index_;
-
-  dealii::internal::DoFAccessorImplementation::Implementation::set_dof_index(
-    *this->dof_handler,
-    0,
-    this->vertex_index(vertex),
-    fe_index,
-    i,
-    std::integral_constant<int, 0>(),
-    index);
-}
 
 
 template <int structdim, int dim, int spacedim, bool level_dof_access>
@@ -1706,6 +1685,9 @@ DoFAccessor<structdim, dim, spacedim, level_dof_access>::get_mg_dof_indices(
   const unsigned int                    fe_index_) const
 {
   Assert(this->dof_handler != nullptr, ExcInvalidObject());
+  Assert(this->dof_handler->mg_vertex_dofs.size() > 0,
+         ExcMessage("Multigrid DoF indices can only be accessed after "
+                    "DoFHandler::distribute_mg_dofs() has been called!"));
 
   const unsigned int fe_index =
     (this->dof_handler->hp_capability_enabled == false &&
@@ -1899,19 +1881,6 @@ DoFAccessor<0, 1, spacedim, level_dof_access>::set_dof_handler(
 template <int spacedim, bool level_dof_access>
 inline void
 DoFAccessor<0, 1, spacedim, level_dof_access>::set_dof_index(
-  const unsigned int /*i*/,
-  const types::global_dof_index /*index*/,
-  const unsigned int /*fe_index*/) const
-{
-  Assert(false, ExcNotImplemented());
-}
-
-
-
-template <int spacedim, bool level_dof_access>
-inline void
-DoFAccessor<0, 1, spacedim, level_dof_access>::set_vertex_dof_index(
-  const unsigned int /*vertex*/,
   const unsigned int /*i*/,
   const types::global_dof_index /*index*/,
   const unsigned int /*fe_index*/) const

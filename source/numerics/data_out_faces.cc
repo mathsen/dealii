@@ -99,31 +99,37 @@ DataOutFaces<dim, spacedim>::build_one_patch(
   internal::DataOutFacesImplementation::ParallelData<dim, spacedim> &data,
   DataOutBase::Patch<patch_dim, patch_spacedim> &                    patch)
 {
-  Assert(cell_and_face->first->is_locally_owned(), ExcNotImplemented());
+  const cell_iterator cell        = cell_and_face->first;
+  const unsigned int  face_number = cell_and_face->second;
 
-  // we use the mapping to transform the vertices. However, the mapping works
+  Assert(cell->is_locally_owned(), ExcNotImplemented());
+
+  // First set the kind of object we are dealing with here in the 'patch'
+  // object.
+  patch.reference_cell = cell->face(face_number)->reference_cell();
+
+  // We use the mapping to transform the vertices. However, the mapping works
   // on cells, not faces, so transform the face vertex to a cell vertex, that
   // to a unit cell vertex and then, finally, that to the mapped vertex. In
   // most cases this complicated procedure will be the identity.
-  for (unsigned int vertex = 0;
-       vertex < GeometryInfo<dim - 1>::vertices_per_cell;
-       ++vertex)
-    patch.vertices[vertex] =
-      data.mapping_collection[0].transform_unit_to_real_cell(
-        cell_and_face->first,
-        GeometryInfo<dim>::unit_cell_vertex(
-          GeometryInfo<dim>::face_to_cell_vertices(
-            cell_and_face->second,
-            vertex,
-            cell_and_face->first->face_orientation(cell_and_face->second),
-            cell_and_face->first->face_flip(cell_and_face->second),
-            cell_and_face->first->face_rotation(cell_and_face->second))));
+  for (const unsigned int vertex : cell->face(face_number)->vertex_indices())
+    {
+      const Point<dim> vertex_reference_coordinates =
+        cell->reference_cell().template vertex<dim>(
+          cell->reference_cell().face_to_cell_vertices(
+            face_number, vertex, cell->combined_face_orientation(face_number)));
+
+      const Point<dim> vertex_real_coordinates =
+        data.mapping_collection[0].transform_unit_to_real_cell(
+          cell, vertex_reference_coordinates);
+
+      patch.vertices[vertex] = vertex_real_coordinates;
+    }
+
 
   if (data.n_datasets > 0)
     {
-      data.reinit_all_fe_values(this->dof_data,
-                                cell_and_face->first,
-                                cell_and_face->second);
+      data.reinit_all_fe_values(this->dof_data, cell, face_number);
       const FEValuesBase<dim> &fe_patch_values = data.get_present_fe_values(0);
 
       const unsigned int n_q_points = fe_patch_values.n_quadrature_points;
@@ -132,9 +138,9 @@ DataOutFaces<dim, spacedim>::build_one_patch(
       Assert(patch.space_dim == dim, ExcInternalError());
       const std::vector<Point<dim>> &q_points =
         fe_patch_values.get_quadrature_points();
-      // resize the patch.data member in order to have enough memory for the
+      // size the patch.data member in order to have enough memory for the
       // quadrature points as well
-      patch.data.reinit(data.n_datasets + dim, patch.data.size(1));
+      patch.data.reinit(data.n_datasets + dim, q_points.size());
       // set the flag indicating that for this cell the points are explicitly
       // given
       patch.points_are_available = true;
@@ -166,39 +172,40 @@ DataOutFaces<dim, spacedim>::build_one_patch(
                 {
                   // at each point there is only one component of value,
                   // gradient etc.
-                  if (update_flags & update_values)
+                  if ((update_flags & update_values) != 0u)
                     this->dof_data[dataset]->get_function_values(
                       this_fe_patch_values,
                       internal::DataOutImplementation::ComponentExtractor::
                         real_part,
                       data.patch_values_scalar.solution_values);
-                  if (update_flags & update_gradients)
+                  if ((update_flags & update_gradients) != 0u)
                     this->dof_data[dataset]->get_function_gradients(
                       this_fe_patch_values,
                       internal::DataOutImplementation::ComponentExtractor::
                         real_part,
                       data.patch_values_scalar.solution_gradients);
-                  if (update_flags & update_hessians)
+                  if ((update_flags & update_hessians) != 0u)
                     this->dof_data[dataset]->get_function_hessians(
                       this_fe_patch_values,
                       internal::DataOutImplementation::ComponentExtractor::
                         real_part,
                       data.patch_values_scalar.solution_hessians);
 
-                  if (update_flags & update_quadrature_points)
+                  if ((update_flags & update_quadrature_points) != 0u)
                     data.patch_values_scalar.evaluation_points =
                       this_fe_patch_values.get_quadrature_points();
 
-                  if (update_flags & update_normal_vectors)
+                  if ((update_flags & update_normal_vectors) != 0u)
                     data.patch_values_scalar.normals =
                       this_fe_patch_values.get_normal_vectors();
 
                   const typename DoFHandler<dim, spacedim>::active_cell_iterator
-                    dh_cell(&cell_and_face->first->get_triangulation(),
-                            cell_and_face->first->level(),
-                            cell_and_face->first->index(),
+                    dh_cell(&cell->get_triangulation(),
+                            cell->level(),
+                            cell->index(),
                             this->dof_data[dataset]->dof_handler);
-                  data.patch_values_scalar.template set_cell<dim>(dh_cell);
+                  data.patch_values_scalar.template set_cell_and_face<dim>(
+                    dh_cell, face_number);
 
                   postprocessor->evaluate_scalar_field(
                     data.patch_values_scalar,
@@ -209,39 +216,40 @@ DataOutFaces<dim, spacedim>::build_one_patch(
                   // at each point there is a vector valued function and its
                   // derivative...
                   data.resize_system_vectors(n_components);
-                  if (update_flags & update_values)
+                  if ((update_flags & update_values) != 0u)
                     this->dof_data[dataset]->get_function_values(
                       this_fe_patch_values,
                       internal::DataOutImplementation::ComponentExtractor::
                         real_part,
                       data.patch_values_system.solution_values);
-                  if (update_flags & update_gradients)
+                  if ((update_flags & update_gradients) != 0u)
                     this->dof_data[dataset]->get_function_gradients(
                       this_fe_patch_values,
                       internal::DataOutImplementation::ComponentExtractor::
                         real_part,
                       data.patch_values_system.solution_gradients);
-                  if (update_flags & update_hessians)
+                  if ((update_flags & update_hessians) != 0u)
                     this->dof_data[dataset]->get_function_hessians(
                       this_fe_patch_values,
                       internal::DataOutImplementation::ComponentExtractor::
                         real_part,
                       data.patch_values_system.solution_hessians);
 
-                  if (update_flags & update_quadrature_points)
+                  if ((update_flags & update_quadrature_points) != 0u)
                     data.patch_values_system.evaluation_points =
                       this_fe_patch_values.get_quadrature_points();
 
-                  if (update_flags & update_normal_vectors)
+                  if ((update_flags & update_normal_vectors) != 0u)
                     data.patch_values_system.normals =
                       this_fe_patch_values.get_normal_vectors();
 
                   const typename DoFHandler<dim, spacedim>::active_cell_iterator
-                    dh_cell(&cell_and_face->first->get_triangulation(),
-                            cell_and_face->first->level(),
-                            cell_and_face->first->index(),
+                    dh_cell(&cell->get_triangulation(),
+                            cell->level(),
+                            cell->index(),
                             this->dof_data[dataset]->dof_handler);
-                  data.patch_values_system.template set_cell<dim>(dh_cell);
+                  data.patch_values_system.template set_cell_and_face<dim>(
+                    dh_cell, face_number);
 
                   postprocessor->evaluate_vector_field(
                     data.patch_values_system,
@@ -294,15 +302,14 @@ DataOutFaces<dim, spacedim>::build_one_patch(
           // belongs in order to access the cell data. this is not readily
           // available, so choose the following rather inefficient way:
           Assert(
-            cell_and_face->first->is_active(),
+            cell->is_active(),
             ExcMessage(
               "The current function is trying to generate cell-data output "
               "for a face that does not belong to an active cell. This is "
               "not supported."));
           const unsigned int cell_number = std::distance(
             this->triangulation->begin_active(),
-            typename Triangulation<dim, spacedim>::active_cell_iterator(
-              cell_and_face->first));
+            typename Triangulation<dim, spacedim>::active_cell_iterator(cell));
 
           const double value = this->cell_data[dataset]->get_cell_data_value(
             cell_number,
@@ -317,9 +324,17 @@ DataOutFaces<dim, spacedim>::build_one_patch(
 
 template <int dim, int spacedim>
 void
-DataOutFaces<dim, spacedim>::build_patches(const unsigned int n_subdivisions_)
+DataOutFaces<dim, spacedim>::build_patches(const unsigned int n_subdivisions)
 {
-  build_patches(StaticMappingQ1<dim, spacedim>::mapping, n_subdivisions_);
+  if (this->triangulation->get_reference_cells().size() == 1)
+    build_patches(this->triangulation->get_reference_cells()[0]
+                    .template get_default_linear_mapping<dim, spacedim>(),
+                  n_subdivisions);
+  else
+    Assert(false,
+           ExcMessage("The DataOutFaces class can currently not be "
+                      "used on meshes that do not have the same cell type "
+                      "throughout."))
 }
 
 
@@ -387,9 +402,6 @@ DataOutFaces<dim, spacedim>::build_patches(
     update_flags);
   DataOutBase::Patch<patch_dim, patch_spacedim> sample_patch;
   sample_patch.n_subdivisions = n_subdivisions;
-  sample_patch.data.reinit(n_datasets,
-                           Utilities::fixed_power<patch_dim>(n_subdivisions +
-                                                             1));
 
   // now build the patches in parallel
   WorkStream::run(
@@ -418,8 +430,8 @@ DataOutFaces<dim, spacedim>::first_face()
   // simply find first active cell with a face on the boundary
   for (const auto &cell : this->triangulation->active_cell_iterators())
     if (cell->is_locally_owned())
-      for (const unsigned int f : GeometryInfo<dim>::face_indices())
-        if (!surface_only || cell->face(f)->at_boundary())
+      for (const unsigned int f : cell->face_indices())
+        if ((surface_only == false) || cell->face(f)->at_boundary())
           return FaceDescriptor(cell, f);
 
   // just return an invalid descriptor if we haven't found a locally
@@ -439,8 +451,7 @@ DataOutFaces<dim, spacedim>::next_face(const FaceDescriptor &old_face)
   // first check whether the present cell has more faces on the boundary. since
   // we started with this face, its cell must clearly be locally owned
   Assert(face.first->is_locally_owned(), ExcInternalError());
-  for (unsigned int f = face.second + 1; f < GeometryInfo<dim>::faces_per_cell;
-       ++f)
+  for (unsigned int f = face.second + 1; f < face.first->n_faces(); ++f)
     if (!surface_only || face.first->face(f)->at_boundary())
       // yup, that is so, so return it
       {
@@ -464,7 +475,7 @@ DataOutFaces<dim, spacedim>::next_face(const FaceDescriptor &old_face)
       // check all the faces of this active cell. but skip it altogether
       // if it isn't locally owned
       if (active_cell->is_locally_owned())
-        for (const unsigned int f : GeometryInfo<dim>::face_indices())
+        for (const unsigned int f : face.first->face_indices())
           if (!surface_only || active_cell->face(f)->at_boundary())
             {
               face.first  = active_cell;

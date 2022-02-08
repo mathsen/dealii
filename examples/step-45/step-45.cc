@@ -384,7 +384,7 @@ namespace Step45
       constraints.clear();
       constraints.reinit(locally_relevant_dofs);
 
-      FEValuesExtractors::Vector velocities(0);
+      const FEValuesExtractors::Vector velocities(0);
 
       DoFTools::make_hanging_node_constraints(dof_handler, constraints);
       VectorTools::interpolate_boundary_values(mapping,
@@ -462,19 +462,6 @@ namespace Step45
                                                        fe.component_mask(
                                                          velocities),
                                                        first_vector_components);
-
-      VectorTools::interpolate_boundary_values(mapping,
-                                               dof_handler,
-                                               0,
-                                               BoundaryValues<dim>(),
-                                               constraints,
-                                               fe.component_mask(velocities));
-      VectorTools::interpolate_boundary_values(mapping,
-                                               dof_handler,
-                                               1,
-                                               BoundaryValues<dim>(),
-                                               constraints,
-                                               fe.component_mask(velocities));
     }
 
     constraints.close();
@@ -747,7 +734,7 @@ namespace Step45
   {
     Vector<float> estimated_error_per_cell(triangulation.n_active_cells());
 
-    FEValuesExtractors::Scalar pressure(dim);
+    const FEValuesExtractors::Scalar pressure(dim);
     KellyErrorEstimator<dim>::estimate(
       dof_handler,
       QGauss<dim - 1>(degree + 1),

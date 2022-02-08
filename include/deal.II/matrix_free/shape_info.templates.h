@@ -26,6 +26,7 @@
 #include <deal.II/base/tensor_product_polynomials.h>
 #include <deal.II/base/utilities.h>
 
+#include <deal.II/fe/fe.h>
 #include <deal.II/fe/fe_dgp.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/fe_poly.h>
@@ -61,8 +62,6 @@ namespace internal
     {}
 
 
-
-    // ----------------- actual ShapeInfo functions --------------------
 
     template <typename Number>
     Number
@@ -196,6 +195,8 @@ namespace internal
 
 
 
+    // ----------------- actual ShapeInfo implementation --------------------
+
     template <typename Number>
     ShapeInfo<Number>::ShapeInfo()
       : element_type(tensor_general)
@@ -210,62 +211,33 @@ namespace internal
 
 
     template <typename Number>
-    template <int dim, int spacedim>
-    bool
-    ShapeInfo<Number>::is_supported(const FiniteElement<dim, spacedim> &fe)
+    template <int dim, int spacedim, int dim_q>
+    inline ShapeInfo<Number>::ShapeInfo(
+      const Quadrature<dim_q> &           quad,
+      const FiniteElement<dim, spacedim> &fe_in,
+      const unsigned int                  base_element_number)
+      : element_type(tensor_general)
+      , n_dimensions(0)
+      , n_components(0)
+      , n_q_points(0)
+      , dofs_per_component_on_cell(0)
+      , n_q_points_face(0)
+      , dofs_per_component_on_face(0)
     {
-      if (dim != spacedim)
-        return false;
-
-      for (unsigned int base = 0; base < fe.n_base_elements(); ++base)
-        {
-          const FiniteElement<dim, spacedim> *fe_ptr = &(fe.base_element(base));
-          if (fe_ptr->n_components() != 1)
-            return false;
-
-          // then check if the base element is supported or not
-          if (dynamic_cast<const FE_Poly<dim, spacedim> *>(fe_ptr) != nullptr)
-            {
-              const FE_Poly<dim, spacedim> *fe_poly_ptr =
-                dynamic_cast<const FE_Poly<dim, spacedim> *>(fe_ptr);
-              // Simplices are a special case since the polynomial family is not
-              // indicative of their support
-              if (dynamic_cast<const FE_SimplexP<dim> *>(fe_poly_ptr) ||
-                  dynamic_cast<const FE_SimplexDGP<dim> *>(fe_poly_ptr) ||
-                  dynamic_cast<const FE_WedgeP<dim> *>(fe_poly_ptr) ||
-                  dynamic_cast<const FE_PyramidP<dim> *>(fe_poly_ptr))
-                return true;
-
-              if (dynamic_cast<const TensorProductPolynomials<dim> *>(
-                    &fe_poly_ptr->get_poly_space()) == nullptr &&
-                  dynamic_cast<const TensorProductPolynomials<
-                      dim,
-                      Polynomials::PiecewisePolynomial<double>> *>(
-                    &fe_poly_ptr->get_poly_space()) == nullptr &&
-                  dynamic_cast<const FE_DGP<dim, spacedim> *>(fe_ptr) ==
-                    nullptr &&
-                  dynamic_cast<const FE_Q_DG0<dim, spacedim> *>(fe_ptr) ==
-                    nullptr)
-                return false;
-            }
-          else
-            return false;
-        }
-
-      // if we arrived here, all base elements were supported so we can
-      // support the present element
-      return true;
+      reinit(quad, fe_in, base_element_number);
     }
 
 
 
     template <typename Number>
-    template <int dim, int dim_q>
+    template <int dim, int spacedim, int dim_q>
     void
-    ShapeInfo<Number>::reinit(const Quadrature<dim_q> & quad_in,
-                              const FiniteElement<dim> &fe_in,
-                              const unsigned int        base_element_number)
+    ShapeInfo<Number>::reinit(const Quadrature<dim_q> &           quad_in,
+                              const FiniteElement<dim, spacedim> &fe_in,
+                              const unsigned int base_element_number)
     {
+      static_assert(dim == spacedim,
+                    "Currently, only the case dim=spacedim is implemented");
       if (quad_in.is_tensor_product() == false ||
           dynamic_cast<const FE_SimplexP<dim> *>(
             &fe_in.base_element(base_element_number)) ||
@@ -332,7 +304,7 @@ namespace internal
 
                 const auto grad = fe.shape_grad(i, quad.point(q));
 
-                for (int d = 0; d < dim; ++d)
+                for (unsigned int d = 0; d < dim; ++d)
                   shape_gradients[d * n_dofs * n_q_points + i * n_q_points +
                                   q] = grad[d];
               }
@@ -422,7 +394,7 @@ namespace internal
 
                               const auto grad = fe.shape_grad(i, point);
 
-                              for (int d = 0; d < dim; ++d)
+                              for (unsigned int d = 0; d < dim; ++d)
                                 shape_gradients_face(
                                   f, o, d, i * n_q_points_face + q) = grad[d];
                             }
@@ -627,18 +599,31 @@ namespace internal
 
       if (dim > 1 && dynamic_cast<const FE_Q<dim> *>(&fe))
         {
-          auto &subface_interpolation_matrix =
-            univariate_shape_data.subface_interpolation_matrix;
+          auto &subface_interpolation_matrix_0 =
+            univariate_shape_data.subface_interpolation_matrices[0];
+          auto &subface_interpolation_matrix_1 =
+            univariate_shape_data.subface_interpolation_matrices[1];
+          auto &subface_interpolation_matrix_scalar_0 =
+            univariate_shape_data.subface_interpolation_matrices_scalar[0];
+          auto &subface_interpolation_matrix_scalar_1 =
+            univariate_shape_data.subface_interpolation_matrices_scalar[1];
 
           const auto fe_1d = create_fe<1>(fe);
           const auto fe_2d = create_fe<2>(fe);
 
-          FullMatrix<double> interpolation_matrix(fe_2d->n_dofs_per_face(0),
-                                                  fe_2d->n_dofs_per_face(0));
+          FullMatrix<double> interpolation_matrix_0(fe_2d->n_dofs_per_face(0),
+                                                    fe_2d->n_dofs_per_face(0));
+          FullMatrix<double> interpolation_matrix_1(fe_2d->n_dofs_per_face(0),
+                                                    fe_2d->n_dofs_per_face(0));
 
           fe_2d->get_subface_interpolation_matrix(*fe_2d,
                                                   0,
-                                                  interpolation_matrix,
+                                                  interpolation_matrix_0,
+                                                  0);
+
+          fe_2d->get_subface_interpolation_matrix(*fe_2d,
+                                                  1,
+                                                  interpolation_matrix_1,
                                                   0);
 
           ElementType               element_type;
@@ -652,14 +637,33 @@ namespace internal
                                                 scalar_lexicographic,
                                                 lexicographic_numbering);
 
-          subface_interpolation_matrix.resize(fe_1d->n_dofs_per_cell() *
-                                              fe_1d->n_dofs_per_cell());
+          subface_interpolation_matrix_0.resize(fe_1d->n_dofs_per_cell() *
+                                                fe_1d->n_dofs_per_cell());
+          subface_interpolation_matrix_1.resize(fe_1d->n_dofs_per_cell() *
+                                                fe_1d->n_dofs_per_cell());
+
+          subface_interpolation_matrix_scalar_0.resize(
+            fe_1d->n_dofs_per_cell() * fe_1d->n_dofs_per_cell());
+          subface_interpolation_matrix_scalar_1.resize(
+            fe_1d->n_dofs_per_cell() * fe_1d->n_dofs_per_cell());
 
           for (unsigned int i = 0, c = 0; i < fe_1d->n_dofs_per_cell(); ++i)
             for (unsigned int j = 0; j < fe_1d->n_dofs_per_cell(); ++j, ++c)
-              subface_interpolation_matrix[c] =
-                interpolation_matrix(scalar_lexicographic[i],
-                                     scalar_lexicographic[j]);
+              {
+                subface_interpolation_matrix_0[c] =
+                  interpolation_matrix_0(scalar_lexicographic[i],
+                                         scalar_lexicographic[j]);
+                subface_interpolation_matrix_1[c] =
+                  interpolation_matrix_1(scalar_lexicographic[i],
+                                         scalar_lexicographic[j]);
+
+                subface_interpolation_matrix_scalar_0[c] =
+                  interpolation_matrix_0(scalar_lexicographic[i],
+                                         scalar_lexicographic[j]);
+                subface_interpolation_matrix_scalar_1[c] =
+                  interpolation_matrix_1(scalar_lexicographic[i],
+                                         scalar_lexicographic[j]);
+              }
         }
 
       // get gradient and Hessian transformation matrix for the polynomial
@@ -850,40 +854,13 @@ namespace internal
           // (similar to MappingInfoStorage::QuadratureDescriptor::initialize)
           if (dim == 3)
             {
-              const unsigned int n = fe_degree + 1;
-              face_orientations.reinit(8, n * n);
-              for (unsigned int j = 0, i = 0; j < n; ++j)
-                for (unsigned int k = 0; k < n; ++k, ++i)
-                  {
-                    // face_orientation=true,  face_flip=false,
-                    // face_rotation=false
-                    face_orientations[0][i] = i;
-                    // face_orientation=false, face_flip=false,
-                    // face_rotation=false
-                    face_orientations[1][i] = j + k * n;
-                    // face_orientation=true,  face_flip=true,
-                    // face_rotation=false
-                    face_orientations[2][i] = (n - 1 - k) + (n - 1 - j) * n;
-                    // face_orientation=false, face_flip=true,
-                    // face_rotation=false
-                    face_orientations[3][i] = (n - 1 - j) + (n - 1 - k) * n;
-                    // face_orientation=true,  face_flip=false,
-                    // face_rotation=true
-                    face_orientations[4][i] = j + (n - 1 - k) * n;
-                    // face_orientation=false, face_flip=false,
-                    // face_rotation=true
-                    face_orientations[5][i] = k + (n - 1 - j) * n;
-                    // face_orientation=true,  face_flip=true,
-                    // face_rotation=true
-                    face_orientations[6][i] = (n - 1 - j) + k * n;
-                    // face_orientation=false, face_flip=true,
-                    // face_rotation=true
-                    face_orientations[7][i] = (n - 1 - k) + j * n;
-                  }
+              face_orientations_dofs = compute_orientation_table(fe_degree + 1);
+              face_orientations_quad = compute_orientation_table(n_q_points_1d);
             }
           else
             {
-              face_orientations.reinit(1, 1);
+              face_orientations_dofs.reinit(1, 1);
+              face_orientations_quad.reinit(1, 1);
             }
         }
 
@@ -1099,6 +1076,86 @@ namespace internal
                 return false;
             }
       return true;
+    }
+
+
+
+    template <typename Number>
+    template <int dim, int spacedim>
+    bool
+    ShapeInfo<Number>::is_supported(const FiniteElement<dim, spacedim> &fe)
+    {
+      if (dim != spacedim)
+        return false;
+
+      for (unsigned int base = 0; base < fe.n_base_elements(); ++base)
+        {
+          const FiniteElement<dim, spacedim> *fe_ptr = &(fe.base_element(base));
+          if (fe_ptr->n_components() != 1)
+            return false;
+
+          // then check if the base element is supported or not
+          if (dynamic_cast<const FE_Poly<dim, spacedim> *>(fe_ptr) != nullptr)
+            {
+              const FE_Poly<dim, spacedim> *fe_poly_ptr =
+                dynamic_cast<const FE_Poly<dim, spacedim> *>(fe_ptr);
+              // Simplices are a special case since the polynomial family is not
+              // indicative of their support
+              if (dynamic_cast<const FE_SimplexP<dim> *>(fe_poly_ptr) ||
+                  dynamic_cast<const FE_SimplexDGP<dim> *>(fe_poly_ptr) ||
+                  dynamic_cast<const FE_WedgeP<dim> *>(fe_poly_ptr) ||
+                  dynamic_cast<const FE_PyramidP<dim> *>(fe_poly_ptr))
+                return true;
+
+              if (dynamic_cast<const TensorProductPolynomials<dim> *>(
+                    &fe_poly_ptr->get_poly_space()) == nullptr &&
+                  dynamic_cast<const TensorProductPolynomials<
+                      dim,
+                      Polynomials::PiecewisePolynomial<double>> *>(
+                    &fe_poly_ptr->get_poly_space()) == nullptr &&
+                  dynamic_cast<const FE_DGP<dim, spacedim> *>(fe_ptr) ==
+                    nullptr &&
+                  dynamic_cast<const FE_Q_DG0<dim, spacedim> *>(fe_ptr) ==
+                    nullptr)
+                return false;
+            }
+          else
+            return false;
+        }
+
+      // if we arrived here, all base elements were supported so we can
+      // support the present element
+      return true;
+    }
+
+
+
+    template <typename Number>
+    Table<2, unsigned int>
+    ShapeInfo<Number>::compute_orientation_table(const unsigned int n)
+    {
+      Table<2, unsigned int> face_orientations(8, n * n);
+      for (unsigned int j = 0, i = 0; j < n; ++j)
+        for (unsigned int k = 0; k < n; ++k, ++i)
+          {
+            // face_orientation=true,  face_flip=false, face_rotation=false
+            face_orientations[0][i] = i;
+            // face_orientation=false, face_flip=false, face_rotation=false
+            face_orientations[1][i] = j + k * n;
+            // face_orientation=true,  face_flip=true, face_rotation=false
+            face_orientations[2][i] = (n - 1 - k) + (n - 1 - j) * n;
+            // face_orientation=false, face_flip=true, face_rotation=false
+            face_orientations[3][i] = (n - 1 - j) + (n - 1 - k) * n;
+            // face_orientation=true,  face_flip=false, face_rotation=true
+            face_orientations[4][i] = j + (n - 1 - k) * n;
+            // face_orientation=false, face_flip=false, face_rotation=true
+            face_orientations[5][i] = k + (n - 1 - j) * n;
+            // face_orientation=true,  face_flip=true, face_rotation=true
+            face_orientations[6][i] = (n - 1 - j) + k * n;
+            // face_orientation=false, face_flip=true, face_rotation=true
+            face_orientations[7][i] = (n - 1 - k) + j * n;
+          }
+      return face_orientations;
     }
 
 

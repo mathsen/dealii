@@ -3416,6 +3416,21 @@ public:
   bool
   all_reference_cells_are_hyper_cube() const;
 
+  /**
+   * Indicate if the triangulation only consists of simplex-like cells, i.e.,
+   * lines, triangles, or tetrahedra.
+   */
+  bool
+  all_reference_cells_are_simplex() const;
+
+  /**
+   * Indicate if the triangulation consists of different cell types (mix of
+   * simplices, hypercubes, ...) or different face types, as in the case
+   * of pyramids or wedges..
+   */
+  bool
+  is_mixed_mesh() const;
+
 #ifdef DOXYGEN
   /**
    * Write and read the data of this object from a stream for the purpose
@@ -3448,7 +3463,7 @@ public:
                  << arg1
                  << " of a triangulation, but this triangulation only has "
                  << arg2 << " refinement levels. The given level " << arg1
-                 << " must be *less* than " << arg2 << ".");
+                 << " must be *less* than " << arg2 << '.');
   /**
    * The function raising this exception can only operate on an empty
    * Triangulation, i.e., a Triangulation without grid cells.
@@ -4002,7 +4017,7 @@ private:
    * type FlatManifold.
    */
   std::map<types::manifold_id, std::unique_ptr<const Manifold<dim, spacedim>>>
-    manifold;
+    manifolds;
 
   /**
    * Flag indicating whether anisotropic refinement took place.

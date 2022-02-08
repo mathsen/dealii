@@ -35,6 +35,8 @@
 
 #include <deal.II/matrix_free/evaluation_flags.h>
 #include <deal.II/matrix_free/evaluation_template_factory.h>
+#include <deal.II/matrix_free/fe_evaluation_data.h>
+#include <deal.II/matrix_free/mapping_info_storage.h>
 #include <deal.II/matrix_free/shape_info.h>
 #include <deal.II/matrix_free/tensor_product_kernels.h>
 
@@ -480,6 +482,10 @@ namespace internal
       const std::vector<unsigned int> &                   renumber,
       const bool print_iterations_to_deallog = false)
     {
+      if (print_iterations_to_deallog)
+        deallog << "Start MappingQ::do_transform_real_to_unit_cell for real "
+                << "point [ " << p << " ] " << std::endl;
+
       AssertDimension(points.size(),
                       Utilities::pow(polynomials_1d.size(), dim));
 
@@ -546,8 +552,8 @@ namespace internal
       const unsigned int newton_iteration_limit = 20;
 
       Point<dim, Number> invalid_point;
-      invalid_point[0]              = std::numeric_limits<double>::infinity();
-      bool try_project_to_unit_cell = false;
+      invalid_point[0]                = std::numeric_limits<double>::infinity();
+      bool tried_project_to_unit_cell = false;
 
       unsigned int newton_iteration            = 0;
       Number       f_weighted_norm_square      = 1.;
@@ -576,7 +582,7 @@ namespace internal
               // back to the unit cell and go on with the Newton iteration
               // from there. Since the outside case is unlikely, we can
               // afford spending the extra effort at this place.
-              if (try_project_to_unit_cell == false)
+              if (tried_project_to_unit_cell == false)
                 {
                   p_unit = GeometryInfo<dim>::project_to_unit_cell(p_unit);
                   p_real = internal::evaluate_tensor_product_value_and_gradient(
@@ -588,7 +594,7 @@ namespace internal
                   f                           = p_real.first - p;
                   f_weighted_norm_square      = 1.;
                   last_f_weighted_norm_square = 1;
-                  try_project_to_unit_cell    = true;
+                  tried_project_to_unit_cell  = true;
                   continue;
                 }
               else
@@ -604,7 +610,7 @@ namespace internal
             deallog << "   delta=" << delta << std::endl;
 
           // do a line search
-          double step_length = 1;
+          double step_length = 1.0;
           do
             {
               // update of p_unit. The spacedim-th component of transformed
@@ -628,11 +634,14 @@ namespace internal
               f_weighted_norm_square = (df_inverse * f_trial).norm_square();
 
               if (print_iterations_to_deallog)
-                deallog << "     step_length=" << step_length << std::endl
-                        << "       ||f ||   =" << f.norm() << std::endl
-                        << "       ||f*||   =" << f_trial.norm() << std::endl
-                        << "       ||f*||_A ="
-                        << std::sqrt(f_weighted_norm_square) << std::endl;
+                {
+                  deallog << "     step_length=" << step_length << std::endl;
+                  if (step_length == 1.0)
+                    deallog << "       ||f ||   =" << f.norm() << std::endl;
+                  deallog << "       ||f*||   =" << f_trial.norm() << std::endl
+                          << "       ||f*||_A ="
+                          << std::sqrt(f_weighted_norm_square) << std::endl;
+                }
 
               // See if we are making progress with the current step length
               // and if not, reduce it by a factor of two and try again.
@@ -672,7 +681,7 @@ namespace internal
           // too small, we give the iteration another try with the
           // projection of the initial guess to the unit cell before we give
           // up, just like for the negative determinant case.
-          if (step_length <= 0.05 && try_project_to_unit_cell == false)
+          if (step_length <= 0.05 && tried_project_to_unit_cell == false)
             {
               p_unit = GeometryInfo<dim>::project_to_unit_cell(p_unit);
               p_real = internal::evaluate_tensor_product_value_and_gradient(
@@ -684,7 +693,7 @@ namespace internal
               f                           = p_real.first - p;
               f_weighted_norm_square      = 1.;
               last_f_weighted_norm_square = 1;
-              try_project_to_unit_cell    = true;
+              tried_project_to_unit_cell  = true;
               continue;
             }
           else if (step_length <= 0.05)
@@ -904,10 +913,16 @@ namespace internal
               make_array_view(real_support_points));
             DerivativeForm<1, spacedim, dim> A_inv =
               affine.first.covariant_form().transpose();
-            coefficients[0] = apply_transformation(A_inv, affine.second);
+
+            // The code for evaluation assumes an additional transformation of
+            // the form (x - normalization_shift) * normalization_length --
+            // account for this in the definition of the coefficients.
+            coefficients[0] =
+              apply_transformation(A_inv, normalization_shift - affine.second);
             for (unsigned int d = 0; d < spacedim; ++d)
               for (unsigned int e = 0; e < dim; ++e)
-                coefficients[1 + d][e] = A_inv[e][d];
+                coefficients[1 + d][e] =
+                  A_inv[e][d] * (1.0 / normalization_length);
             is_affine = true;
             return;
           }
@@ -958,7 +973,8 @@ namespace internal
                 Lij_sum += matrix[i][j] * matrix[i][j];
               }
             AssertThrow(matrix[i][i] - Lij_sum >= 0,
-                        ExcMessage("Matrix not positive definite"));
+                        ExcMessage("Matrix of normal equations not positive "
+                                   "definite"));
 
             // Store the inverse in the diagonal since that is the quantity
             // needed later in the factorization as well as the forward and
@@ -1026,10 +1042,30 @@ namespace internal
 
         if (!is_affine)
           {
+            Point<dim, Number> result_affine = result;
             for (unsigned int d = 0, c = 0; d < spacedim; ++d)
               for (unsigned int e = 0; e <= d; ++e, ++c)
                 result +=
                   coefficients[1 + spacedim + c] * (p_scaled[d] * p_scaled[e]);
+
+            // Check if the quadratic approximation ends up considerably
+            // farther outside the unit cell on some or all SIMD lanes than
+            // the affine approximation - in that case, we switch those
+            // components back to the affine approximation. Note that the
+            // quadratic approximation will grow more quickly away from the
+            // unit cell. We make the selection for each SIMD lane with a
+            // ternary operation.
+            const Number distance_to_unit_cell = result.distance_square(
+              GeometryInfo<dim>::project_to_unit_cell(result));
+            const Number affine_distance_to_unit_cell =
+              result_affine.distance_square(
+                GeometryInfo<dim>::project_to_unit_cell(result_affine));
+            for (unsigned int d = 0; d < dim; ++d)
+              result[d] = compare_and_apply_mask<SIMDComparison::greater_than>(
+                distance_to_unit_cell,
+                affine_distance_to_unit_cell + 0.5,
+                result_affine[d],
+                result[d]);
           }
         return result;
       }
@@ -1079,9 +1115,12 @@ namespace internal
     {
       const UpdateFlags update_flags = data.update_each;
 
+      using VectorizedArrayType =
+        typename dealii::MappingQ<dim,
+                                  spacedim>::InternalData::VectorizedArrayType;
       const unsigned int     n_shape_values = data.n_shape_functions;
       const unsigned int     n_q_points     = data.shape_info.n_q_points;
-      constexpr unsigned int n_lanes        = VectorizedArray<double>::size();
+      constexpr unsigned int n_lanes        = VectorizedArrayType::size();
       constexpr unsigned int n_comp         = 1 + (spacedim - 1) / n_lanes;
       constexpr unsigned int n_hessians     = (dim * (dim + 1)) / 2;
 
@@ -1125,16 +1164,17 @@ namespace internal
           return;
         }
 
+      FEEvaluationData<dim, VectorizedArrayType, false> eval(data.shape_info);
+
       // prepare arrays
       if (evaluation_flag != EvaluationFlags::nothing)
         {
-          data.values_dofs.resize(n_comp * n_shape_values);
-          data.values_quad.resize(n_comp * n_q_points);
-          data.gradients_quad.resize(n_comp * n_q_points * dim);
-          data.scratch.resize(2 * std::max(n_q_points, n_shape_values));
+          eval.set_data_pointers(&data.scratch, n_comp);
 
-          if (evaluation_flag & EvaluationFlags::hessians)
-            data.hessians_quad.resize(n_comp * n_q_points * n_hessians);
+          // make sure to initialize on all lanes also when some are unused in
+          // the code below
+          for (unsigned int i = 0; i < n_shape_values * n_comp; ++i)
+            eval.begin_dof_values()[i] = VectorizedArrayType();
 
           const std::vector<unsigned int> &renumber_to_lexicographic =
             data.shape_info.lexicographic_numbering;
@@ -1143,20 +1183,14 @@ namespace internal
               {
                 const unsigned int in_comp  = d % n_lanes;
                 const unsigned int out_comp = d / n_lanes;
-                data.values_dofs[out_comp * n_shape_values + i][in_comp] =
+                eval
+                  .begin_dof_values()[out_comp * n_shape_values + i][in_comp] =
                   data.mapping_support_points[renumber_to_lexicographic[i]][d];
               }
 
           // do the actual tensorized evaluation
-          internal::FEEvaluationFactory<dim, double, VectorizedArray<double>>::
-            evaluate(n_comp,
-                     evaluation_flag,
-                     data.shape_info,
-                     data.values_dofs.begin(),
-                     data.values_quad.begin(),
-                     data.gradients_quad.begin(),
-                     data.hessians_quad.begin(),
-                     data.scratch.begin());
+          internal::FEEvaluationFactory<dim, VectorizedArrayType>::evaluate(
+            n_comp, evaluation_flag, eval.begin_dof_values(), eval);
         }
 
       // do the postprocessing
@@ -1168,7 +1202,7 @@ namespace internal
                    in_comp < n_lanes && in_comp < spacedim - out_comp * n_lanes;
                    ++in_comp)
                 quadrature_points[i][out_comp * n_lanes + in_comp] =
-                  data.values_quad[out_comp * n_q_points + i][in_comp];
+                  eval.begin_values()[out_comp * n_q_points + i][in_comp];
         }
 
       if (evaluation_flag & EvaluationFlags::gradients)
@@ -1190,9 +1224,9 @@ namespace internal
                     const unsigned int new_point    = total_number % n_q_points;
                     data.contravariant[new_point][out_comp * n_lanes + in_comp]
                                       [new_comp] =
-                      data
-                        .gradients_quad[(out_comp * n_q_points + point) * dim +
-                                        j][in_comp];
+                      eval.begin_gradients()[(out_comp * n_q_points + point) *
+                                               dim +
+                                             j][in_comp];
                   }
         }
       if (update_flags & update_covariant_transformation)
@@ -1233,9 +1267,9 @@ namespace internal
                       dim == 2 ? desymmetrize_2d[new_hessian_comp][1] :
                                  desymmetrize_3d[new_hessian_comp][1];
                     const double value =
-                      data.hessians_quad[(out_comp * n_q_points + point) *
-                                           n_hessians +
-                                         j][in_comp];
+                      eval.begin_hessians()[(out_comp * n_q_points + point) *
+                                              n_hessians +
+                                            j][in_comp];
                     jacobian_grads[new_point][out_comp * n_lanes + in_comp]
                                   [new_hessian_comp_i][new_hessian_comp_j] =
                                     value;

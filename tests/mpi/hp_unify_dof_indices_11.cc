@@ -30,12 +30,14 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_system.h>
 
+#include <deal.II/grid/filtered_iterator.h>
 #include <deal.II/grid/grid_generator.h>
 
 #include <deal.II/hp/fe_collection.h>
 
 #include "../tests.h"
 
+#include "../test_grids.h"
 #include "hp_unify_dof_indices.h"
 
 
@@ -45,17 +47,7 @@ test()
 {
   parallel::distributed::Triangulation<dim> triangulation(
     MPI_COMM_WORLD, Triangulation<dim>::limit_level_difference_at_vertices);
-
-  std::vector<unsigned int> reps(dim, 1U);
-  reps[0] = 2;
-  Point<dim> top_right;
-  for (unsigned int d = 0; d < dim; ++d)
-    top_right[d] = (d == 0 ? 2 : 1);
-  GridGenerator::subdivided_hyper_rectangle(triangulation,
-                                            reps,
-                                            Point<dim>(),
-                                            top_right);
-  Assert(triangulation.n_global_active_cells() == 2, ExcInternalError());
+  TestGrids::hyper_line(triangulation, 2);
   Assert(triangulation.n_active_cells() == 2, ExcInternalError());
 
   hp::FECollection<dim> fe;
@@ -63,14 +55,14 @@ test()
   fe.push_back(FESystem<dim>(FE_Q<dim>(2), 1, FE_Q<dim>(1), 1));
 
   DoFHandler<dim> dof_handler(triangulation);
-  for (const auto &cell : dof_handler.active_cell_iterators())
-    if (cell->is_locally_owned())
-      {
-        if (cell->id().to_string() == "0_0:")
-          cell->set_active_fe_index(0);
-        if (cell->id().to_string() == "1_0:")
-          cell->set_active_fe_index(1);
-      }
+  for (const auto &cell : dof_handler.active_cell_iterators() |
+                            IteratorFilters::LocallyOwnedCell())
+    {
+      if (cell->id().to_string() == "0_0:")
+        cell->set_active_fe_index(0);
+      if (cell->id().to_string() == "1_0:")
+        cell->set_active_fe_index(1);
+    }
   dof_handler.distribute_dofs(fe);
 
   log_dof_diagnostics(dof_handler);

@@ -24,6 +24,7 @@
 
 #include <deal.II/fe/mapping.h>
 
+#include <deal.II/grid/filtered_iterator.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/grid_tools_cache.h>
 #include <deal.II/grid/tria.h>
@@ -37,12 +38,14 @@ namespace Utilities
   {
     template <int dim, int spacedim>
     RemotePointEvaluation<dim, spacedim>::RemotePointEvaluation(
-      const double       tolerance,
-      const bool         enforce_unique_mapping,
-      const unsigned int rtree_level)
+      const double                              tolerance,
+      const bool                                enforce_unique_mapping,
+      const unsigned int                        rtree_level,
+      const std::function<std::vector<bool>()> &marked_vertices)
       : tolerance(tolerance)
       , enforce_unique_mapping(enforce_unique_mapping)
       , rtree_level(rtree_level)
+      , marked_vertices(marked_vertices)
       , ready_flag(false)
     {}
 
@@ -80,9 +83,9 @@ namespace Utilities
       this->mapping = &mapping;
 
       std::vector<BoundingBox<spacedim>> local_boxes;
-      for (const auto &cell : tria.active_cell_iterators())
-        if (cell->is_locally_owned())
-          local_boxes.push_back(mapping.get_bounding_box(cell));
+      for (const auto &cell :
+           tria.active_cell_iterators() | IteratorFilters::LocallyOwnedCell())
+        local_boxes.push_back(mapping.get_bounding_box(cell));
 
       // create r-tree of bounding boxes
       const auto local_tree = pack_rtree(local_boxes);
@@ -102,6 +105,7 @@ namespace Utilities
           cache,
           points,
           global_bboxes,
+          marked_vertices ? marked_vertices() : std::vector<bool>(),
           tolerance,
           true,
           enforce_unique_mapping);

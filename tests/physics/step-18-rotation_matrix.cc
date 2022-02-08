@@ -128,14 +128,14 @@ namespace Step18
   Tensor<2, 3>
   get_rotation_matrix(const std::vector<Tensor<1, 3>> &grad_u)
   {
-    const Point<3> curl(grad_u[2][1] - grad_u[1][2],
-                        grad_u[0][2] - grad_u[2][0],
-                        grad_u[1][0] - grad_u[0][1]);
-    const double   tan_angle = std::sqrt(curl * curl);
+    const Tensor<1, 3> curl({grad_u[2][1] - grad_u[1][2],
+                             grad_u[0][2] - grad_u[2][0],
+                             grad_u[1][0] - grad_u[0][1]});
+    const double       tan_angle = std::sqrt(curl * curl);
     // Note: Here the negative angle suggests that we're computing the rotation
     // of the coordinate system around a fixed point
-    const double   angle = -std::atan(tan_angle);
-    const Point<3> axis  = curl / tan_angle;
+    const double       angle = -std::atan(tan_angle);
+    const Tensor<1, 3> axis  = curl / tan_angle;
     return Physics::Transformations::Rotations::rotation_matrix_3d(axis, angle);
   }
   template <int dim>
@@ -594,7 +594,7 @@ namespace Step18
           pcout << (p == 0 ? ' ' : '+')
                 << (GridTools::count_cells_with_subdomain_association(
                      triangulation, p));
-        pcout << ")" << std::endl;
+        pcout << ')' << std::endl;
         setup_system();
         pcout << "    Number of degrees of freedom: " << dof_handler.n_dofs()
               << " (by partition:";
@@ -602,7 +602,7 @@ namespace Step18
           pcout << (p == 0 ? ' ' : '+')
                 << (DoFTools::count_dofs_with_subdomain_association(dof_handler,
                                                                     p));
-        pcout << ")" << std::endl;
+        pcout << ')' << std::endl;
         // Get point at which to output displacement
         // (outer radius of displaced surface)
         {

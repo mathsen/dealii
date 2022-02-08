@@ -37,12 +37,10 @@
 
 DEAL_II_NAMESPACE_OPEN
 
-template <int, int>
-class MappingQ;
-
+#ifndef DOXYGEN
 template <int, int>
 class MappingQCache;
-
+#endif
 
 /*!@addtogroup mapping */
 /*@{*/
@@ -230,6 +228,31 @@ public:
   /**
    * @}
    */
+
+  /**
+   * As opposed to the other fill_fe_values() and fill_fe_face_values()
+   * functions that rely on pre-computed information of InternalDataBase, this
+   * function chooses the flexible evaluation path on the cell and points
+   * passed in to the current function.
+   *
+   * @param[in] cell The cell where to evaluate the mapping
+   *
+   * @param[in] unit_points The points in reference coordinates where the
+   * transformation (Jacobians, positions) should be computed.
+   *
+   * @param[in] update_flags The kind of information that should be computed.
+   *
+   * @param[out] output_data A struct containing the evaluated quantities such
+   * as the Jacobian resulting from application of the mapping on the given
+   * cell with its underlying manifolds.
+   */
+  void
+  fill_mapping_data_for_generic_points(
+    const typename Triangulation<dim, spacedim>::cell_iterator &cell,
+    const ArrayView<const Point<dim>> &                         unit_points,
+    const UpdateFlags                                           update_flags,
+    dealii::internal::FEValuesImplementation::MappingRelatedData<dim, spacedim>
+      &output_data) const;
 
   /**
    * @name Interface with FEValues and friends
@@ -450,42 +473,36 @@ public:
     QGaussLobatto<1> line_support_points;
 
     /**
+     * For the fast tensor-product path of the MappingQ class, we choose SIMD
+     * vectors that are as wide as possible to minimize the number of
+     * arithmetic operations. However, we do not want to choose it wider than
+     * necessary, e.g., we avoid something like 8-wide AVX-512 when we only
+     * compute 3 components of a 3D computation. This is because the
+     * additional lanes would not do useful work, but a few operations on very
+     * wide vectors can already lead to a lower clock frequency of processors
+     * over long time spans (thousands of clock cycles). Hence, we choose
+     * 2-wide SIMD for 1D and 2D and 4-wide SIMD for 3D. Note that we do not
+     * immediately fall back to no SIMD for 1D because all architectures that
+     * support SIMD also support 128-bit vectors (and none is reported to
+     * reduce clock frequency for 128-bit SIMD).
+     */
+    using VectorizedArrayType =
+      VectorizedArray<double,
+                      std::min<std::size_t>(VectorizedArray<double>::size(),
+                                            (dim <= 2 ? 2 : 4))>;
+
+    /**
      * In case the quadrature rule given represents a tensor product
      * we need to store the evaluations of the 1d polynomials at
      * the 1d quadrature points. That is what this variable is for.
      */
-    internal::MatrixFreeFunctions::ShapeInfo<VectorizedArray<double>>
-      shape_info;
+    internal::MatrixFreeFunctions::ShapeInfo<VectorizedArrayType> shape_info;
 
     /**
      * In case the quadrature rule given represents a tensor product
      * we need to store temporary data in this object.
      */
-    mutable AlignedVector<VectorizedArray<double>> scratch;
-
-    /**
-     * In case the quadrature rule given represents a tensor product
-     * the values at the mapped support points are stored in this object.
-     */
-    mutable AlignedVector<VectorizedArray<double>> values_dofs;
-
-    /**
-     * In case the quadrature rule given represents a tensor product
-     * the values at the quadrature points are stored in this object.
-     */
-    mutable AlignedVector<VectorizedArray<double>> values_quad;
-
-    /**
-     * In case the quadrature rule given represents a tensor product
-     * the gradients at the quadrature points are stored in this object.
-     */
-    mutable AlignedVector<VectorizedArray<double>> gradients_quad;
-
-    /**
-     * In case the quadrature rule given represents a tensor product
-     * the hessians at the quadrature points are stored in this object.
-     */
-    mutable AlignedVector<VectorizedArray<double>> hessians_quad;
+    mutable AlignedVector<VectorizedArrayType> scratch;
 
     /**
      * Indicates whether the given Quadrature object is a tensor product.
@@ -536,7 +553,7 @@ public:
     mutable AlignedVector<double> volume_elements;
   };
 
-
+protected:
   // documentation can be found in Mapping::requires_update_flags()
   virtual UpdateFlags
   requires_update_flags(const UpdateFlags update_flags) const override;
@@ -590,37 +607,19 @@ public:
     dealii::internal::FEValuesImplementation::MappingRelatedData<dim, spacedim>
       &output_data) const override;
 
-
-  /**
-   * As opposed to the other fill_fe_values() and fill_fe_face_values()
-   * functions that rely on pre-computed information of InternalDataBase, this
-   * function chooses the flexible evaluation path on the cell and points
-   * passed in to the current function.
-   *
-   * @param[in] cell The cell where to evaluate the mapping
-   *
-   * @param[in] unit_points The points in reference coordinates where the
-   * transformation (Jacobians, positions) should be computed.
-   *
-   * @param[in] update_flags The kind of information that should be computed.
-   *
-   * @param[out] output_data A struct containing the evaluated quantities such
-   * as the Jacobian resulting from application of the mapping on the given
-   * cell with its underlying manifolds.
-   */
-  void
-  fill_mapping_data_for_generic_points(
+  // documentation can be found in Mapping::fill_fe_immersed_surface_values()
+  virtual void
+  fill_fe_immersed_surface_values(
     const typename Triangulation<dim, spacedim>::cell_iterator &cell,
-    const ArrayView<const Point<dim>> &                         unit_points,
-    const UpdateFlags                                           update_flags,
+    const NonMatching::ImmersedSurfaceQuadrature<dim> &         quadrature,
+    const typename Mapping<dim, spacedim>::InternalDataBase &   internal_data,
     dealii::internal::FEValuesImplementation::MappingRelatedData<dim, spacedim>
-      &output_data) const;
+      &output_data) const override;
 
   /**
    * @}
    */
 
-protected:
   /**
    * The degree of the polynomials used as shape functions for the mapping of
    * cells.

@@ -36,7 +36,7 @@ namespace internal
   // FIXME: this is wrong for Trilinos/Petsc MPI vectors
   // where we should first do Partitioner::local_to_global()
   template <typename VectorType,
-            typename std::enable_if<!has_local_element<VectorType>::value,
+            typename std::enable_if<!has_local_element<VectorType>,
                                     VectorType>::type * = nullptr>
   inline typename VectorType::value_type
   vector_access(const VectorType &vec, const unsigned int entry)
@@ -50,7 +50,7 @@ namespace internal
   // FIXME: this is wrong for Trilinos/Petsc MPI vectors
   // where we should first do Partitioner::local_to_global()
   template <typename VectorType,
-            typename std::enable_if<!has_local_element<VectorType>::value,
+            typename std::enable_if<!has_local_element<VectorType>,
                                     VectorType>::type * = nullptr>
   inline typename VectorType::value_type &
   vector_access(VectorType &vec, const unsigned int entry)
@@ -64,7 +64,7 @@ namespace internal
   // method to access data in local index space, which is what we use in
   // DoFInfo and hence in read_dof_values etc.
   template <typename VectorType,
-            typename std::enable_if<has_local_element<VectorType>::value,
+            typename std::enable_if<has_local_element<VectorType>,
                                     VectorType>::type * = nullptr>
   inline typename VectorType::value_type &
   vector_access(VectorType &vec, const unsigned int entry)
@@ -76,7 +76,7 @@ namespace internal
 
   // same for const access
   template <typename VectorType,
-            typename std::enable_if<has_local_element<VectorType>::value,
+            typename std::enable_if<has_local_element<VectorType>,
                                     VectorType>::type * = nullptr>
   inline typename VectorType::value_type
   vector_access(const VectorType &vec, const unsigned int entry)
@@ -87,7 +87,7 @@ namespace internal
 
 
   template <typename VectorType,
-            typename std::enable_if<has_add_local_element<VectorType>::value,
+            typename std::enable_if<has_add_local_element<VectorType>,
                                     VectorType>::type * = nullptr>
   inline void
   vector_access_add(VectorType &                           vec,
@@ -100,7 +100,7 @@ namespace internal
 
 
   template <typename VectorType,
-            typename std::enable_if<!has_add_local_element<VectorType>::value,
+            typename std::enable_if<!has_add_local_element<VectorType>,
                                     VectorType>::type * = nullptr>
   inline void
   vector_access_add(VectorType &                           vec,
@@ -113,7 +113,7 @@ namespace internal
 
 
   template <typename VectorType,
-            typename std::enable_if<has_add_local_element<VectorType>::value,
+            typename std::enable_if<has_add_local_element<VectorType>,
                                     VectorType>::type * = nullptr>
   inline void
   vector_access_add_global(VectorType &                           vec,
@@ -126,7 +126,7 @@ namespace internal
 
 
   template <typename VectorType,
-            typename std::enable_if<!has_add_local_element<VectorType>::value,
+            typename std::enable_if<!has_add_local_element<VectorType>,
                                     VectorType>::type * = nullptr>
   inline void
   vector_access_add_global(VectorType &                           vec,
@@ -139,7 +139,7 @@ namespace internal
 
 
   template <typename VectorType,
-            typename std::enable_if<has_set_local_element<VectorType>::value,
+            typename std::enable_if<has_set_local_element<VectorType>,
                                     VectorType>::type * = nullptr>
   inline void
   vector_access_set(VectorType &                           vec,
@@ -152,7 +152,7 @@ namespace internal
 
 
   template <typename VectorType,
-            typename std::enable_if<!has_set_local_element<VectorType>::value,
+            typename std::enable_if<!has_set_local_element<VectorType>,
                                     VectorType>::type * = nullptr>
   inline void
   vector_access_set(VectorType &                           vec,
@@ -170,7 +170,7 @@ namespace internal
   // FIXME: this is incorrect for PETSc/Trilinos MPI vectors
   template <
     typename VectorType,
-    typename std::enable_if<!has_partitioners_are_compatible<VectorType>::value,
+    typename std::enable_if<!has_partitioners_are_compatible<VectorType>,
                             VectorType>::type * = nullptr>
   inline void
   check_vector_compatibility(
@@ -186,10 +186,9 @@ namespace internal
 
 
   // same as above for has_partitioners_are_compatible == true
-  template <
-    typename VectorType,
-    typename std::enable_if<has_partitioners_are_compatible<VectorType>::value,
-                            VectorType>::type * = nullptr>
+  template <typename VectorType,
+            typename std::enable_if<has_partitioners_are_compatible<VectorType>,
+                                    VectorType>::type * = nullptr>
   inline void
   check_vector_compatibility(
     const VectorType &                            vec,
@@ -247,10 +246,20 @@ namespace internal
                             VectorizedArrayType *dof_values,
                             std::integral_constant<bool, true>) const
     {
+#ifdef DEBUG
+      // in debug mode, run non-vectorized version because this path
+      // has additional checks (e.g., regarding ghosting)
+      process_dofs_vectorized(dofs_per_cell,
+                              dof_index,
+                              vec,
+                              dof_values,
+                              std::integral_constant<bool, false>());
+#else
       const Number *vec_ptr = vec.begin() + dof_index;
       for (unsigned int i = 0; i < dofs_per_cell;
            ++i, vec_ptr += VectorizedArrayType::size())
         dof_values[i].load(vec_ptr);
+#endif
     }
 
 
@@ -340,7 +349,17 @@ namespace internal
                        VectorizedArrayType &res,
                        std::integral_constant<bool, true>) const
     {
+#ifdef DEBUG
+      // in debug mode, run non-vectorized version because this path
+      // has additional checks (e.g., regarding ghosting)
+      process_dof_gather(indices,
+                         vec,
+                         constant_offset,
+                         res,
+                         std::integral_constant<bool, false>());
+#else
       res.gather(vec.begin() + constant_offset, indices);
+#endif
     }
 
 

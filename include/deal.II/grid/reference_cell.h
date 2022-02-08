@@ -21,9 +21,12 @@
 #include <deal.II/base/array_view.h>
 #include <deal.II/base/geometry_info.h>
 #include <deal.II/base/ndarray.h>
+#include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/utilities.h>
 
+#include <iosfwd>
+#include <string>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -235,6 +238,17 @@ public:
   vertex_indices() const;
 
   /**
+   * Return the location of the `v`th vertex of the reference
+   * cell that corresponds to the current object.
+   *
+   * Because the ReferenceCell class does not have a `dim` argument,
+   * it has to be explicitly specified in the call to this function.
+   */
+  template <int dim>
+  Point<dim>
+  vertex(const unsigned int v) const;
+
+  /**
    * Return the number of lines that make up the reference
    * cell in question. A line is an "edge" (a one-dimensional
    * object) of the reference cell.
@@ -263,6 +277,27 @@ public:
    */
   std_cxx20::ranges::iota_view<unsigned int, unsigned int>
   face_indices() const;
+
+  /**
+   * Return the number of cells one would get by isotropically
+   * refining the current cell. Here, "isotropic refinement"
+   * means that we subdivide in each "direction" of a cell.
+   * For example, a square would be refined into four children
+   * by introducing new vertices along each edge and a new
+   * vertex in the cell center. For triangles, one would introduce
+   * new vertices at the center of each edge, and connect them to
+   * obtain four children. Similar constructions can be done for
+   * the other reference cell types.
+   */
+  unsigned int
+  n_isotropic_children() const;
+
+  /**
+   * Return an object that can be thought of as an array containing all
+   * indices from zero to n_isotropic_children().
+   */
+  std_cxx20::ranges::iota_view<unsigned int, unsigned int>
+  isotropic_child_indices() const;
 
   /**
    * Return the reference-cell type of face @p face_no of the current
@@ -330,8 +365,8 @@ public:
    * entry.
    */
   unsigned int
-  child_cell_on_face(const unsigned int  face_n,
-                     const unsigned int  subface_n,
+  child_cell_on_face(const unsigned int  face,
+                     const unsigned int  subface,
                      const unsigned char face_orientation = 1) const;
 
   /**
@@ -403,7 +438,7 @@ public:
   bool
   standard_vs_true_line_orientation(const unsigned int  line,
                                     const unsigned char face_orientation,
-                                    const unsigned char line_orientation) const;
+                                    const bool          line_orientation) const;
 
   /**
    * @}
@@ -505,6 +540,12 @@ public:
   vtk_lagrange_type() const;
 
   /**
+   * Return the GMSH element type code that corresponds to the reference cell.
+   */
+  unsigned int
+  gmsh_element_type() const;
+
+  /**
    * @}
    */
 
@@ -570,8 +611,34 @@ private:
    */
   friend DEAL_II_CONSTEXPR ReferenceCell
   internal::ReferenceCell::make_reference_cell_from_int(const std::uint8_t);
+
+  friend std::ostream &
+  operator<<(std::ostream &out, const ReferenceCell &reference_cell);
+
+  friend std::istream &
+  operator>>(std::istream &in, ReferenceCell &reference_cell);
 };
 
+
+/**
+ * Output operator that writes the @p reference_cell object to the stream
+ * in a text format in which the object is represented by an integer. The
+ * details of which integer value represents each kind of reference cell
+ * is unimportant and consequently not specified. If you want a string
+ * representation of what a ReferenceCell is, use ReferenceCell::to_string().
+ */
+std::ostream &
+operator<<(std::ostream &out, const ReferenceCell &reference_cell);
+
+/**
+ * Input operator that reads the @p reference_cell object from the stream
+ * in a text format in which the object is represented by an integer. Which
+ * specific integer value represents which reference cell is unspecified,
+ * but the function uses the same translation as the corresponding
+ * output `operator<<`.
+ */
+std::istream &
+operator>>(std::istream &in, ReferenceCell &reference_cell);
 
 
 inline constexpr ReferenceCell::ReferenceCell(const std::uint8_t kind)
@@ -850,6 +917,102 @@ ReferenceCell::n_lines() const
 
 
 
+template <int dim>
+Point<dim>
+ReferenceCell::vertex(const unsigned int v) const
+{
+  AssertDimension(dim, get_dimension());
+  AssertIndexRange(v, n_vertices());
+
+  if ((dim == 0) && (*this == ReferenceCells::Vertex))
+    {
+      return Point<dim>(0);
+    }
+  else if ((dim == 1) && (*this == ReferenceCells::Line))
+    {
+      static const Point<dim> vertices[2] = {
+        Point<dim>(),              // the origin
+        Point<dim>::unit_vector(0) // unit point along x-axis
+      };
+      return vertices[v];
+    }
+  else if ((dim == 2) && (*this == ReferenceCells::Quadrilateral))
+    {
+      static const Point<dim> vertices[4] = {
+        // First the two points on the x-axis
+        Point<dim>(),
+        Point<dim>::unit_vector(0),
+        // Then these two points shifted in the y-direction
+        Point<dim>() + Point<dim>::unit_vector(1),
+        Point<dim>::unit_vector(0) + Point<dim>::unit_vector(1)};
+      return vertices[v];
+    }
+  else if ((dim == 3) && (*this == ReferenceCells::Hexahedron))
+    {
+      static const Point<dim> vertices[8] = {
+        // First the two points on the x-axis
+        Point<dim>(),
+        Point<dim>::unit_vector(0),
+        // Then these two points shifted in the y-direction
+        Point<dim>() + Point<dim>::unit_vector(1),
+        Point<dim>::unit_vector(0) + Point<dim>::unit_vector(1),
+        // And now all four points shifted in the z-direction
+        Point<dim>() + Point<dim>::unit_vector(2),
+        Point<dim>::unit_vector(0) + Point<dim>::unit_vector(2),
+        Point<dim>() + Point<dim>::unit_vector(1) + Point<dim>::unit_vector(2),
+        Point<dim>::unit_vector(0) + Point<dim>::unit_vector(1) +
+          Point<dim>::unit_vector(2)};
+      return vertices[v];
+    }
+  else if ((dim == 2) && (*this == ReferenceCells::Triangle))
+    {
+      static const Point<dim> vertices[3] = {
+        Point<dim>(),               // the origin
+        Point<dim>::unit_vector(0), // unit point along x-axis
+        Point<dim>::unit_vector(1)  // unit point along y-axis
+      };
+      return vertices[v];
+    }
+  else if ((dim == 3) && (*this == ReferenceCells::Tetrahedron))
+    {
+      static const Point<dim> vertices[4] = {
+        Point<dim>(),               // the origin
+        Point<dim>::unit_vector(0), // unit point along x-axis
+        Point<dim>::unit_vector(1), // unit point along y-axis
+        Point<dim>::unit_vector(2)  // unit point along z-axis
+      };
+      return vertices[v];
+    }
+  else if ((dim == 3) && (*this == ReferenceCells::Pyramid))
+    {
+      static const Point<dim> vertices[5] = {Point<dim>{-1.0, -1.0, 0.0},
+                                             Point<dim>{+1.0, -1.0, 0.0},
+                                             Point<dim>{-1.0, +1.0, 0.0},
+                                             Point<dim>{+1.0, +1.0, 0.0},
+                                             Point<dim>{+0.0, +0.0, 1.0}};
+      return vertices[v];
+    }
+  else if ((dim == 3) && (*this == ReferenceCells::Wedge))
+    {
+      static const Point<dim> vertices[6] = {
+        // First the three points on the triangular base of the wedge:
+        Point<dim>(),
+        Point<dim>::unit_vector(0),
+        Point<dim>::unit_vector(1),
+        // And now everything shifted in the z-direction again
+        Point<dim>() + Point<dim>::unit_vector(2),
+        Point<dim>::unit_vector(0) + Point<dim>::unit_vector(2),
+        Point<dim>::unit_vector(1) + Point<dim>::unit_vector(2)};
+      return vertices[v];
+    }
+  else
+    {
+      Assert(false, ExcNotImplemented());
+      return Point<dim>();
+    }
+}
+
+
 inline unsigned int
 ReferenceCell::n_faces() const
 {
@@ -877,6 +1040,53 @@ ReferenceCell::n_faces() const
 
 
 inline std_cxx20::ranges::iota_view<unsigned int, unsigned int>
+ReferenceCell::face_indices() const
+{
+  return {0U, n_faces()};
+}
+
+
+
+inline unsigned int
+ReferenceCell::n_isotropic_children() const
+{
+  if (*this == ReferenceCells::Vertex)
+    return 0;
+  else if (*this == ReferenceCells::Line)
+    return 2;
+  else if (*this == ReferenceCells::Triangle)
+    return 4;
+  else if (*this == ReferenceCells::Quadrilateral)
+    return 4;
+  else if (*this == ReferenceCells::Tetrahedron)
+    return 8;
+  else if (*this == ReferenceCells::Pyramid)
+    {
+      // We haven't yet decided how to refine pyramids. Update
+      // this when we have
+      Assert(false, ExcNotImplemented());
+      return numbers::invalid_unsigned_int;
+    }
+  else if (*this == ReferenceCells::Wedge)
+    return 8;
+  else if (*this == ReferenceCells::Hexahedron)
+    return 8;
+
+  Assert(false, ExcNotImplemented());
+  return numbers::invalid_unsigned_int;
+}
+
+
+
+inline std_cxx20::ranges::iota_view<unsigned int, unsigned int>
+ReferenceCell::isotropic_child_indices() const
+{
+  return {0U, n_isotropic_children()};
+}
+
+
+
+inline std_cxx20::ranges::iota_view<unsigned int, unsigned int>
 ReferenceCell::vertex_indices() const
 {
   return {0U, n_vertices()};
@@ -888,14 +1098,6 @@ inline std_cxx20::ranges::iota_view<unsigned int, unsigned int>
 ReferenceCell::line_indices() const
 {
   return {0U, n_lines()};
-}
-
-
-
-inline std_cxx20::ranges::iota_view<unsigned int, unsigned int>
-ReferenceCell::face_indices() const
-{
-  return {0U, n_faces()};
 }
 
 
@@ -945,6 +1147,7 @@ ReferenceCell::child_cell_on_face(
   const unsigned char face_orientation_raw) const
 {
   AssertIndexRange(face, n_faces());
+  AssertIndexRange(subface, face_reference_cell(face).n_isotropic_children());
 
   if (*this == ReferenceCells::Vertex)
     {
@@ -968,7 +1171,7 @@ ReferenceCell::child_cell_on_face(
       const bool face_rotation    = Utilities::get_bit(face_orientation_raw, 1);
 
       return GeometryInfo<2>::child_cell_on_face(
-        RefinementCase<2>(RefinementPossibilities<2>::no_refinement),
+        RefinementCase<2>(RefinementPossibilities<2>::isotropic_refinement),
         face,
         subface,
         face_orientation,
@@ -994,7 +1197,7 @@ ReferenceCell::child_cell_on_face(
       const bool face_rotation    = Utilities::get_bit(face_orientation_raw, 1);
 
       return GeometryInfo<3>::child_cell_on_face(
-        RefinementCase<3>(RefinementPossibilities<3>::no_refinement),
+        RefinementCase<3>(RefinementPossibilities<3>::isotropic_refinement),
         face,
         subface,
         face_orientation,
@@ -1224,7 +1427,7 @@ ReferenceCell::face_to_cell_vertices(const unsigned int  face,
       static const ndarray<unsigned int, 3, 2> table = {
         {{{0, 1}}, {{1, 2}}, {{2, 0}}}};
 
-      return table[face][face_orientation ? vertex : (1 - vertex)];
+      return table[face][face_orientation != 0u ? vertex : (1 - vertex)];
     }
   else if (*this == ReferenceCells::Quadrilateral)
     {
@@ -1309,7 +1512,8 @@ ReferenceCell::standard_to_real_face_vertex(
   else if (*this == ReferenceCells::Quadrilateral)
     {
       return GeometryInfo<2>::standard_to_real_line_vertex(vertex,
-                                                           face_orientation);
+                                                           face_orientation !=
+                                                             0u);
     }
   else if (*this == ReferenceCells::Tetrahedron)
     {
@@ -1798,7 +2002,7 @@ inline bool
 ReferenceCell::standard_vs_true_line_orientation(
   const unsigned int  line,
   const unsigned char face_orientation_raw,
-  const unsigned char line_orientation) const
+  const bool          line_orientation) const
 {
   if (*this == ReferenceCells::Hexahedron)
     {
@@ -1820,7 +2024,7 @@ ReferenceCell::standard_vs_true_line_orientation(
       const bool face_flip        = Utilities::get_bit(face_orientation_raw, 2);
       const bool face_rotation    = Utilities::get_bit(face_orientation_raw, 1);
 
-      return (static_cast<bool>(line_orientation) ==
+      return (line_orientation ==
               bool_table[line / 2][face_orientation][face_flip][face_rotation]);
     }
   else
@@ -1859,7 +2063,7 @@ namespace internal
     virtual void
     print_info(std::ostream &out) const override
     {
-      out << "[";
+      out << '[';
 
       const unsigned int n_vertices = entity_type.n_vertices();
 
@@ -1867,7 +2071,7 @@ namespace internal
         {
           out << vertices_0[i];
           if (i + 1 != n_vertices)
-            out << ",";
+            out << ',';
         }
 
       out << "] is not a permutation of [";
@@ -1876,7 +2080,7 @@ namespace internal
         {
           out << vertices_1[i];
           if (i + 1 != n_vertices)
-            out << ",";
+            out << ',';
         }
 
       out << "]." << std::endl;

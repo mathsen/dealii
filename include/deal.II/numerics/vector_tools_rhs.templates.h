@@ -457,6 +457,8 @@ namespace VectorTools
                                                      rhs_vector);
             }
       }
+
+    rhs_vector.compress(VectorOperation::values::add);
   }
 
 
@@ -534,7 +536,7 @@ namespace VectorTools
               dofs.resize(dofs_per_cell);
               cell_vector.reinit(dofs_per_cell);
 
-              const std::vector<Number> &weights = fe_values.get_JxW_values();
+              const auto &weights = fe_values.get_JxW_values();
               rhs_function.value_list(fe_values.get_quadrature_points(),
                                       rhs_values);
 
@@ -570,7 +572,7 @@ namespace VectorTools
               dofs.resize(dofs_per_cell);
               cell_vector.reinit(dofs_per_cell);
 
-              const std::vector<Number> &weights = fe_values.get_JxW_values();
+              const auto &weights = fe_values.get_JxW_values();
               rhs_function.vector_value_list(fe_values.get_quadrature_points(),
                                              rhs_values);
 
@@ -617,6 +619,8 @@ namespace VectorTools
                                                      rhs_vector);
             }
       }
+
+    rhs_vector.compress(VectorOperation::values::add);
   }
 
 

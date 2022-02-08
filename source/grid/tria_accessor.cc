@@ -72,7 +72,7 @@ namespace
     // which is 0 or 1 in an anisotropic case
     // (case_x, case_y, casex2y or casey2x) or
     // 0...3 in an isotropic case (case_xy)
-    return subface_no + first_child_has_children;
+    return subface_no + static_cast<unsigned int>(first_child_has_children);
   }
 
 
@@ -1671,8 +1671,8 @@ double
 TriaAccessor<2, 2, 2>::extent_in_direction(const unsigned int axis) const
 {
   const unsigned int lines[2][2] = {
-    {2, 3},  /// Lines along x-axis, see GeometryInfo
-    {0, 1}}; /// Lines along y-axis
+    {2, 3},  //  Lines along x-axis, see GeometryInfo
+    {0, 1}}; //  Lines along y-axis
 
   AssertIndexRange(axis, 2);
 
@@ -1685,8 +1685,8 @@ double
 TriaAccessor<2, 2, 3>::extent_in_direction(const unsigned int axis) const
 {
   const unsigned int lines[2][2] = {
-    {2, 3},  /// Lines along x-axis, see GeometryInfo
-    {0, 1}}; /// Lines along y-axis
+    {2, 3},  //  Lines along x-axis, see GeometryInfo
+    {0, 1}}; //  Lines along y-axis
 
   AssertIndexRange(axis, 2);
 
@@ -1700,9 +1700,9 @@ double
 TriaAccessor<3, 3, 3>::extent_in_direction(const unsigned int axis) const
 {
   const unsigned int lines[3][4] = {
-    {2, 3, 6, 7},    /// Lines along x-axis, see GeometryInfo
-    {0, 1, 4, 5},    /// Lines along y-axis
-    {8, 9, 10, 11}}; /// Lines along z-axis
+    {2, 3, 6, 7},    // Lines along x-axis, see GeometryInfo
+    {0, 1, 4, 5},    // Lines along y-axis
+    {8, 9, 10, 11}}; // Lines along z-axis
 
   AssertIndexRange(axis, 3);
 
@@ -1796,6 +1796,190 @@ TriaAccessor<structdim, dim, spacedim>::center(
   else
     return get_new_point_on_object(*this, use_interpolation);
 }
+
+
+/*---------------- Functions: TriaAccessor<0,1,spacedim> -------------------*/
+
+
+template <int spacedim>
+bool
+TriaAccessor<0, 1, spacedim>::user_flag_set() const
+{
+  Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
+  Assert(false, ExcNotImplemented());
+  return true;
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::set_user_flag() const
+{
+  Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
+  Assert(false, ExcNotImplemented());
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::clear_user_flag() const
+{
+  Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
+  Assert(false, ExcNotImplemented());
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::recursively_set_user_flag() const
+{
+  set_user_flag();
+
+  if (this->has_children())
+    for (unsigned int c = 0; c < this->n_children(); ++c)
+      this->child(c)->recursively_set_user_flag();
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::recursively_clear_user_flag() const
+{
+  clear_user_flag();
+
+  if (this->has_children())
+    for (unsigned int c = 0; c < this->n_children(); ++c)
+      this->child(c)->recursively_clear_user_flag();
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::clear_user_data() const
+{
+  Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
+  Assert(false, ExcNotImplemented());
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::set_user_pointer(void *) const
+{
+  Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
+  Assert(false, ExcNotImplemented());
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::clear_user_pointer() const
+{
+  Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
+  Assert(false, ExcNotImplemented());
+}
+
+
+
+template <int spacedim>
+void *
+TriaAccessor<0, 1, spacedim>::user_pointer() const
+{
+  Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
+  Assert(false, ExcNotImplemented());
+  return nullptr;
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::recursively_set_user_pointer(void *p) const
+{
+  set_user_pointer(p);
+
+  if (this->has_children())
+    for (unsigned int c = 0; c < this->n_children(); ++c)
+      this->child(c)->recursively_set_user_pointer(p);
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::recursively_clear_user_pointer() const
+{
+  clear_user_pointer();
+
+  if (this->has_children())
+    for (unsigned int c = 0; c < this->n_children(); ++c)
+      this->child(c)->recursively_clear_user_pointer();
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::set_user_index(const unsigned int) const
+{
+  Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
+  Assert(false, ExcNotImplemented());
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::clear_user_index() const
+{
+  Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
+  Assert(false, ExcNotImplemented());
+}
+
+
+
+template <int spacedim>
+unsigned int
+TriaAccessor<0, 1, spacedim>::user_index() const
+{
+  Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
+  Assert(false, ExcNotImplemented());
+  return 0;
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::recursively_set_user_index(unsigned int p) const
+{
+  set_user_index(p);
+
+  if (this->has_children())
+    for (unsigned int c = 0; c < this->n_children(); ++c)
+      this->child(c)->recursively_set_user_index(p);
+}
+
+
+
+template <int spacedim>
+void
+TriaAccessor<0, 1, spacedim>::recursively_clear_user_index() const
+{
+  clear_user_index();
+
+  if (this->has_children())
+    for (unsigned int c = 0; c < this->n_children(); ++c)
+      this->child(c)->recursively_clear_user_index();
+}
+
 
 
 /*------------------------ Functions: CellAccessor<1> -----------------------*/
@@ -2124,17 +2308,6 @@ CellAccessor<dim, spacedim>::parent_index() const
 
 
 template <int dim, int spacedim>
-unsigned int
-CellAccessor<dim, spacedim>::active_cell_index() const
-{
-  Assert(this->is_active(), TriaAccessorExceptions::ExcCellNotActive());
-  return this->tria->levels[this->present_level]
-    ->active_cell_indices[this->present_index];
-}
-
-
-
-template <int dim, int spacedim>
 void
 CellAccessor<dim, spacedim>::set_active_cell_index(
   const unsigned int active_cell_index) const
@@ -2157,37 +2330,12 @@ CellAccessor<dim, spacedim>::set_global_active_cell_index(
 
 
 template <int dim, int spacedim>
-inline types::global_cell_index
-CellAccessor<dim, spacedim>::global_active_cell_index() const
-{
-  Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
-  Assert(this->is_active(),
-         ExcMessage(
-           "global_active_cell_index() can only be called on active cells!"));
-
-  return this->tria->levels[this->present_level]
-    ->global_active_cell_indices[this->present_index];
-}
-
-
-
-template <int dim, int spacedim>
 void
 CellAccessor<dim, spacedim>::set_global_level_cell_index(
   const types::global_cell_index index) const
 {
   this->tria->levels[this->present_level]
     ->global_level_cell_indices[this->present_index] = index;
-}
-
-
-
-template <int dim, int spacedim>
-inline types::global_cell_index
-CellAccessor<dim, spacedim>::global_level_cell_index() const
-{
-  return this->tria->levels[this->present_level]
-    ->global_level_cell_indices[this->present_index];
 }
 
 
@@ -2930,8 +3078,8 @@ CellAccessor<dim, spacedim>::neighbor_child_on_subface(
                   subface;
 
               const unsigned int neighbor_child_index =
-                ReferenceCells::Triangle.child_cell_on_face(neighbor_face,
-                                                            neighbor_subface);
+                neighbor_cell->reference_cell().child_cell_on_face(
+                  neighbor_face, neighbor_subface);
               const TriaIterator<CellAccessor<dim, spacedim>> sub_neighbor =
                 neighbor_cell->child(neighbor_child_index);
 

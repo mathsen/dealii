@@ -21,6 +21,7 @@
 #include <deal.II/distributed/tria_base.h>
 
 #include <deal.II/grid/cell_id_translator.h>
+#include <deal.II/grid/filtered_iterator.h>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -31,7 +32,7 @@ namespace RepartitioningPolicyTools
   {
     template <int dim, int spacedim>
     void
-    add_indices_recursevly_for_first_child_policy(
+    add_indices_recursively_for_first_child_policy(
       const TriaIterator<CellAccessor<dim, spacedim>> &cell,
       const internal::CellIDTranslator<dim> &          cell_id_translator,
       IndexSet &                                       is_fine)
@@ -40,18 +41,67 @@ namespace RepartitioningPolicyTools
 
       if (cell->level() > 0 &&
           (cell->index() % GeometryInfo<dim>::max_children_per_cell) == 0)
-        add_indices_recursevly_for_first_child_policy(cell->parent(),
-                                                      cell_id_translator,
-                                                      is_fine);
+        add_indices_recursively_for_first_child_policy(cell->parent(),
+                                                       cell_id_translator,
+                                                       is_fine);
     }
   } // namespace
+
+
+  template <int dim, int spacedim>
+  DefaultPolicy<dim, spacedim>::DefaultPolicy(const bool tighten)
+    : tighten(tighten)
+  {}
 
   template <int dim, int spacedim>
   LinearAlgebra::distributed::Vector<double>
   DefaultPolicy<dim, spacedim>::partition(
-    const Triangulation<dim, spacedim> &) const
+    const Triangulation<dim, spacedim> &tria_in) const
   {
-    return {}; // nothing to do
+    if (tighten == false)
+      return {}; // nothing to do
+
+    const auto tria =
+      dynamic_cast<const parallel::TriangulationBase<dim, spacedim> *>(
+        &tria_in);
+
+    if (tria == nullptr)
+      return {}; // nothing to do, since serial triangulation
+
+#ifndef DEAL_II_WITH_MPI
+    Assert(false, ExcNeedsMPI());
+    return {};
+#else
+
+    const auto comm = tria->get_communicator();
+
+    const unsigned int process_has_active_locally_owned_cells =
+      tria->n_locally_owned_active_cells() > 0;
+    const unsigned int n_processes_with_active_locally_owned_cells =
+      Utilities::MPI::sum(process_has_active_locally_owned_cells, comm);
+
+    if (n_processes_with_active_locally_owned_cells ==
+        Utilities::MPI::n_mpi_processes(comm))
+      return {}; // nothing to do, since all processes have cells
+
+    unsigned int offset = 0;
+
+    const int ierr = MPI_Exscan(&process_has_active_locally_owned_cells,
+                                &offset,
+                                1,
+                                Utilities::MPI::internal::mpi_type_id(
+                                  &process_has_active_locally_owned_cells),
+                                MPI_SUM,
+                                comm);
+    AssertThrowMPI(ierr);
+
+    LinearAlgebra::distributed::Vector<double> partition(
+      tria->global_active_cell_index_partitioner().lock());
+
+    partition = offset;
+
+    return partition;
+#endif
   }
 
 
@@ -73,9 +123,9 @@ namespace RepartitioningPolicyTools
 
     for (const auto &cell : tria_fine.active_cell_iterators())
       if (cell->is_locally_owned())
-        add_indices_recursevly_for_first_child_policy(cell,
-                                                      cell_id_translator,
-                                                      is_level_partitions);
+        add_indices_recursively_for_first_child_policy(cell,
+                                                       cell_id_translator,
+                                                       is_level_partitions);
   }
 
 
@@ -122,11 +172,11 @@ namespace RepartitioningPolicyTools
     LinearAlgebra::distributed::Vector<double> partition(
       tria->global_active_cell_index_partitioner().lock());
 
-    for (const auto &cell : tria_coarse_in.active_cell_iterators())
-      if (cell->is_locally_owned())
-        partition[cell->global_active_cell_index()] =
-          owning_ranks_of_coarse_cells[is_coarse.index_within_set(
-            cell_id_translator.translate(cell))];
+    for (const auto &cell : tria_coarse_in.active_cell_iterators() |
+                              IteratorFilters::LocallyOwnedCell())
+      partition[cell->global_active_cell_index()] =
+        owning_ranks_of_coarse_cells[is_coarse.index_within_set(
+          cell_id_translator.translate(cell))];
 
     return partition;
   }
@@ -156,10 +206,11 @@ namespace RepartitioningPolicyTools
 
     // step 1) check if all processes have enough cells
 
-    unsigned int n_locally_owned_active_cells = 0;
-    for (const auto &cell : tria_in.active_cell_iterators())
-      if (cell->is_locally_owned())
-        ++n_locally_owned_active_cells;
+    const unsigned int n_locally_owned_active_cells =
+      std::count_if(tria_in.begin_active(),
+                    typename Triangulation<dim, spacedim>::active_cell_iterator(
+                      tria_in.end()),
+                    [](const auto &cell) { return cell.is_locally_owned(); });
 
     const auto comm = tria_in.get_communicator();
 
@@ -170,12 +221,14 @@ namespace RepartitioningPolicyTools
     // a repartitioning kicks in with the aim that all processes that own
     // cells have at least the specified number of cells
 
-    const unsigned int n_global_active_cells = tria_in.n_global_active_cells();
+    const types::global_cell_index n_global_active_cells =
+      tria_in.n_global_active_cells();
 
     const unsigned int n_partitions =
       std::max<unsigned int>(1,
-                             std::min(n_global_active_cells / n_min_cells,
-                                      Utilities::MPI::n_mpi_processes(comm)));
+                             std::min<types::global_cell_index>(
+                               n_global_active_cells / n_min_cells,
+                               Utilities::MPI::n_mpi_processes(comm)));
 
     const unsigned int min_cells = n_global_active_cells / n_partitions;
 
@@ -241,12 +294,11 @@ namespace RepartitioningPolicyTools
     const auto n_subdomains = Utilities::MPI::n_mpi_processes(mpi_communicator);
 
     // determine weight of each cell
-    for (const auto &cell : tria->active_cell_iterators())
-      if (cell->is_locally_owned())
-        weights[partitioner->global_to_local(
-          cell->global_active_cell_index())] =
-          weighting_function(
-            cell, Triangulation<dim, spacedim>::CellStatus::CELL_PERSIST);
+    for (const auto &cell :
+         tria->active_cell_iterators() | IteratorFilters::LocallyOwnedCell())
+      weights[partitioner->global_to_local(cell->global_active_cell_index())] =
+        weighting_function(
+          cell, Triangulation<dim, spacedim>::CellStatus::CELL_PERSIST);
 
     // determine weight of all the cells locally owned by this process
     uint64_t process_local_weight = 0;
@@ -273,6 +325,7 @@ namespace RepartitioningPolicyTools
                      Utilities::MPI::internal::mpi_type_id(&total_weight),
                      n_subdomains - 1,
                      mpi_communicator);
+    AssertThrowMPI(ierr);
 
     // setup partition
     LinearAlgebra::distributed::Vector<double> partition(partitioner);

@@ -68,11 +68,55 @@ namespace VectorTools
    * Given a (distributed) solution vector @p vector, evaluate the values at
    * the (arbitrary and even remote) points specified by @p evaluation_points.
    *
+   * The following code snippet shows the usage of this function. Given
+   * a Mapping object, a DoFHandler object, and solution vector as well as a
+   * vector filled with points at which the vector should be evaluated, this
+   * function returns a vector with values at those points. Furthermore, the
+   * function initializes the communication pattern within the cache
+   * Utilities::MPI::RemotePointEvaluation, which can be efficiently used in
+   * further function calls (see also the function below).
+   *
+   * @code
+   * // first usage: set up cache
+   * Utilities::MPI::RemotePointEvaluation<dim, spacedim> cache;
+   *
+   * const auto result_1 = VectorTools::point_values(
+   *   mapping, dof_handler_1, vector_1, evaluation_points, cache);
+   *
+   * // further usages: reuse the cache
+   * const auto result_2 = VectorTools::point_values(
+   *   cache, dof_handler_2, vector_2);
+   * @endcode
+   *
+   * Note that different DoFHandler objects can be passed to different
+   * calls of this function. However, the underlying Triangulation object
+   * needs to be the same if the cache should be reused.
+   *
+   * Alternatively, the user can set up the cache via
+   * Utilities::MPI::RemotePointEvaluation::reinit() manually:
+   *
+   * @code
+   * // set up cache manually
+   * Utilities::MPI::RemotePointEvaluation<dim, spacedim> cache;
+   * cache.reinit(evaluation_points, triangulation, mapping);
+   *
+   * // use the cache
+   * const auto result_1 = VectorTools::point_values(
+   *   cache, dof_handler_1, vector_1);
+   *
+   * const auto result_2 = VectorTools::point_values(
+   *   cache, dof_handler_2, vector_2);
+   * @endcode
+   *
    * @warning This is a collective call that needs to be executed by all
    *   processors in the communicator.
    */
   template <int n_components, int dim, int spacedim, typename VectorType>
-  std::vector<typename FEPointEvaluation<n_components, dim>::value_type>
+  std::vector<
+    typename FEPointEvaluation<n_components,
+                               dim,
+                               spacedim,
+                               typename VectorType::value_type>::value_type>
   point_values(
     const Mapping<dim> &                                  mapping,
     const DoFHandler<dim, spacedim> &                     dof_handler,
@@ -87,13 +131,18 @@ namespace VectorTools
    * above function.
    *
    * @note Refinement/coarsening/repartitioning leads to the invalidation of the
-   *   cache so that the above function has to be called again.
+   *   cache so that the above function has to be called again. See also the
+   *   example above.
    *
    * @warning This is a collective call that needs to be executed by all
    *   processors in the communicator.
    */
   template <int n_components, int dim, int spacedim, typename VectorType>
-  std::vector<typename FEPointEvaluation<n_components, dim>::value_type>
+  std::vector<
+    typename FEPointEvaluation<n_components,
+                               dim,
+                               spacedim,
+                               typename VectorType::value_type>::value_type>
   point_values(
     const Utilities::MPI::RemotePointEvaluation<dim, spacedim> &cache,
     const DoFHandler<dim, spacedim> &                           dof_handler,
@@ -103,9 +152,19 @@ namespace VectorTools
   /**
    * Given a (distributed) solution vector @p vector, evaluate the gradients at
    * the (arbitrary and even remote) points specified by @p evaluation_points.
+   *
+   * @note The same comments as in the case of point_values() are true for this
+   *   function.
+   *
+   * @warning This is a collective call that needs to be executed by all
+   *   processors in the communicator.
    */
   template <int n_components, int dim, int spacedim, typename VectorType>
-  std::vector<typename FEPointEvaluation<n_components, dim>::gradient_type>
+  std::vector<
+    typename FEPointEvaluation<n_components,
+                               dim,
+                               spacedim,
+                               typename VectorType::value_type>::gradient_type>
   point_gradients(
     const Mapping<dim> &                                  mapping,
     const DoFHandler<dim, spacedim> &                     dof_handler,
@@ -119,11 +178,18 @@ namespace VectorTools
    * the points specified by @p cache which might have been set up by the
    * above function.
    *
-   * @note Refinement/coarsening/repartitioning leads to the invalidation of the
-   *   cache so that the above function has to be called again.
+   * @note The same comments as in the case of point_values() are true for this
+   *   function.
+   *
+   * @warning This is a collective call that needs to be executed by all
+   *   processors in the communicator.
    */
   template <int n_components, int dim, int spacedim, typename VectorType>
-  std::vector<typename FEPointEvaluation<n_components, dim>::gradient_type>
+  std::vector<
+    typename FEPointEvaluation<n_components,
+                               dim,
+                               spacedim,
+                               typename VectorType::value_type>::gradient_type>
   point_gradients(
     const Utilities::MPI::RemotePointEvaluation<dim, spacedim> &cache,
     const DoFHandler<dim, spacedim> &                           dof_handler,
@@ -137,7 +203,11 @@ namespace VectorTools
 
 #ifndef DOXYGEN
   template <int n_components, int dim, int spacedim, typename VectorType>
-  inline std::vector<typename FEPointEvaluation<n_components, dim>::value_type>
+  inline std::vector<
+    typename FEPointEvaluation<n_components,
+                               dim,
+                               spacedim,
+                               typename VectorType::value_type>::value_type>
   point_values(const Mapping<dim> &                mapping,
                const DoFHandler<dim, spacedim> &   dof_handler,
                const VectorType &                  vector,
@@ -154,7 +224,10 @@ namespace VectorTools
 
   template <int n_components, int dim, int spacedim, typename VectorType>
   inline std::vector<
-    typename FEPointEvaluation<n_components, dim>::gradient_type>
+    typename FEPointEvaluation<n_components,
+                               dim,
+                               spacedim,
+                               typename VectorType::value_type>::gradient_type>
   point_gradients(const Mapping<dim> &                mapping,
                   const DoFHandler<dim, spacedim> &   dof_handler,
                   const VectorType &                  vector,
@@ -241,7 +314,10 @@ namespace VectorTools
       const UpdateFlags                                           update_flags,
       const dealii::EvaluationFlags::EvaluationFlags evaluation_flags,
       const std::function<
-        value_type(const FEPointEvaluation<n_components, dim> &,
+        value_type(const FEPointEvaluation<n_components,
+                                           dim,
+                                           spacedim,
+                                           typename VectorType::value_type> &,
                    const unsigned int &)> process_quadrature_point)
     {
       Assert(cache.is_ready(),
@@ -265,7 +341,11 @@ namespace VectorTools
                                              const auto &cell_data) {
           std::vector<typename VectorType::value_type> solution_values;
 
-          std::vector<std::unique_ptr<FEPointEvaluation<n_components, dim>>>
+          std::vector<
+            std::unique_ptr<FEPointEvaluation<n_components,
+                                              dim,
+                                              spacedim,
+                                              typename VectorType::value_type>>>
             evaluators(dof_handler.get_fe_collection().size());
 
           for (unsigned int i = 0; i < cell_data.cells.size(); ++i)
@@ -289,9 +369,12 @@ namespace VectorTools
                                    solution_values.end());
 
               if (evaluators[cell->active_fe_index()] == nullptr)
-                evaluators[cell->active_fe_index()] =
-                  std::make_unique<FEPointEvaluation<n_components, dim>>(
-                    cache.get_mapping(), cell->get_fe(), update_flags);
+                evaluators[cell->active_fe_index()] = std::make_unique<
+                  FEPointEvaluation<n_components,
+                                    dim,
+                                    spacedim,
+                                    typename VectorType::value_type>>(
+                  cache.get_mapping(), cell->get_fe(), update_flags);
               auto &evaluator = *evaluators[cell->active_fe_index()];
 
               evaluator.reinit(cell, unit_points);
@@ -344,7 +427,11 @@ namespace VectorTools
   } // namespace internal
 
   template <int n_components, int dim, int spacedim, typename VectorType>
-  inline std::vector<typename FEPointEvaluation<n_components, dim>::value_type>
+  inline std::vector<
+    typename FEPointEvaluation<n_components,
+                               dim,
+                               spacedim,
+                               typename VectorType::value_type>::value_type>
   point_values(
     const Utilities::MPI::RemotePointEvaluation<dim, spacedim> &cache,
     const DoFHandler<dim, spacedim> &                           dof_handler,
@@ -356,7 +443,10 @@ namespace VectorTools
       dim,
       spacedim,
       VectorType,
-      typename FEPointEvaluation<n_components, dim>::value_type>(
+      typename FEPointEvaluation<n_components,
+                                 dim,
+                                 spacedim,
+                                 typename VectorType::value_type>::value_type>(
       cache,
       dof_handler,
       vector,
@@ -370,7 +460,10 @@ namespace VectorTools
 
   template <int n_components, int dim, int spacedim, typename VectorType>
   inline std::vector<
-    typename FEPointEvaluation<n_components, dim>::gradient_type>
+    typename FEPointEvaluation<n_components,
+                               dim,
+                               spacedim,
+                               typename VectorType::value_type>::gradient_type>
   point_gradients(
     const Utilities::MPI::RemotePointEvaluation<dim, spacedim> &cache,
     const DoFHandler<dim, spacedim> &                           dof_handler,
@@ -382,7 +475,11 @@ namespace VectorTools
       dim,
       spacedim,
       VectorType,
-      typename FEPointEvaluation<n_components, dim>::gradient_type>(
+      typename FEPointEvaluation<
+        n_components,
+        dim,
+        spacedim,
+        typename VectorType::value_type>::gradient_type>(
       cache,
       dof_handler,
       vector,

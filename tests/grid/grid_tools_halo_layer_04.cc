@@ -36,7 +36,7 @@ write_active_fe_index_to_file(const DoFHandler<dim> &dof_handler)
                                                  endc = dof_handler.end();
   for (; cell != endc; ++cell, ++count)
     {
-      deallog << count << " " << cell->active_fe_index() << std::endl;
+      deallog << count << ' ' << cell->active_fe_index() << std::endl;
     }
   deallog << std::endl;
 }
@@ -64,7 +64,6 @@ write_vtk(const DoFHandler<dim> &dof_handler, const std::string filename)
   DataOut<dim> data_out;
   data_out.attach_dof_handler(dof_handler);
   data_out.add_data_vector(active_fe_index,
-
                            data_names,
                            DataOut<dim>::type_cell_data,
                            data_component_interpretation);

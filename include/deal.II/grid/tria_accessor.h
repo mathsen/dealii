@@ -268,7 +268,7 @@ namespace TriaAccessorExceptions
     ExcSetOnlyEvenChildren,
     int,
     << "You can only set the child index of an even numbered child."
-    << "The number of the child given was " << arg1 << ".");
+    << "The number of the child given was " << arg1 << '.');
 } // namespace TriaAccessorExceptions
 
 
@@ -898,6 +898,13 @@ public:
   /**
    * @{
    */
+
+  /**
+   * Return an integer representation that uniquely encodes the orientation,
+   * flip, and rotation of a @p face.
+   */
+  unsigned char
+  combined_face_orientation(const unsigned int face) const;
 
   /**
    * Return whether the face with index @p face has its normal pointing in the
@@ -2105,6 +2112,12 @@ public:
    */
 
   /**
+   * @brief Always return 0
+   */
+  static unsigned char
+  combined_face_orientation(const unsigned int face);
+
+  /**
    * @brief Always return false
    */
   static bool
@@ -2372,6 +2385,14 @@ public:
   copy_from(const TriaAccessor &);
 
   /**
+   * Copy operator. We need this function to support generic
+   * programming, but it just throws an exception because it cannot do
+   * the required operations.
+   */
+  void
+  copy_from(const TriaAccessorBase<0, 1, spacedim> &);
+
+  /**
    * Return the state of the iterator. Since an iterator to points can not be
    * incremented or decremented, its state remains constant, and in particular
    * equal to IteratorState::valid.
@@ -2557,11 +2578,206 @@ public:
    * Return the manifold indicator of this object.
    *
    * @see
-   * @ref GlossManifoldIndicator "Glossary entry on manifold indicators"
+   * @ref GlossManifoldIndicator "Glossary entry on manifold indicators".
    */
   types::manifold_id
   manifold_id() const;
 
+
+  /**
+   * @name User data
+   */
+  /**
+   * @{
+   */
+  /**
+   * Read the user flag. See
+   * @ref GlossUserFlags
+   * for more information.
+   */
+  bool
+  user_flag_set() const;
+
+  /**
+   * Set the user flag. See
+   * @ref GlossUserFlags
+   * for more information.
+   */
+  void
+  set_user_flag() const;
+
+  /**
+   * Clear the user flag. See
+   * @ref GlossUserFlags
+   * for more information.
+   */
+  void
+  clear_user_flag() const;
+
+  /**
+   * Set the user flag for this and all descendants. See
+   * @ref GlossUserFlags
+   * for more information.
+   */
+  void
+  recursively_set_user_flag() const;
+
+  /**
+   * Clear the user flag for this and all descendants. See
+   * @ref GlossUserFlags
+   * for more information.
+   */
+  void
+  recursively_clear_user_flag() const;
+
+  /**
+   * Reset the user data to zero, independent if pointer or index. See
+   * @ref GlossUserData
+   * for more information.
+   */
+  void
+  clear_user_data() const;
+
+  /**
+   * Set the user pointer to @p p.
+   *
+   * @note User pointers and user indices are mutually exclusive. Therefore,
+   * you can only use one of them, unless you call
+   * Triangulation::clear_user_data() in between.
+   *
+   * See
+   * @ref GlossUserData
+   * for more information.
+   */
+  void
+  set_user_pointer(void *p) const;
+
+  /**
+   * Reset the user pointer to a @p nullptr pointer. See
+   * @ref GlossUserData
+   * for more information.
+   */
+  void
+  clear_user_pointer() const;
+
+  /**
+   * Access the value of the user pointer. It is in the responsibility of the
+   * user to make sure that the pointer points to something useful. You should
+   * use the new style cast operator to maintain a minimum of type safety,
+   * e.g.
+   *
+   * @note User pointers and user indices are mutually exclusive. Therefore,
+   * you can only use one of them, unless you call
+   * Triangulation::clear_user_data() in between. <tt>A
+   * *a=static_cast<A*>(cell->user_pointer());</tt>.
+   *
+   * See
+   * @ref GlossUserData
+   * for more information.
+   */
+  void *
+  user_pointer() const;
+
+  /**
+   * Set the user pointer of this object and all its children to the given
+   * value. This is useful for example if all cells of a certain subdomain, or
+   * all faces of a certain part of the boundary should have user pointers
+   * pointing to objects describing this part of the domain or boundary.
+   *
+   * Note that the user pointer is not inherited under mesh refinement, so
+   * after mesh refinement there might be cells or faces that don't have user
+   * pointers pointing to the describing object. In this case, simply loop
+   * over all the elements of the coarsest level that has this information,
+   * and use this function to recursively set the user pointer of all finer
+   * levels of the triangulation.
+   *
+   * @note User pointers and user indices are mutually exclusive. Therefore,
+   * you can only use one of them, unless you call
+   * Triangulation::clear_user_data() in between.
+   *
+   * See
+   * @ref GlossUserData
+   * for more information.
+   */
+  void
+  recursively_set_user_pointer(void *p) const;
+
+  /**
+   * Clear the user pointer of this object and all of its descendants. The
+   * same holds as said for the recursively_set_user_pointer() function. See
+   * @ref GlossUserData
+   * for more information.
+   */
+  void
+  recursively_clear_user_pointer() const;
+
+  /**
+   * Set the user index to @p p.
+   *
+   * @note User pointers and user indices are mutually exclusive. Therefore,
+   * you can only use one of them, unless you call
+   * Triangulation::clear_user_data() in between. See
+   * @ref GlossUserData
+   * for more information.
+   */
+  void
+  set_user_index(const unsigned int p) const;
+
+  /**
+   * Reset the user index to 0. See
+   * @ref GlossUserData
+   * for more information.
+   */
+  void
+  clear_user_index() const;
+
+  /**
+   * Access the value of the user index.
+   *
+   * @note User pointers and user indices are mutually exclusive. Therefore,
+   * you can only use one of them, unless you call
+   * Triangulation::clear_user_data() in between.
+   *
+   * See
+   * @ref GlossUserData
+   * for more information.
+   */
+  unsigned int
+  user_index() const;
+
+  /**
+   * Set the user index of this object and all its children.
+   *
+   * Note that the user index is not inherited under mesh refinement, so after
+   * mesh refinement there might be cells or faces that don't have the
+   * expected user indices. In this case, simply loop over all the elements of
+   * the coarsest level that has this information, and use this function to
+   * recursively set the user index of all finer levels of the triangulation.
+   *
+   * @note User pointers and user indices are mutually exclusive. Therefore,
+   * you can only use one of them, unless you call
+   * Triangulation::clear_user_data() in between.
+   *
+   * See
+   * @ref GlossUserData
+   * for more information.
+   */
+  void
+  recursively_set_user_index(const unsigned int p) const;
+
+  /**
+   * Clear the user index of this object and all of its descendants. The same
+   * holds as said for the recursively_set_user_index() function.
+   *
+   * See
+   * @ref GlossUserData
+   * for more information.
+   */
+  void
+  recursively_clear_user_index() const;
+  /**
+   * @}
+   */
 
   /**
    * @name Orientation of sub-objects
@@ -2569,6 +2785,12 @@ public:
   /**
    * @{
    */
+
+  /**
+   * @brief Always return 0
+   */
+  static unsigned char
+  combined_face_orientation(const unsigned int face);
 
   /**
    * @brief Always return false
@@ -3749,6 +3971,15 @@ public:
    */
   bool
   is_artificial() const;
+
+  /**
+   * Similar to is_artificial() but checking the conditions on the levels.
+   *
+   * @post The returned value is equal to <code>!is_ghost_on_level() &&
+   * !is_locally_owned_on_level()</code>.
+   */
+  bool
+  is_artificial_on_level() const;
 
   /**
    * Test whether the point @p p is inside this cell. Points on the boundary

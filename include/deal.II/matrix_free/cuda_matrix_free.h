@@ -38,10 +38,18 @@
 #  include <deal.II/lac/cuda_vector.h>
 #  include <deal.II/lac/la_parallel_vector.h>
 
-#  include <deal.II/matrix_free/hanging_nodes_internal.h>
 
 
 DEAL_II_NAMESPACE_OPEN
+
+// Forward declaration
+namespace internal
+{
+  namespace MatrixFreeFunctions
+  {
+    enum class ConstraintKinds : std::uint16_t;
+  }
+} // namespace internal
 
 namespace CUDAWrappers
 {
@@ -273,7 +281,7 @@ namespace CUDAWrappers
     reinit(const DoFHandler<dim> &          dof_handler,
            const AffineConstraints<Number> &constraints,
            const Quadrature<1> &            quad,
-           const AdditionalData &           AdditionalData = AdditionalData());
+           const AdditionalData &           additional_data = AdditionalData());
 
     /**
      * Return the Data structure associated with @p color.
@@ -670,7 +678,7 @@ namespace CUDAWrappers
     SharedData(Number *vd, Number *gq[dim])
       : values(vd)
     {
-      for (int d = 0; d < dim; ++d)
+      for (unsigned int d = 0; d < dim; ++d)
         gradients[d] = gq[d];
     }
 

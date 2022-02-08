@@ -222,32 +222,68 @@ namespace internal
       std::vector<std::shared_ptr<dealii::hp::FEFaceValues<dim, spacedim>>>
         &x_fe_face_values)
     {
-      unsigned int n_q_points = 0;
+      // First figure out which reference cell types are present in the
+      // FECollections we got as arguments. To this end, use a lambda
+      // function that for a FECollection object tests whether one of the
+      // elements uses a specific reference cell. Then use this
+      // lambda function in a std::any_of() call that accumulates over
+      // all of the FECollection objects we were given.
+      //
+      // Note that in 1d, we will count a line segment as a hypercube
+      // even though it is *also* a simplex. Furthermore, wedges and
+      // pyramids can only appear in 3d set ups, so we do not need
+      // to test there if dim<3.
+      static const auto has_fe_with_reference_cell =
+        [](const dealii::hp::FECollection<dim, spacedim> &fe_collection,
+           const dealii::ReferenceCell &                  reference_cell) {
+          for (unsigned int i = 0; i < fe_collection.size(); ++i)
+            if (fe_collection[i].reference_cell() == reference_cell)
+              return true;
+          return false;
+        };
+
+      const bool needs_hypercube_setup = std::any_of(
+        finite_elements.begin(),
+        finite_elements.end(),
+        [](const std::shared_ptr<dealii::hp::FECollection<dim, spacedim>>
+             &fe_collection) {
+          return has_fe_with_reference_cell(
+            *fe_collection, ReferenceCells::get_hypercube<dim>());
+        });
+      const bool needs_simplex_setup =
+        (dim > 1 &&
+         std::any_of(
+           finite_elements.begin(),
+           finite_elements.end(),
+           [](const std::shared_ptr<dealii::hp::FECollection<dim, spacedim>>
+                &fe_collection) {
+             return has_fe_with_reference_cell(
+               *fe_collection, ReferenceCells::get_simplex<dim>());
+           }));
+      const bool needs_wedge_setup =
+        (dim == 3 &&
+         std::any_of(
+           finite_elements.begin(),
+           finite_elements.end(),
+           [](const std::shared_ptr<dealii::hp::FECollection<dim, spacedim>>
+                &fe_collection) {
+             return has_fe_with_reference_cell(*fe_collection,
+                                               ReferenceCells::Wedge);
+           }));
+      const bool needs_pyramid_setup =
+        (dim == 3 &&
+         std::any_of(
+           finite_elements.begin(),
+           finite_elements.end(),
+           [](const std::shared_ptr<dealii::hp::FECollection<dim, spacedim>>
+                &fe_collection) {
+             return has_fe_with_reference_cell(*fe_collection,
+                                               ReferenceCells::Pyramid);
+           }));
+
+      // Decide whether we want to work on cell or face FE(Face)Values objects:
       if (use_face_values == false)
         {
-          // determine if specific quadrature rules need to set up
-          bool needs_hypercube_setup = false;
-          bool needs_simplex_setup   = false;
-          bool needs_wedge_setup     = false;
-          bool needs_pyramid_setup   = false;
-
-          for (const auto &fe : finite_elements)
-            for (unsigned int i = 0; i < fe->size(); ++i)
-              {
-                const auto reference_cell = (*fe)[i].reference_cell();
-
-                if (reference_cell.is_hyper_cube())
-                  needs_hypercube_setup |= true;
-                else if (reference_cell.is_simplex())
-                  needs_simplex_setup |= true;
-                else if (reference_cell == dealii::ReferenceCells::Wedge)
-                  needs_wedge_setup |= true;
-                else if (reference_cell == dealii::ReferenceCells::Pyramid)
-                  needs_pyramid_setup |= true;
-                else
-                  Assert(false, ExcNotImplemented());
-              }
-
           std::unique_ptr<dealii::Quadrature<dim>> quadrature_simplex;
           std::unique_ptr<dealii::Quadrature<dim>> quadrature_hypercube;
           std::unique_ptr<dealii::Quadrature<dim>> quadrature_wedge;
@@ -260,8 +296,7 @@ namespace internal
                   generate_simplex_evaluation_points<dim>(n_subdivisions));
               else
                 quadrature_simplex = std::make_unique<Quadrature<dim>>(
-                  FE_SimplexP<dim, spacedim>(n_subdivisions)
-                    .get_unit_support_points());
+                  FE_SimplexP<dim>(n_subdivisions).get_unit_support_points());
             }
 
           if (needs_hypercube_setup)
@@ -273,52 +308,40 @@ namespace internal
 
           if (needs_wedge_setup)
             {
+              Assert(n_subdivisions == 1, ExcNotImplemented());
+
               quadrature_wedge = std::make_unique<Quadrature<dim>>(
-                FE_WedgeP<dim, spacedim>(
-                  1 /*note: vtk only supports linear wedges*/)
-                  .get_unit_support_points());
+                ReferenceCells::Wedge.get_nodal_type_quadrature<dim>());
             }
 
           if (needs_pyramid_setup)
             {
-              Assert(1 <= n_subdivisions && n_subdivisions <= 2,
-                     ExcNotImplemented());
+              Assert(n_subdivisions == 1, ExcNotImplemented());
 
-              std::vector<Point<dim>> points;
-
-              points.emplace_back(-1.0, -1.0, 0.0);
-              points.emplace_back(+1.0, -1.0, 0.0);
-              points.emplace_back(+1.0, +1.0, 0.0);
-              points.emplace_back(-1.0, +1.0, 0.0);
-              points.emplace_back(+0.0, +0.0, 1.0);
-
-              quadrature_pyramid = std::make_unique<Quadrature<dim>>(points);
+              quadrature_pyramid = std::make_unique<Quadrature<dim>>(
+                ReferenceCells::Pyramid.get_nodal_type_quadrature<dim>());
             }
-
-          n_q_points =
-            std::max({needs_wedge_setup ? quadrature_wedge->size() : 0,
-                      needs_simplex_setup ? quadrature_simplex->size() : 0,
-                      needs_hypercube_setup ? quadrature_hypercube->size() : 0,
-                      needs_pyramid_setup ? quadrature_pyramid->size() : 0});
 
           x_fe_values.resize(finite_elements.size());
           for (unsigned int i = 0; i < finite_elements.size(); ++i)
             {
-              // check if there is a finite element that is equal to the
-              // present one, then we can re-use the FEValues object
+              // Check if one of the previous finite elements is equal to the
+              // present one. If so, re-use the FEValues object.
               for (unsigned int j = 0; j < i; ++j)
                 if (finite_elements[i].get() == finite_elements[j].get())
                   {
                     x_fe_values[i] = x_fe_values[j];
                     break;
                   }
+
+              // If none was found, create an FEValues object:
               if (x_fe_values[i].get() == nullptr)
                 {
                   dealii::hp::QCollection<dim> quadrature;
 
                   for (unsigned int j = 0; j < finite_elements[i]->size(); ++j)
                     {
-                      const auto reference_cell =
+                      const dealii::ReferenceCell reference_cell =
                         (*finite_elements[i])[j].reference_cell();
 
                       if (reference_cell.is_hyper_cube())
@@ -348,34 +371,100 @@ namespace internal
                         update_flags);
                 }
             }
+
+          // Return maximal number of evaluation points:
+          return std::max(
+            {needs_wedge_setup ? quadrature_wedge->size() : 0,
+             needs_simplex_setup ? quadrature_simplex->size() : 0,
+             needs_hypercube_setup ? quadrature_hypercube->size() : 0,
+             needs_pyramid_setup ? quadrature_pyramid->size() : 0});
         }
-      else
+      else // build FEFaceValues objects instead
         {
-          dealii::hp::QCollection<dim - 1> quadrature(
-            QIterated<dim - 1>(QTrapezoid<1>(), n_subdivisions));
-          n_q_points = quadrature[0].size();
+          // The code following is not quite right for wedges and pyramids.
+          // Assert that we don't have these kinds of meshes.
+          Assert(needs_pyramid_setup == false && needs_wedge_setup == false,
+                 ExcNotImplemented());
+
+          std::unique_ptr<dealii::Quadrature<dim - 1>> quadrature_simplex;
+          std::unique_ptr<dealii::Quadrature<dim - 1>> quadrature_hypercube;
+
+          // See whether we need simplex or hypercube quadrature formulas.
+          // This is only an issue in 3d (in 2d every face integral is just
+          // a line integral, so we can deal with that via the usual hypercube
+          // quadrature rule).
+          if ((dim == 3) &&
+              (needs_simplex_setup || needs_pyramid_setup || needs_wedge_setup))
+            {
+              quadrature_simplex = std::make_unique<Quadrature<dim - 1>>(
+                generate_simplex_evaluation_points<dim - 1>(n_subdivisions));
+            }
+
+          if ((dim < 3) || (needs_hypercube_setup || needs_pyramid_setup ||
+                            needs_wedge_setup))
+            {
+              quadrature_hypercube =
+                std::make_unique<QIterated<dim - 1>>(QTrapezoid<1>(),
+                                                     n_subdivisions);
+            }
+
           x_fe_face_values.resize(finite_elements.size());
           for (unsigned int i = 0; i < finite_elements.size(); ++i)
             {
-              // check if there is a finite element that is equal to the
-              // present one, then we can re-use the FEValues object
+              // Check if one of the previous finite elements is equal to the
+              // present one. If so, re-use the FEValues object.
               for (unsigned int j = 0; j < i; ++j)
                 if (finite_elements[i].get() == finite_elements[j].get())
                   {
                     x_fe_face_values[i] = x_fe_face_values[j];
                     break;
                   }
-              if (x_fe_face_values[i].get() == nullptr)
-                x_fe_face_values[i] =
-                  std::make_shared<dealii::hp::FEFaceValues<dim, spacedim>>(
-                    mapping_collection,
-                    *finite_elements[i],
-                    quadrature,
-                    update_flags);
-            }
-        }
 
-      return n_q_points;
+              // If none was found, create an FEFaceValues object:
+              if (x_fe_face_values[i].get() == nullptr)
+                {
+                  dealii::hp::QCollection<dim - 1> quadrature;
+
+                  for (unsigned int j = 0; j < finite_elements[i]->size(); ++j)
+                    {
+                      const dealii::ReferenceCell reference_cell =
+                        (*finite_elements[i])[j].reference_cell();
+
+                      // In 1d/2d and for hypercube/wedge/pyramid elements, we
+                      // need hypercube quadratures.
+                      if ((dim < 3) ||
+                          (reference_cell.is_hyper_cube() ||
+                           (reference_cell == dealii::ReferenceCells::Wedge) ||
+                           (reference_cell == dealii::ReferenceCells::Pyramid)))
+                        quadrature.push_back(*quadrature_hypercube);
+
+                      // In 3d, if the element is for simplex/wedge/pyramid
+                      // cells, then we also need simplex quadratures
+                      if ((dim == 3) &&
+                          (reference_cell.is_simplex() ||
+                           (reference_cell == dealii::ReferenceCells::Wedge) ||
+                           (reference_cell == dealii::ReferenceCells::Pyramid)))
+                        quadrature.push_back(*quadrature_simplex);
+                    }
+
+                  x_fe_face_values[i] =
+                    std::make_shared<dealii::hp::FEFaceValues<dim, spacedim>>(
+                      mapping_collection,
+                      *finite_elements[i],
+                      quadrature,
+                      update_flags);
+                }
+            }
+
+          // Return maximal number of evaluation points:
+          return std::max(
+            {(dim == 3) && (needs_simplex_setup || needs_pyramid_setup ||
+                            needs_wedge_setup) ?
+               quadrature_simplex->size() :
+               0,
+             (dim < 3) || needs_hypercube_setup ? quadrature_hypercube->size() :
+                                                  0});
+        }
     }
 
 
@@ -467,11 +556,14 @@ namespace internal
             {
               if (cell->is_active())
                 {
-                  typename DoFHandler<dim, spacedim>::active_cell_iterator
+                  const typename DoFHandler<dim, spacedim>::active_cell_iterator
                     dh_cell(&cell->get_triangulation(),
                             cell->level(),
                             cell->index(),
                             dof_data[dataset]->dof_handler);
+
+                  // Check whether we need cell or face FEValues objects by
+                  // testing which of the two arrays actually has any content.
                   if (x_fe_values.empty())
                     {
                       AssertIndexRange(face, GeometryInfo<dim>::faces_per_cell);
@@ -484,6 +576,11 @@ namespace internal
                 x_fe_values[dataset]->reinit(cell);
             }
         }
+
+      // If there is are no DoF-associated data (just cell-associated ones),
+      // then the loop above will not execute any iterations. In that case,
+      // do the initialization for the first FE(Face)Values object by
+      // hand, using only the (triangulation) cell without a DoFHandler.
       if (dof_data.empty())
         {
           if (x_fe_values.empty())
@@ -504,6 +601,9 @@ namespace internal
       const unsigned int dataset) const
     {
       AssertIndexRange(dataset, finite_elements.size());
+
+      // Check whether we need cell or face FEValues objects by testing
+      // which of the two arrays actually has any content.
       if (x_fe_values.empty())
         return x_fe_face_values[dataset]->get_present_fe_values();
       else
@@ -827,7 +927,6 @@ namespace internal
       }
 #endif
 
-
       /**
        * Create a ghosted-copy of a block dof vector.
        */
@@ -1093,9 +1192,9 @@ namespace internal
       : DataEntryBase<dim, spacedim>(dofs, names, data_component_interpretation)
     {
       if (actual_type == DataVectorType::type_dof_data)
-        create_vector(*dofs, *data, vector);
+        create_dof_vector(*dofs, *data, vector);
       else if (actual_type == DataVectorType::type_cell_data)
-        create_vector(*dofs, *data, vector);
+        create_cell_vector(*data, vector);
       else
         Assert(false, ExcInternalError());
     }
@@ -1110,7 +1209,7 @@ namespace internal
       const DataPostprocessor<spacedim> *data_postprocessor)
       : DataEntryBase<dim, spacedim>(dofs, data_postprocessor)
     {
-      create_vector(*dofs, *data, vector);
+      create_dof_vector(*dofs, *data, vector);
     }
 
 

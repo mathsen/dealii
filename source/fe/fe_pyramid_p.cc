@@ -95,14 +95,35 @@ FE_PyramidPoly<dim, spacedim>::FE_PyramidPoly(
 {
   AssertDimension(dim, 3);
 
-
   if (degree == 1)
     {
-      this->unit_support_points.emplace_back(-1.0, -1.0, 0.0);
-      this->unit_support_points.emplace_back(+1.0, -1.0, 0.0);
-      this->unit_support_points.emplace_back(-1.0, +1.0, 0.0);
-      this->unit_support_points.emplace_back(+1.0, +1.0, 0.0);
-      this->unit_support_points.emplace_back(+0.0, +0.0, 1.0);
+      for (const unsigned int i : ReferenceCells::Pyramid.vertex_indices())
+        this->unit_support_points.emplace_back(
+          ReferenceCells::Pyramid.vertex<dim>(i));
+    }
+  else
+    Assert(false, ExcNotImplemented());
+}
+
+
+
+template <int dim, int spacedim>
+void
+FE_PyramidPoly<dim, spacedim>::
+  convert_generalized_support_point_values_to_dof_values(
+    const std::vector<Vector<double>> &support_point_values,
+    std::vector<double> &              nodal_values) const
+{
+  AssertDimension(support_point_values.size(),
+                  this->get_unit_support_points().size());
+  AssertDimension(support_point_values.size(), nodal_values.size());
+  AssertDimension(this->dofs_per_cell, nodal_values.size());
+
+  for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
+    {
+      AssertDimension(support_point_values[i].size(), 1);
+
+      nodal_values[i] = support_point_values[i](0);
     }
 }
 

@@ -451,7 +451,7 @@ public:
   get_new_point(const ArrayView<const Point<spacedim>> &surrounding_points,
                 const ArrayView<const double> &         weights) const override;
 
-protected:
+private:
   /**
    * A vector orthogonal to the normal direction.
    */
@@ -467,11 +467,15 @@ protected:
    */
   const Point<spacedim> point_on_axis;
 
-private:
   /**
    * Relative tolerance to measure zero distances.
    */
-  double tolerance;
+  const double tolerance;
+
+  /**
+   * The direction vector perpendicular to both direction and normal_direction.
+   */
+  const Tensor<1, spacedim> dxn;
 };
 
 /**
@@ -546,7 +550,7 @@ public:
   push_forward_gradient(const Point<spacedim> &chart_point) const override;
 
 
-protected:
+private:
   /**
    * The direction vector of the major axis.
    */
@@ -561,7 +565,6 @@ protected:
   const double cosh_u;
   const double sinh_u;
 
-private:
   /**
    * @copydoc ChartManifold::get_periodicity()
    *

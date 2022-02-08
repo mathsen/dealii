@@ -20,6 +20,7 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_system.h>
 
+#include <deal.II/grid/filtered_iterator.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/intergrid_map.h>
 
@@ -525,6 +526,8 @@ namespace VectorTools
     VectorType &                                               vec,
     const ComponentMask &                                      component_mask)
   {
+    AssertDimension(dof.get_fe_collection().n_components(),
+                    function.n_components);
     interpolate(get_default_linear_mapping(dof.get_triangulation()),
                 dof,
                 function,
@@ -673,22 +676,21 @@ namespace VectorTools
         Assert(fe.is_primitive(),
                ExcMessage("FE is not Primitive! This won't work."));
 
-        for (const auto &cell : dh.active_cell_iterators())
-          if (cell->is_locally_owned())
-            {
-              fe_v.reinit(cell);
-              cell->get_dof_indices(dofs);
-              const std::vector<Point<spacedim>> &points =
-                fe_v.get_quadrature_points();
-              for (unsigned int q = 0; q < points.size(); ++q)
-                {
-                  const unsigned int comp =
-                    fe.system_to_component_index(q).first;
-                  if (fe_mask[comp])
-                    ::dealii::internal::ElementAccess<VectorType>::set(
-                      points[q][fe_to_real[comp]], dofs[q], vector);
-                }
-            }
+        for (const auto &cell :
+             dh.active_cell_iterators() | IteratorFilters::LocallyOwnedCell())
+          {
+            fe_v.reinit(cell);
+            cell->get_dof_indices(dofs);
+            const std::vector<Point<spacedim>> &points =
+              fe_v.get_quadrature_points();
+            for (unsigned int q = 0; q < points.size(); ++q)
+              {
+                const unsigned int comp = fe.system_to_component_index(q).first;
+                if (fe_mask[comp])
+                  ::dealii::internal::ElementAccess<VectorType>::set(
+                    points[q][fe_to_real[comp]], dofs[q], vector);
+              }
+          }
       }
     else
       {

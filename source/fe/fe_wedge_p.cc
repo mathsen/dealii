@@ -80,6 +80,8 @@ namespace
   }
 } // namespace
 
+
+
 template <int dim, int spacedim>
 FE_WedgePoly<dim, spacedim>::FE_WedgePoly(
   const unsigned int                                degree,
@@ -105,12 +107,38 @@ FE_WedgePoly<dim, spacedim>::FE_WedgePoly(
 
   if (degree == 1)
     {
-      this->unit_support_points.emplace_back(0.0, 0.0, 0.0);
-      this->unit_support_points.emplace_back(1.0, 0.0, 0.0);
-      this->unit_support_points.emplace_back(0.0, 1.0, 0.0);
-      this->unit_support_points.emplace_back(0.0, 0.0, 1.0);
-      this->unit_support_points.emplace_back(1.0, 0.0, 1.0);
-      this->unit_support_points.emplace_back(0.0, 1.0, 1.0);
+      for (const unsigned int i : ReferenceCells::Wedge.vertex_indices())
+        this->unit_support_points.emplace_back(
+          ReferenceCells::Wedge.vertex<dim>(i));
+    }
+  else
+    {
+      // TODO: Wedge elements work for higher degrees, but we don't currently
+      // fill their support points. Leaving the array empty is valid, however,
+      // and will simply result in an error when someone tries to access the
+      // array.
+    }
+}
+
+
+
+template <int dim, int spacedim>
+void
+FE_WedgePoly<dim, spacedim>::
+  convert_generalized_support_point_values_to_dof_values(
+    const std::vector<Vector<double>> &support_point_values,
+    std::vector<double> &              nodal_values) const
+{
+  AssertDimension(support_point_values.size(),
+                  this->get_unit_support_points().size());
+  AssertDimension(support_point_values.size(), nodal_values.size());
+  AssertDimension(this->dofs_per_cell, nodal_values.size());
+
+  for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
+    {
+      AssertDimension(support_point_values[i].size(), 1);
+
+      nodal_values[i] = support_point_values[i](0);
     }
 }
 

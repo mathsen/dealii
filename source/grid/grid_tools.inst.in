@@ -146,6 +146,7 @@ for (deal_II_dimension : DIMENSIONS; deal_II_space_dimension : SPACE_DIMENSIONS)
         const Cache<deal_II_dimension, deal_II_space_dimension> &,
         const std::vector<Point<deal_II_space_dimension>> &,
         const std::vector<std::vector<BoundingBox<deal_II_space_dimension>>> &,
+        const std::vector<bool> &marked_vertices,
         const double,
         const bool,
         const bool);
@@ -271,6 +272,12 @@ for (deal_II_dimension : DIMENSIONS; deal_II_space_dimension : SPACE_DIMENSIONS)
         Triangulation<deal_II_dimension, deal_II_space_dimension> &);
 
 #  if deal_II_space_dimension == 3
+      template void
+      rotate<deal_II_dimension>(
+        const Tensor<1, deal_II_space_dimension, double> &,
+        const double,
+        Triangulation<deal_II_dimension, deal_II_space_dimension> &);
+
       template void
       rotate<deal_II_dimension>(
         const double,

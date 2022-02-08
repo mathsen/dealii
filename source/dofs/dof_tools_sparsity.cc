@@ -45,8 +45,6 @@
 #include <deal.II/lac/trilinos_sparsity_pattern.h>
 #include <deal.II/lac/vector.h>
 
-#include <deal.II/numerics/vector_tools.h>
-
 #include <algorithm>
 #include <numeric>
 
@@ -92,14 +90,11 @@ namespace DoFTools
 
     std::vector<types::global_dof_index> dofs_on_this_cell;
     dofs_on_this_cell.reserve(dof.get_fe_collection().max_dofs_per_cell());
-    typename DoFHandler<dim, spacedim>::active_cell_iterator
-      cell = dof.begin_active(),
-      endc = dof.end();
 
     // In case we work with a distributed sparsity pattern of Trilinos
     // type, we only have to do the work if the current cell is owned by
     // the calling processor. Otherwise, just continue.
-    for (; cell != endc; ++cell)
+    for (const auto &cell : dof.active_cell_iterators())
       if (((subdomain_id == numbers::invalid_subdomain_id) ||
            (subdomain_id == cell->subdomain_id())) &&
           cell->is_locally_owned())
@@ -183,14 +178,11 @@ namespace DoFTools
 
     std::vector<types::global_dof_index> dofs_on_this_cell(
       fe_collection.max_dofs_per_cell());
-    typename DoFHandler<dim, spacedim>::active_cell_iterator
-      cell = dof.begin_active(),
-      endc = dof.end();
 
     // In case we work with a distributed sparsity pattern of Trilinos
     // type, we only have to do the work if the current cell is owned by
     // the calling processor. Otherwise, just continue.
-    for (; cell != endc; ++cell)
+    for (const auto &cell : dof.active_cell_iterators())
       if (((subdomain_id == numbers::invalid_subdomain_id) ||
            (subdomain_id == cell->subdomain_id())) &&
           cell->is_locally_owned())
@@ -404,10 +396,7 @@ namespace DoFTools
     // @p{cell->has_boundary_lines}), since we do not support boundaries of
     // dimension dim-2, and so every boundary line is also part of a
     // boundary face.
-    typename DoFHandler<dim, spacedim>::active_cell_iterator
-      cell = dof.begin_active(),
-      endc = dof.end();
-    for (; cell != endc; ++cell)
+    for (const auto &cell : dof.active_cell_iterators())
       for (const unsigned int f : cell->face_indices())
         if (cell->at_boundary(f))
           {
@@ -501,10 +490,7 @@ namespace DoFTools
 
     std::vector<types::global_dof_index> dofs_on_this_face;
     dofs_on_this_face.reserve(dof.get_fe_collection().max_dofs_per_face());
-    typename DoFHandler<dim, spacedim>::active_cell_iterator
-      cell = dof.begin_active(),
-      endc = dof.end();
-    for (; cell != endc; ++cell)
+    for (const auto &cell : dof.active_cell_iterators())
       for (const unsigned int f : cell->face_indices())
         if (boundary_ids.find(cell->face(f)->boundary_id()) !=
             boundary_ids.end())
@@ -564,9 +550,6 @@ namespace DoFTools
     std::vector<types::global_dof_index> dofs_on_other_cell;
     dofs_on_this_cell.reserve(dof.get_fe_collection().max_dofs_per_cell());
     dofs_on_other_cell.reserve(dof.get_fe_collection().max_dofs_per_cell());
-    typename DoFHandler<dim, spacedim>::active_cell_iterator
-      cell = dof.begin_active(),
-      endc = dof.end();
 
     // TODO: in an old implementation, we used user flags before to tag
     // faces that were already touched. this way, we could reduce the work
@@ -576,7 +559,7 @@ namespace DoFTools
     // In case we work with a distributed sparsity pattern of Trilinos
     // type, we only have to do the work if the current cell is owned by
     // the calling processor. Otherwise, just continue.
-    for (; cell != endc; ++cell)
+    for (const auto &cell : dof.active_cell_iterators())
       if (((subdomain_id == numbers::invalid_subdomain_id) ||
            (subdomain_id == cell->subdomain_id())) &&
           cell->is_locally_owned())
@@ -820,10 +803,7 @@ namespace DoFTools
                 if (int_dof_mask(i, j) != none)
                   bool_int_dof_mask(i, j) = true;
 
-            typename DoFHandler<dim, spacedim>::active_cell_iterator
-              cell = dof.begin_active(),
-              endc = dof.end();
-            for (; cell != endc; ++cell)
+            for (const auto &cell : dof.active_cell_iterators())
               if (((subdomain_id == numbers::invalid_subdomain_id) ||
                    (subdomain_id == cell->subdomain_id())) &&
                   cell->is_locally_owned())
@@ -1156,10 +1136,7 @@ namespace DoFTools
               }
 
 
-            typename dealii::DoFHandler<dim, spacedim>::active_cell_iterator
-              cell = dof.begin_active(),
-              endc = dof.end();
-            for (; cell != endc; ++cell)
+            for (const auto &cell : dof.active_cell_iterators())
               if (((subdomain_id == numbers::invalid_subdomain_id) ||
                    (subdomain_id == cell->subdomain_id())) &&
                   cell->is_locally_owned())

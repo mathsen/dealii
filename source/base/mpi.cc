@@ -246,10 +246,8 @@ namespace Utilities
             }
           if (*new_comm != comm_old)
             {
-              ierr = MPI_Comm_free(&ic);
-              AssertThrowMPI(ierr);
-              ierr = MPI_Comm_free(&comm_old);
-              AssertThrowMPI(ierr);
+              Utilities::MPI::free_communicator(ic);
+              Utilities::MPI::free_communicator(comm_old);
             }
         }
 
@@ -281,6 +279,8 @@ namespace Utilities
       return res;
     }
 
+
+
     IndexSet
     create_evenly_distributed_partitioning(const MPI_Comm &          comm,
                                            const IndexSet::size_type total_size)
@@ -291,6 +291,100 @@ namespace Utilities
       return Utilities::create_evenly_distributed_partitioning(this_proc,
                                                                n_proc,
                                                                total_size);
+    }
+
+
+
+    std::unique_ptr<MPI_Datatype, void (*)(MPI_Datatype *)>
+    create_mpi_data_type_n_bytes(const std::size_t n_bytes)
+    {
+      // Simplified version from BigMPI repository, see
+      // https://github.com/jeffhammond/BigMPI/blob/5300b18cc8ec1b2431bf269ee494054ee7bd9f72/src/type_contiguous_x.c#L74
+      // (code is MIT licensed)
+
+      // We create an MPI datatype that has the layout A*n+B where A is
+      // max_signed_int bytes repeated n times and B is the remainder.
+
+      const MPI_Count max_signed_int = std::numeric_limits<int>::max();
+
+      const MPI_Count n_chunks          = n_bytes / max_signed_int;
+      const MPI_Count n_bytes_remainder = n_bytes % max_signed_int;
+
+      Assert(static_cast<std::size_t>(max_signed_int * n_chunks +
+                                      n_bytes_remainder) == n_bytes,
+             ExcInternalError());
+
+      MPI_Datatype chunks;
+
+      int ierr = MPI_Type_vector(
+        n_chunks, max_signed_int, max_signed_int, MPI_BYTE, &chunks);
+      AssertThrowMPI(ierr);
+
+      MPI_Datatype remainder;
+      ierr = MPI_Type_contiguous(n_bytes_remainder, MPI_BYTE, &remainder);
+      AssertThrowMPI(ierr);
+
+      const int      blocklengths[2]  = {1, 1};
+      const MPI_Aint displacements[2] = {0,
+                                         static_cast<MPI_Aint>(n_chunks) *
+                                           max_signed_int};
+
+      // This fails if Aint happens to be 32 bits (maybe on some 32bit
+      // systems as it has type "long" which is usually 64bits) or the
+      // message is very, very big.
+      AssertThrow(
+        displacements[1] == n_chunks * max_signed_int,
+        ExcMessage(
+          "Error in create_mpi_data_type_n_bytes(): the size is too big to support."));
+
+      MPI_Datatype result;
+
+      const MPI_Datatype types[2] = {chunks, remainder};
+      ierr =
+        MPI_Type_create_struct(2, blocklengths, displacements, types, &result);
+      AssertThrowMPI(ierr);
+
+      ierr = MPI_Type_commit(&result);
+      AssertThrowMPI(ierr);
+
+      ierr = MPI_Type_free(&chunks);
+      AssertThrowMPI(ierr);
+      ierr = MPI_Type_free(&remainder);
+      AssertThrowMPI(ierr);
+
+#  ifdef DEBUG
+#    if DEAL_II_MPI_VERSION_GTE(3, 0)
+      MPI_Count size64;
+      // this function is only available starting with MPI 3.0:
+      ierr = MPI_Type_size_x(result, &size64);
+      AssertThrowMPI(ierr);
+
+      Assert(size64 == static_cast<MPI_Count>(n_bytes), ExcInternalError());
+#    endif
+#  endif
+
+      // Now put the new data type into a std::unique_ptr with a custom
+      // deleter. We call the std::unique_ptr constructor that as first
+      // argument takes a pointer (here, a pointer to a copy of the `result`
+      // object, and as second argument a pointer-to-function, for which
+      // we here use a lambda function without captures that acts as the
+      // 'deleter' object: it calls `MPI_Type_free` and then deletes the
+      // pointer. To avoid a compiler warning about a null this pointer
+      // in the lambda (which don't make sense: the lambda doesn't store
+      // anything), we create the deleter first.
+      auto deleter = [](MPI_Datatype *p) {
+        if (p != nullptr)
+          {
+            const int ierr = MPI_Type_free(p);
+            (void)ierr;
+            AssertNothrow(ierr == MPI_SUCCESS, ExcMPI(ierr));
+
+            delete p;
+          }
+      };
+
+      return std::unique_ptr<MPI_Datatype, void (*)(MPI_Datatype *)>(
+        new MPI_Datatype(result), deleter);
     }
 
 
@@ -313,14 +407,47 @@ namespace Utilities
 
 #  if DEAL_II_MPI_VERSION_GTE(3, 0)
 
-      ConsensusAlgorithms::AnonymousProcess<char, char> process(
-        [&]() { return destinations; });
-      ConsensusAlgorithms::NBX<char, char> consensus_algorithm(process,
-                                                               mpi_comm);
-      return consensus_algorithm.run();
+      // Have a little function that checks if destinations provided
+      // to the current process are unique. The way it does this is
+      // to create a sorted list of destinations and then walk through
+      // the list and look at successive elements -- if we find the
+      // same number twice, we know that the destinations were not
+      // unique
+      const bool my_destinations_are_unique = [destinations]() {
+        if (destinations.size() == 0)
+          return true;
+        else
+          {
+            std::vector<unsigned int> my_destinations = destinations;
+            std::sort(my_destinations.begin(), my_destinations.end());
+            return (std::adjacent_find(my_destinations.begin(),
+                                       my_destinations.end()) ==
+                    my_destinations.end());
+          }
+      }();
 
-#  elif DEAL_II_MPI_VERSION_GTE(2, 2)
+      // If all processes report that they have unique destinations,
+      // then we can short-cut the process using a consensus algorithm (which
+      // is implemented only for the case of unique destinations):
+      if (Utilities::MPI::min((my_destinations_are_unique ? 1 : 0), mpi_comm) ==
+          1)
+        {
+          ConsensusAlgorithms::AnonymousProcess<char, char> process(
+            [&]() { return destinations; });
+          ConsensusAlgorithms::NBX<char, char> consensus_algorithm(process,
+                                                                   mpi_comm);
+          return consensus_algorithm.run();
+        }
+        // If that was not the case, we need to use the remainder of the code
+        // below, i.e., just fall through the if condition above.
+#  endif
 
+
+        // So we need to run a different algorithm, specifically one that
+        // requires more memory -- MPI_Reduce_scatter_block will require memory
+        // proportional to the number of processes involved; that function is
+        // also only available for MPI 2.2 or later:
+#  if DEAL_II_MPI_VERSION_GTE(2, 2)
       static CollectiveMutex      mutex;
       CollectiveMutex::ScopedLock lock(mutex, mpi_comm);
 
@@ -382,9 +509,16 @@ namespace Utilities
         }
 
       return origins;
+
 #  else
-      // let all processors communicate the maximal number of destinations
-      // they have
+
+      // If we don't have MPI_Reduce_scatter_block available, fall back to
+      // a different algorithm that requires even more memory: the number
+      // of processes times the max over the number of destinations they
+      // each have:
+
+      // Start by letting all processors communicate the maximal number of
+      // destinations they have:
       const unsigned int max_n_destinations =
         Utilities::MPI::max(destinations.size(), mpi_comm);
 
@@ -437,9 +571,95 @@ namespace Utilities
       const MPI_Comm &                 mpi_comm,
       const std::vector<unsigned int> &destinations)
     {
-      return compute_point_to_point_communication_pattern(mpi_comm,
-                                                          destinations)
-        .size();
+      // Have a little function that checks if destinations provided
+      // to the current process are unique:
+      const bool my_destinations_are_unique = [destinations]() {
+        std::vector<unsigned int> my_destinations = destinations;
+        const unsigned int        n_destinations  = my_destinations.size();
+        std::sort(my_destinations.begin(), my_destinations.end());
+        my_destinations.erase(std::unique(my_destinations.begin(),
+                                          my_destinations.end()),
+                              my_destinations.end());
+        return (my_destinations.size() == n_destinations);
+      }();
+
+      // If all processes report that they have unique destinations,
+      // then we can short-cut the process using a consensus algorithm (which
+      // is implemented only for the case of unique destinations, and also only
+      // for MPI 3 and later):
+#  if DEAL_II_MPI_VERSION_GTE(3, 0)
+      if (Utilities::MPI::min((my_destinations_are_unique ? 1 : 0), mpi_comm) ==
+          1)
+        {
+          ConsensusAlgorithms::AnonymousProcess<char, char> process(
+            [&]() { return destinations; });
+          ConsensusAlgorithms::NBX<char, char> consensus_algorithm(process,
+                                                                   mpi_comm);
+          return consensus_algorithm.run().size();
+        }
+      else
+#  endif
+        {
+          const unsigned int n_procs =
+            Utilities::MPI::n_mpi_processes(mpi_comm);
+
+          for (const unsigned int destination : destinations)
+            {
+              (void)destination;
+              AssertIndexRange(destination, n_procs);
+              Assert(destination != Utilities::MPI::this_mpi_process(mpi_comm),
+                     ExcMessage(
+                       "There is no point in communicating with ourselves."));
+            }
+
+          // Calculate the number of messages to send to each process
+          std::vector<unsigned int> dest_vector(n_procs);
+          for (const auto &el : destinations)
+            ++dest_vector[el];
+
+#  if DEAL_II_MPI_VERSION_GTE(2, 2)
+          // Find out how many processes will send to this one
+          // MPI_Reduce_scatter(_block) does exactly this
+          unsigned int n_recv_from = 0;
+
+          const int ierr = MPI_Reduce_scatter_block(dest_vector.data(),
+                                                    &n_recv_from,
+                                                    1,
+                                                    MPI_UNSIGNED,
+                                                    MPI_SUM,
+                                                    mpi_comm);
+
+          AssertThrowMPI(ierr);
+
+          return n_recv_from;
+#  else
+        // Find out how many processes will send to this one
+        // by reducing with sum and then scattering the
+        // results over all processes
+        std::vector<unsigned int> buffer(dest_vector.size());
+        unsigned int              n_recv_from = 0;
+
+        int ierr = MPI_Reduce(dest_vector.data(),
+                              buffer.data(),
+                              dest_vector.size(),
+                              MPI_UNSIGNED,
+                              MPI_SUM,
+                              0,
+                              mpi_comm);
+        AssertThrowMPI(ierr);
+        ierr = MPI_Scatter(buffer.data(),
+                           1,
+                           MPI_UNSIGNED,
+                           &n_recv_from,
+                           1,
+                           MPI_UNSIGNED,
+                           0,
+                           mpi_comm);
+        AssertThrowMPI(ierr);
+
+        return n_recv_from;
+#  endif
+        }
     }
 
 
@@ -553,7 +773,7 @@ namespace Utilities
 
         int ierr =
           MPI_Op_create(reinterpret_cast<MPI_User_function *>(&max_reduce),
-                        true,
+                        static_cast<int>(true),
                         &op);
         AssertThrowMPI(ierr);
 

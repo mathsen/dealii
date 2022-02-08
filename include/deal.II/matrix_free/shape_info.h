@@ -22,12 +22,18 @@
 
 #include <deal.II/base/aligned_vector.h>
 #include <deal.II/base/exceptions.h>
-#include <deal.II/base/quadrature_lib.h>
-
-#include <deal.II/fe/fe.h>
+#include <deal.II/base/quadrature.h>
+#include <deal.II/base/table.h>
+#include <deal.II/base/vectorization.h>
 
 
 DEAL_II_NAMESPACE_OPEN
+
+
+// forward declaration
+template <int dim, int spacedim>
+class FiniteElement;
+
 
 namespace internal
 {
@@ -131,7 +137,7 @@ namespace internal
       ElementType element_type;
 
       /**
-       * Stores the shape values of the 1D finite element evaluated on all 1D
+       * Stores the shape values of the 1D finite element evaluated at all 1D
        * quadrature points. The length of
        * this array is <tt>n_dofs_1d * n_q_points_1d</tt> and quadrature
        * points are the index running fastest.
@@ -139,7 +145,7 @@ namespace internal
       AlignedVector<Number> shape_values;
 
       /**
-       * Stores the shape gradients of the 1D finite element evaluated on all
+       * Stores the shape gradients of the 1D finite element evaluated at all
        * 1D quadrature points. The length of
        * this array is <tt>n_dofs_1d * n_q_points_1d</tt> and quadrature
        * points are the index running fastest.
@@ -147,7 +153,7 @@ namespace internal
       AlignedVector<Number> shape_gradients;
 
       /**
-       * Stores the shape Hessians of the 1D finite element evaluated on all
+       * Stores the shape Hessians of the 1D finite element evaluated at all
        * 1D quadrature points. The length of
        * this array is <tt>n_dofs_1d * n_q_points_1d</tt> and quadrature
        * points are the index running fastest.
@@ -262,10 +268,19 @@ namespace internal
       std::array<AlignedVector<Number>, 2> hessians_within_subface;
 
       /**
-       * A 1D subface interpolation matrix to the first quadrant. This data
-       * structure is only set up for FE_Q for dim > 1.
+       * A 1D subface interpolation matrices to the first and second quadrant.
+       * This data structure is only set up for FE_Q for dim > 1.
        */
-      AlignedVector<Number> subface_interpolation_matrix;
+      std::array<AlignedVector<Number>, 2> subface_interpolation_matrices;
+
+      /**
+       * Same as above but stored in a scalar format independent of the type of
+       * Number
+       */
+      std::array<AlignedVector<typename dealii::internal::VectorizedArrayTrait<
+                   Number>::value_type>,
+                 2>
+        subface_interpolation_matrices_scalar;
 
       /**
        * We store a copy of the one-dimensional quadrature formula
@@ -290,16 +305,16 @@ namespace internal
       bool nodal_at_cell_boundaries;
 
       /**
-       * Stores the shape values of the finite element evaluated on all
+       * Stores the shape values of the finite element evaluated at all
        * quadrature points for all faces and orientations (no tensor-product
        * structure exploited).
        */
       Table<3, Number> shape_values_face;
 
       /**
-       * Stores the shape gradients of the finite element evaluated on all
+       * Stores the shape gradients of the finite element evaluated at all
        * quadrature points for all faces, orientations, and directions
-       * (no tensor-product structure  exploited).
+       * (no tensor-product structure exploited).
        */
       Table<4, Number> shape_gradients_face;
     };
@@ -334,10 +349,10 @@ namespace internal
       /**
        * Constructor that initializes the data fields using the reinit method.
        */
-      template <int dim, int dim_q>
-      ShapeInfo(const Quadrature<dim_q> & quad,
-                const FiniteElement<dim> &fe,
-                const unsigned int        base_element = 0);
+      template <int dim, int spacedim, int dim_q>
+      ShapeInfo(const Quadrature<dim_q> &           quad,
+                const FiniteElement<dim, spacedim> &fe,
+                const unsigned int                  base_element = 0);
 
       /**
        * Initializes the data fields. Takes a one-dimensional quadrature
@@ -347,11 +362,11 @@ namespace internal
        * dimensional element by a tensor product and that the zeroth shape
        * function in zero evaluates to one.
        */
-      template <int dim, int dim_q>
+      template <int dim, int spacedim, int dim_q>
       void
-      reinit(const Quadrature<dim_q> & quad,
-             const FiniteElement<dim> &fe_dim,
-             const unsigned int        base_element = 0);
+      reinit(const Quadrature<dim_q> &           quad,
+             const FiniteElement<dim, spacedim> &fe_dim,
+             const unsigned int                  base_element = 0);
 
       /**
        * Return which kinds of elements are supported by MatrixFree.
@@ -359,6 +374,13 @@ namespace internal
       template <int dim, int spacedim>
       static bool
       is_supported(const FiniteElement<dim, spacedim> &fe);
+
+      /**
+       * Compute a table with numbers of re-orientation for all versions of
+       * face flips, orientation, and rotation (relating only to 3D elements).
+       */
+      static Table<2, unsigned int>
+      compute_orientation_table(const unsigned int n_points_per_dim);
 
       /**
        * Return data of univariate shape functions which defines the
@@ -515,12 +537,20 @@ namespace internal
       dealii::Table<2, unsigned int> face_to_cell_index_hermite;
 
       /**
-       * For degrees on faces, the basis functions are not
+       * For unknowns located on faces, the basis functions are not
        * in the correct order if a face is not in the standard orientation
        * to a given element. This data structure is used to re-order the
        * basis functions to represent the correct order.
        */
-      dealii::Table<2, unsigned int> face_orientations;
+      dealii::Table<2, unsigned int> face_orientations_dofs;
+
+      /**
+       * For interpretation of values at quadrature points, the order of
+       * points is not correct if a face is not in the standard orientation to
+       * a given element. This data structure is used to re-order the
+       * quadrature points to represent the correct order.
+       */
+      dealii::Table<2, unsigned int> face_orientations_quad;
 
     private:
       /**
@@ -545,22 +575,6 @@ namespace internal
 
 
     // ------------------------------------------ inline functions
-
-    template <typename Number>
-    template <int dim, int dim_q>
-    inline ShapeInfo<Number>::ShapeInfo(const Quadrature<dim_q> & quad,
-                                        const FiniteElement<dim> &fe_in,
-                                        const unsigned int base_element_number)
-      : element_type(tensor_general)
-      , n_dimensions(0)
-      , n_components(0)
-      , n_q_points(0)
-      , dofs_per_component_on_cell(0)
-      , n_q_points_face(0)
-      , dofs_per_component_on_face(0)
-    {
-      reinit(quad, fe_in, base_element_number);
-    }
 
     template <typename Number>
     inline const UnivariateShapeData<Number> &

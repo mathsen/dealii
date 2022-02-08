@@ -23,6 +23,7 @@ SET(_src
   evaluation_template_factory_inst4.cc
   evaluation_template_factory_inst5.cc
   evaluation_template_factory_inst6.cc
+  evaluation_template_factory_hanging_nodes.cc
   fe_point_evaluation.cc
   mapping_info.cc
   mapping_info_inst2.cc
@@ -35,6 +36,7 @@ SET(_src
 
 SET(_inst
   evaluation_template_factory.inst.in
+  evaluation_template_factory_hanging_nodes.inst.in
   fe_point_evaluation.inst.in
   mapping_info.inst.in
   matrix_free.inst.in

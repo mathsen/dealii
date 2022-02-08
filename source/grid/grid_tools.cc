@@ -56,6 +56,8 @@
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/numerics/vector_tools_integrate_difference.h>
 
+#include <deal.II/physics/transformations.h>
+
 DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_real_distribution.hpp>
@@ -1970,32 +1972,22 @@ namespace GridTools
     class Rotate3d
     {
     public:
-      Rotate3d(const double angle, const unsigned int axis)
-        : angle(angle)
-        , axis(axis)
+      Rotate3d(const Tensor<1, 3, double> &axis, const double angle)
+        : rotation_matrix(
+            Physics::Transformations::Rotations::rotation_matrix_3d(axis,
+                                                                    angle))
       {}
 
       Point<3>
       operator()(const Point<3> &p) const
       {
-        if (axis == 0)
-          return {p(0),
-                  std::cos(angle) * p(1) - std::sin(angle) * p(2),
-                  std::sin(angle) * p(1) + std::cos(angle) * p(2)};
-        else if (axis == 1)
-          return {std::cos(angle) * p(0) + std::sin(angle) * p(2),
-                  p(1),
-                  -std::sin(angle) * p(0) + std::cos(angle) * p(2)};
-        else
-          return {std::cos(angle) * p(0) - std::sin(angle) * p(1),
-                  std::sin(angle) * p(0) + std::cos(angle) * p(1),
-                  p(2)};
+        return static_cast<Point<3>>(rotation_matrix * p);
       }
 
     private:
-      const double       angle;
-      const unsigned int axis;
+      const Tensor<2, 3, double> rotation_matrix;
     };
+
 
     template <int spacedim>
     class Scale
@@ -2027,14 +2019,28 @@ namespace GridTools
 
   template <int dim>
   void
+  rotate(const Tensor<1, 3, double> &axis,
+         const double                angle,
+         Triangulation<dim, 3> &     triangulation)
+  {
+    transform(internal::Rotate3d(axis, angle), triangulation);
+  }
+
+
+  template <int dim>
+  void
   rotate(const double           angle,
          const unsigned int     axis,
          Triangulation<dim, 3> &triangulation)
   {
     Assert(axis < 3, ExcMessage("Invalid axis given!"));
 
-    transform(internal::Rotate3d(angle, axis), triangulation);
+    Tensor<1, 3, double> vector;
+    vector[axis] = 1.;
+
+    transform(internal::Rotate3d(vector, angle), triangulation);
   }
+
 
   template <int dim, int spacedim>
   void
@@ -2790,7 +2796,7 @@ namespace GridTools
         auto p1 = p;
         auto p2 = p;
 
-        for (int d = 0; d < spacedim; ++d)
+        for (unsigned int d = 0; d < spacedim; ++d)
           {
             p1[d] = p1[d] - tolerance;
             p2[d] = p2[d] + tolerance;
@@ -2887,7 +2893,7 @@ namespace GridTools
         double best_distance = tolerance;
 
         // Search all of the cells adjacent to the closest vertex of the cell
-        // hint Most likely we will find the point in them.
+        // hint. Most likely we will find the point in them.
         for (unsigned int i = 0; i < n_neighbor_cells; ++i)
           {
             try
@@ -3899,11 +3905,11 @@ namespace GridTools
         // In a first step, obtain the weights of the locally owned
         // cells. For all others, the weight remains at the zero the
         // vector was initialized with above.
-        for (const auto &cell : triangulation.active_cell_iterators())
-          if (cell->is_locally_owned())
-            cell_weights[cell->active_cell_index()] =
-              triangulation.signals.cell_weight(
-                cell, Triangulation<dim, spacedim>::CellStatus::CELL_PERSIST);
+        for (const auto &cell : triangulation.active_cell_iterators() |
+                                  IteratorFilters::LocallyOwnedCell())
+          cell_weights[cell->active_cell_index()] =
+            triangulation.signals.cell_weight(
+              cell, Triangulation<dim, spacedim>::CellStatus::CELL_PERSIST);
 
         // If this is a parallel triangulation, we then need to also
         // get the weights for all other cells. We have asserted above
@@ -5689,7 +5695,7 @@ namespace GridTools
   {
     // run internal function ...
     const auto all = internal::distributed_compute_point_locations(
-                       cache, points, global_bboxes, tolerance, false, true)
+                       cache, points, global_bboxes, {}, tolerance, false, true)
                        .send_components;
 
     // ... and reshuffle the data
@@ -5875,6 +5881,7 @@ namespace GridTools
       const GridTools::Cache<dim, spacedim> &                cache,
       const std::vector<Point<spacedim>> &                   points,
       const std::vector<std::vector<BoundingBox<spacedim>>> &global_bboxes,
+      const std::vector<bool> &                              marked_vertices,
       const double                                           tolerance,
       const bool                                             perform_handshake,
       const bool enforce_unique_mapping)
@@ -5895,7 +5902,6 @@ namespace GridTools
       const auto &potential_owners_ptrs    = std::get<1>(potential_owners);
       const auto &potential_owners_indices = std::get<2>(potential_owners);
 
-      const std::vector<bool> marked_vertices;
       auto cell_hint = cache.get_triangulation().begin_active();
 
       const auto translate = [&](const unsigned int other_rank) {
@@ -5910,6 +5916,22 @@ namespace GridTools
 
         return other_rank_index;
       };
+
+      Assert(
+        (marked_vertices.size() == 0) ||
+          (marked_vertices.size() == cache.get_triangulation().n_vertices()),
+        ExcMessage(
+          "The marked_vertices vector has to be either empty or its size has "
+          "to equal the number of vertices of the triangulation."));
+
+      // In the case that a marked_vertices vector has been given and none
+      // of its entries is true, we know that this process does not own
+      // any of the incoming points (and it will not send any data) so
+      // that we can take a short cut.
+      const bool has_relevant_vertices =
+        (marked_vertices.size() == 0) ||
+        (std::find(marked_vertices.begin(), marked_vertices.end(), true) !=
+         marked_vertices.end());
 
       Utilities::MPI::ConsensusAlgorithms::AnonymousProcess<char, char> process(
         [&]() { return potential_owners_ranks; },
@@ -5938,52 +5960,43 @@ namespace GridTools
           std::vector<unsigned int> request_buffer_temp(
             recv_buffer_unpacked.size(), 0);
 
-          cell_hint = cache.get_triangulation().begin_active();
-
-          for (unsigned int i = 0; i < recv_buffer_unpacked.size(); ++i)
+          if (has_relevant_vertices)
             {
-              const auto &index_and_point = recv_buffer_unpacked[i];
+              cell_hint = cache.get_triangulation().begin_active();
 
-              const auto cells_and_reference_positions =
-                find_all_locally_owned_active_cells_around_point(
-                  cache,
-                  index_and_point.second,
-                  cell_hint,
-                  marked_vertices,
-                  tolerance,
-                  enforce_unique_mapping);
-
-              for (const auto &cell_and_reference_position :
-                   cells_and_reference_positions)
+              for (unsigned int i = 0; i < recv_buffer_unpacked.size(); ++i)
                 {
-                  send_components.emplace_back(
-                    std::pair<int, int>(
-                      cell_and_reference_position.first->level(),
-                      cell_and_reference_position.first->index()),
-                    other_rank,
-                    index_and_point.first,
-                    cell_and_reference_position.second,
-                    index_and_point.second,
-                    numbers::invalid_unsigned_int);
-                }
+                  const auto &index_and_point = recv_buffer_unpacked[i];
 
-              request_buffer_temp[i] = cells_and_reference_positions.size();
+                  const auto cells_and_reference_positions =
+                    find_all_locally_owned_active_cells_around_point(
+                      cache,
+                      index_and_point.second,
+                      cell_hint,
+                      marked_vertices,
+                      tolerance,
+                      enforce_unique_mapping);
+
+                  for (const auto &cell_and_reference_position :
+                       cells_and_reference_positions)
+                    {
+                      send_components.emplace_back(
+                        std::pair<int, int>(
+                          cell_and_reference_position.first->level(),
+                          cell_and_reference_position.first->index()),
+                        other_rank,
+                        index_and_point.first,
+                        cell_and_reference_position.second,
+                        index_and_point.second,
+                        numbers::invalid_unsigned_int);
+                    }
+
+                  request_buffer_temp[i] = cells_and_reference_positions.size();
+                }
             }
 
           if (perform_handshake)
             request_buffer = Utilities::pack(request_buffer_temp, false);
-        },
-        [&](const unsigned int other_rank, std::vector<char> &recv_buffer) {
-          if (perform_handshake)
-            {
-              const auto other_rank_index = translate(other_rank);
-
-              recv_buffer =
-                Utilities::pack(std::vector<unsigned int>(
-                                  potential_owners_ptrs[other_rank_index + 1] -
-                                  potential_owners_ptrs[other_rank_index]),
-                                false);
-            }
         },
         [&](const unsigned int       other_rank,
             const std::vector<char> &recv_buffer) {
@@ -6474,10 +6487,10 @@ namespace GridTools
 
     // 2) collect vertices belonging to local cells
     std::vector<bool> vertex_of_own_cell(tria.n_vertices(), false);
-    for (const auto &cell : tria.active_cell_iterators())
-      if (cell->is_locally_owned())
-        for (const unsigned int v : cell->vertex_indices())
-          vertex_of_own_cell[cell->vertex_index(v)] = true;
+    for (const auto &cell :
+         tria.active_cell_iterators() | IteratorFilters::LocallyOwnedCell())
+      for (const unsigned int v : cell->vertex_indices())
+        vertex_of_own_cell[cell->vertex_index(v)] = true;
 
     // 3) for each vertex belonging to a locally owned cell all ghost
     //    neighbors (including the periodic own)
@@ -6568,9 +6581,9 @@ namespace GridTools
     std::vector<Point<dim>> &       vertices,
     std::vector<CellData<dim - 1>> &cells) const
   {
-    for (const auto &cell : background_dof_handler.active_cell_iterators())
-      if (cell->is_locally_owned())
-        process_cell(cell, ls_vector, iso_level, vertices, cells);
+    for (const auto &cell : background_dof_handler.active_cell_iterators() |
+                              IteratorFilters::LocallyOwnedCell())
+      process_cell(cell, ls_vector, iso_level, vertices, cells);
   }
 
 

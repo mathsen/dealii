@@ -52,10 +52,10 @@ partition_distributed_triangulation(const Triangulation<dim, spacedim> &tria_in,
   LinearAlgebra::distributed::Vector<double> partition(
     tria->global_active_cell_index_partitioner().lock());
 
-  for (const auto &cell : tria_in.active_cell_iterators())
-    if (cell->is_locally_owned())
-      partition[cell->global_active_cell_index()] =
-        std::floor(cell->center()[0] * n_partitions);
+  for (const auto &cell :
+       tria_in.active_cell_iterators() | IteratorFilters::LocallyOwnedCell())
+    partition[cell->global_active_cell_index()] =
+      std::floor(cell->center()[0] * n_partitions);
 
   partition.update_ghost_values();
 
@@ -67,7 +67,10 @@ template <int dim>
 void
 test(const MPI_Comm comm, const unsigned int n_partitions)
 {
-  parallel::distributed::Triangulation<dim> tria(comm);
+  parallel::distributed::Triangulation<dim> tria(
+    comm,
+    Triangulation<dim>::none,
+    parallel::distributed::Triangulation<dim>::construct_multigrid_hierarchy);
   GridGenerator::subdivided_hyper_cube(tria, 4);
   tria.refine_global(3);
 
@@ -77,7 +80,9 @@ test(const MPI_Comm comm, const unsigned int n_partitions)
   // repartition triangulation so that it has strided partitioning
   const auto construction_data =
     TriangulationDescription::Utilities::create_description_from_triangulation(
-      tria, partition_new);
+      tria,
+      partition_new,
+      TriangulationDescription::Settings::construct_multigrid_hierarchy);
 
   parallel::fullydistributed::Triangulation<dim> tria_pft(comm);
   tria_pft.create_triangulation(construction_data);
@@ -85,6 +90,7 @@ test(const MPI_Comm comm, const unsigned int n_partitions)
   FE_Q<dim>       fe(2);
   DoFHandler<dim> dof_handler(tria_pft);
   dof_handler.distribute_dofs(fe);
+  dof_handler.distribute_mg_dofs();
 
   // print statistics
   print_statistics(tria_pft);

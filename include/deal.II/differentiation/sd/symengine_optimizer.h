@@ -1477,16 +1477,15 @@ namespace Differentiation
                        OptimizationFlags::optimize_all);
 
       /**
-       * Copy constructor
+       * Copy constructor.
        *
-       * The @p copy_initialized flag, which is set to <code>true</code> by default,
-       * determines whether or not all of the optimized data is copied over from
-       * the @p other optimizer instance. Only with the flag set to <code>false</code>
-       * is it possible to re-optimize the data stored in this class with a
-       * different optimization scheme.
+       * @note The optimized data and results from previous substitutions
+       * executed by the @p other optimizer instance are not copied over.
+       * It is therefore necessary to re-optimize the data stored in
+       * this class, and it is possible to do so with a different optimization
+       * scheme.
        */
-      BatchOptimizer(const BatchOptimizer &other/*,
-                     const bool            copy_initialized = true*/);
+      BatchOptimizer(const BatchOptimizer &other);
 
       /**
        * Move constructor.
@@ -1497,6 +1496,19 @@ namespace Differentiation
        * Destructor.
        */
       ~BatchOptimizer() = default;
+
+      /**
+       * Duplicate the data stored in an @p other BatchOptimizer instance.
+       *
+       * @note The optimized data and results from previous substitutions
+       * executed by the @p other optimizer instance are not copied over.
+       * It is therefore necessary to call optimize() before it is possible to
+       * substitute() values and evaluate() data. One may, however, still
+       * extract() values using @p this optimizer instance if those results are
+       * stored elsewhere.
+       */
+      void
+      copy_from(const BatchOptimizer &other);
 
       /**
        * Print some information on state of the internal data
@@ -2150,38 +2162,36 @@ namespace Differentiation
                                       const bool /*print_cse*/) const
     {
       // Settings
-      stream << "Method? " << optimization_method() << "\n";
-      stream << "Flags: " << optimization_flags() << "\n";
-      stream << "Optimized? " << (optimized() ? "Yes" : "No") << "\n";
+      stream << "Method? " << optimization_method() << '\n';
+      stream << "Flags: " << optimization_flags() << '\n';
+      stream << "Optimized? " << (optimized() ? "Yes" : "No") << '\n';
       stream << "Values substituted? " << values_substituted() << "\n\n";
 
       // Independent variables
       stream << "Symbols (" << n_independent_variables()
-             << " independent variables):"
-             << "\n";
+             << " independent variables):" << '\n';
       int cntr = 0;
       for (SD::types::substitution_map::const_iterator it =
              independent_variables_symbols.begin();
            it != independent_variables_symbols.end();
            ++it, ++cntr)
         {
-          stream << cntr << ": " << it->first << "\n";
+          stream << cntr << ": " << it->first << '\n';
         }
-      stream << "\n" << std::flush;
+      stream << '\n' << std::flush;
 
       // Dependent functions
       stream << "Functions (" << n_dependent_variables()
-             << " dependent variables):"
-             << "\n";
+             << " dependent variables):" << '\n';
       cntr = 0;
       for (typename SD::types::symbol_vector::const_iterator it =
              dependent_variables_functions.begin();
            it != dependent_variables_functions.end();
            ++it, ++cntr)
         {
-          stream << cntr << ": " << (*it) << "\n";
+          stream << cntr << ": " << (*it) << '\n';
         }
-      stream << "\n" << std::flush;
+      stream << '\n' << std::flush;
 
       // Common subexpression
       if (optimized() == true && use_symbolic_CSE() == true)
@@ -2207,7 +2217,7 @@ namespace Differentiation
                       print_dependent_functions,
                       print_cse_reductions);
 
-              stream << "\n" << std::flush;
+              stream << '\n' << std::flush;
             }
           else if (optimization_method() == OptimizerType::lambda)
             {
@@ -2249,8 +2259,7 @@ namespace Differentiation
 
       if (values_substituted())
         {
-          stream << "Evaluated functions:"
-                 << "\n";
+          stream << "Evaluated functions:" << '\n';
           stream << std::flush;
           cntr = 0;
           for (typename std::vector<ReturnType>::const_iterator it =
@@ -2258,9 +2267,9 @@ namespace Differentiation
                it != dependent_variables_output.end();
                ++it, ++cntr)
             {
-              stream << cntr << ": " << (*it) << "\n";
+              stream << cntr << ": " << (*it) << '\n';
             }
-          stream << "\n" << std::flush;
+          stream << '\n' << std::flush;
         }
     }
 
@@ -2517,12 +2526,6 @@ namespace Differentiation
       const Tensor<rank, dim, Expression> &funcs,
       const std::vector<ReturnType> &      cached_evaluation) const
     {
-      Assert(
-        values_substituted() == true,
-        ExcMessage(
-          "The optimizer is not configured to perform evaluation. "
-          "This action can only performed after substitute() has been called."));
-
       return internal::tensor_evaluate_optimized(funcs,
                                                  cached_evaluation,
                                                  *this);
@@ -2536,6 +2539,12 @@ namespace Differentiation
     BatchOptimizer<ReturnType>::evaluate(
       const Tensor<rank, dim, Expression> &funcs) const
     {
+      Assert(
+        values_substituted() == true,
+        ExcMessage(
+          "The optimizer is not configured to perform evaluation. "
+          "This action can only performed after substitute() has been called."));
+
       return extract(funcs, dependent_variables_output);
     }
 
@@ -2548,12 +2557,6 @@ namespace Differentiation
       const SymmetricTensor<rank, dim, Expression> &funcs,
       const std::vector<ReturnType> &               cached_evaluation) const
     {
-      Assert(
-        values_substituted() == true,
-        ExcMessage(
-          "The optimizer is not configured to perform evaluation. "
-          "This action can only performed after substitute() has been called."));
-
       return internal::tensor_evaluate_optimized(funcs,
                                                  cached_evaluation,
                                                  *this);
@@ -2567,6 +2570,12 @@ namespace Differentiation
     BatchOptimizer<ReturnType>::evaluate(
       const SymmetricTensor<rank, dim, Expression> &funcs) const
     {
+      Assert(
+        values_substituted() == true,
+        ExcMessage(
+          "The optimizer is not configured to perform evaluation. "
+          "This action can only performed after substitute() has been called."));
+
       return extract(funcs, dependent_variables_output);
     }
 

@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------
 
 
-// check filtered iterators using multiple predicate
+// check filtered iterators using multiple predicates
 
 #include <deal.II/grid/filtered_iterator.h>
 #include <deal.II/grid/grid_generator.h>

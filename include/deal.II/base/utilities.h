@@ -465,7 +465,8 @@ namespace Utilities
     // The call to __builtin_expect turns out to be problematic.
     if (!(iexp >= 0))
       ::dealii::deal_II_exceptions::internals::issue_error_noreturn(
-        ::dealii::deal_II_exceptions::internals::abort_or_throw_on_exception,
+        ::dealii::deal_II_exceptions::internals::ExceptionHandling::
+          abort_or_throw_on_exception,
         __FILE__,
         __LINE__,
         __PRETTY_FUNCTION__,
@@ -1306,7 +1307,7 @@ namespace Utilities
 #else
         (void)allow_compression;
 #endif
-        fisb.push(boost::iostreams::array_source(&*cbegin, &*cend));
+        fisb.push(boost::iostreams::array_source(&*cbegin, cend - cbegin));
 
         boost::archive::binary_iarchive bia(fisb);
         bia >> object;
@@ -1354,7 +1355,7 @@ namespace Utilities
 #else
         (void)allow_compression;
 #endif
-        fisb.push(boost::iostreams::array_source(&*cbegin, &*cend));
+        fisb.push(boost::iostreams::array_source(&*cbegin, cend - cbegin));
 
         boost::archive::binary_iarchive bia(fisb);
         bia >> unpacked_object;
@@ -1384,7 +1385,7 @@ namespace Utilities
     // source:
     // https://stackoverflow.com/questions/47981/how-do-you-set-clear-and-toggle-a-single-bit
     // "Checking a bit"
-    return (number >> n) & 1U;
+    return ((number >> n) & 1U) != 0u;
   }
 
 

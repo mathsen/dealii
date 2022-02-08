@@ -1068,67 +1068,28 @@ GridOut::write_msh(const Triangulation<dim, spacedim> &tria,
             (msh_flags.write_lines ? n_boundary_lines(tria) : 0))
       << '\n';
 
-  /*
-    elm-type
-    defines the geometrical type of the n-th element:
-    1
-    Line (2 nodes).
-    2
-    Triangle (3 nodes).
-    3
-    Quadrangle (4 nodes).
-    4
-    Tetrahedron (4 nodes).
-    5
-    Hexahedron (8 nodes).
-    6
-    Prism (6 nodes).
-    7
-    Pyramid (5 nodes).
-    8
-    Second order line (3 nodes: 2 associated with the vertices and 1 with the
-    edge).
-    9
-    Second order triangle (6 nodes: 3 associated with the vertices and 3 with
-    the edges). 10 Second order quadrangle (9 nodes: 4 associated with the
-    vertices, 4 with the edges and 1 with the face). 11 Second order tetrahedron
-    (10 nodes: 4 associated with the vertices and 6 with the edges). 12 Second
-    order hexahedron (27 nodes: 8 associated with the vertices, 12 with the
-    edges, 6 with the faces and 1 with the volume). 13 Second order prism (18
-    nodes: 6 associated with the vertices, 9 with the edges and 3 with the
-    quadrangular faces). 14 Second order pyramid (14 nodes: 5 associated with
-    the vertices, 8 with the edges and 1 with the quadrangular face). 15 Point
-    (1 node).
-  */
-  unsigned int elm_type;
-  switch (dim)
-    {
-      case 1:
-        elm_type = 1;
-        break;
-      case 2:
-        elm_type = 3;
-        break;
-      case 3:
-        elm_type = 5;
-        break;
-      default:
-        Assert(false, ExcNotImplemented());
-    }
-
   // write cells. Enumerate cells
   // consecutively, starting with 1
   for (const auto &cell : tria.active_cell_iterators())
     {
-      out << cell->active_cell_index() + 1 << ' ' << elm_type << ' '
+      out << cell->active_cell_index() + 1 << ' '
+          << cell->reference_cell().gmsh_element_type() << ' '
           << cell->material_id() << ' ' << cell->subdomain_id() << ' '
           << cell->n_vertices() << ' ';
 
       // Vertex numbering follows UCD conventions.
 
-      for (const unsigned int vertex : GeometryInfo<dim>::vertex_indices())
-        out << cell->vertex_index(GeometryInfo<dim>::ucd_to_deal[vertex]) + 1
-            << ' ';
+      for (const unsigned int vertex : cell->vertex_indices())
+        {
+          if (cell->reference_cell() == ReferenceCells::get_hypercube<dim>())
+            out << cell->vertex_index(GeometryInfo<dim>::ucd_to_deal[vertex]) +
+                     1
+                << ' ';
+          else if (cell->reference_cell() == ReferenceCells::get_simplex<dim>())
+            out << cell->vertex_index(vertex) + 1 << ' ';
+          else
+            Assert(false, ExcNotImplemented());
+        }
       out << '\n';
     }
 
@@ -2105,7 +2066,7 @@ GridOut::write_svg(const Triangulation<2, 2> &tria, std::ostream &out) const
       additional_width = static_cast<unsigned int>(
         .5 + height * .4); // additional width for legend
     }
-  else if (svg_flags.draw_colorbar && svg_flags.coloring)
+  else if (svg_flags.draw_colorbar && (svg_flags.coloring != 0u))
     {
       additional_width = static_cast<unsigned int>(
         .5 + height * .175); // additional width for colorbar
@@ -2162,7 +2123,7 @@ GridOut::write_svg(const Triangulation<2, 2> &tria, std::ostream &out) const
       << '\n';
 
   // polygon styles with respect to the chosen cell coloring
-  if (svg_flags.coloring)
+  if (svg_flags.coloring != 0u)
     {
       unsigned int labeling_index      = 0;
       auto         materials_it        = materials.begin();
@@ -2306,7 +2267,7 @@ GridOut::write_svg(const Triangulation<2, 2> &tria, std::ostream &out) const
           // draw the current cell
           out << "  <path";
 
-          if (svg_flags.coloring)
+          if (svg_flags.coloring != 0u)
             {
               out << " class=\"p";
 
@@ -2577,7 +2538,7 @@ GridOut::write_svg(const Triangulation<2, 2> &tria, std::ostream &out) const
 
           // if the current cell lies at the boundary of the triangulation, draw
           // the additional boundary line
-          if (svg_flags.boundary_line_thickness)
+          if (svg_flags.boundary_line_thickness != 0u)
             {
               for (auto faceIndex : cell->face_indices())
                 {
@@ -2902,7 +2863,7 @@ GridOut::write_svg(const Triangulation<2, 2> &tria, std::ostream &out) const
 
 
   // draw the colorbar
-  if (svg_flags.draw_colorbar && svg_flags.coloring)
+  if (svg_flags.draw_colorbar && (svg_flags.coloring != 0u))
     {
       out << '\n' << " <!-- colorbar -->" << '\n';
 
@@ -3042,8 +3003,7 @@ GridOut::write_mathgl(const Triangulation<dim, spacedim> &tria,
       << "\n#"
       << "\n# Note: This file is understood by MathGL v2.1 and higher only, and can "
       << "\n#       be quickly viewed in a graphical environment using \'mglview\'. "
-      << "\n#"
-      << "\n";
+      << "\n#" << '\n';
   }
 
   // define a helper to keep loops approximately dim-independent
@@ -3053,8 +3013,7 @@ GridOut::write_mathgl(const Triangulation<dim, spacedim> &tria,
   // (ii) write preamble and graphing tweaks
   out << "\n#"
       << "\n#   Preamble."
-      << "\n#"
-      << "\n";
+      << "\n#" << '\n';
 
   if (mathgl_flags.draw_bounding_box)
     out << "\nbox";
@@ -3074,14 +3033,13 @@ GridOut::write_mathgl(const Triangulation<dim, spacedim> &tria,
       default:
         Assert(false, ExcNotImplemented());
     }
-  out << "\n";
+  out << '\n';
 
   // (iii) write vertex ordering
   out << "\n#"
       << "\n#   Vertex ordering."
       << "\n#   list <vertex order> <vertex indices>"
-      << "\n#"
-      << "\n";
+      << "\n#" << '\n';
 
   // todo: This denotes the natural ordering of vertices, but it needs
   // to check this is really always true for a given grid (it's not
@@ -3089,13 +3047,12 @@ GridOut::write_mathgl(const Triangulation<dim, spacedim> &tria,
   switch (dim)
     {
       case 2:
-        out << "\nlist f 0 1 2 3"
-            << "\n";
+        out << "\nlist f 0 1 2 3" << '\n';
         break;
       case 3:
         out
           << "\nlist f 0 2 4 6 | 1 3 5 7 | 0 4 1 5 | 2 6 3 7 | 0 1 2 3 | 4 5 6 7"
-          << "\n";
+          << '\n';
         break;
       default:
         Assert(false, ExcNotImplemented());
@@ -3105,8 +3062,7 @@ GridOut::write_mathgl(const Triangulation<dim, spacedim> &tria,
   out << "\n#"
       << "\n#   List of vertices."
       << "\n#   list <id> <vertices>"
-      << "\n#"
-      << "\n";
+      << "\n#" << '\n';
 
   // run over all active cells and write out a list of
   // xyz-coordinates that correspond to vertices
@@ -3131,8 +3087,7 @@ GridOut::write_mathgl(const Triangulation<dim, spacedim> &tria,
   out << "\n#"
       << "\n#   List of cells to quadplot."
       << "\n#   quadplot <vertex order> <id> <style>"
-      << "\n#"
-      << "\n";
+      << "\n#" << '\n';
   for (unsigned int i = 0; i < tria.n_active_cells(); ++i)
     {
       out << "\nquadplot f ";
@@ -3140,13 +3095,12 @@ GridOut::write_mathgl(const Triangulation<dim, spacedim> &tria,
         out << axes[j] << i << " ";
       out << "\'k#\'";
     }
-  out << "\n";
+  out << '\n';
 
   // (vi) write footer
   out << "\n#"
       << "\n#"
-      << "\n#"
-      << "\n";
+      << "\n#" << '\n';
 
   // make sure everything now gets to the output stream
   out.flush();
@@ -3951,35 +3905,32 @@ GridOut::write_msh_faces(const Triangulation<dim, spacedim> &tria,
   for (const auto &face : tria.active_face_iterators())
     if (face->at_boundary() && (face->boundary_id() != 0))
       {
-        out << current_element_index << ' ';
-        switch (dim)
-          {
-            case 2:
-              out << 1 << ' ';
-              break;
-            case 3:
-              out << 3 << ' ';
-              break;
-            default:
-              Assert(false, ExcNotImplemented());
-          }
+        out << current_element_index << ' '
+            << face->reference_cell().gmsh_element_type() << ' ';
         out << static_cast<unsigned int>(face->boundary_id()) << ' '
             << static_cast<unsigned int>(face->boundary_id()) << ' '
-            << GeometryInfo<dim>::vertices_per_face;
+            << face->n_vertices();
         // note: vertex numbers are 1-base
-        for (unsigned int vertex = 0;
-             vertex < GeometryInfo<dim>::vertices_per_face;
-             ++vertex)
-          out << ' '
-              << face->vertex_index(
-                   GeometryInfo<dim - 1>::ucd_to_deal[vertex]) +
-                   1;
+        for (unsigned int vertex : face->vertex_indices())
+          {
+            if (face->reference_cell() == ReferenceCells::Quadrilateral)
+              out << ' '
+                  << face->vertex_index(
+                       GeometryInfo<dim - 1>::ucd_to_deal[vertex]) +
+                       1;
+            else if ((face->reference_cell() == ReferenceCells::Triangle) ||
+                     (face->reference_cell() == ReferenceCells::Line))
+              out << ' ' << face->vertex_index(vertex) + 1;
+            else
+              Assert(false, ExcInternalError());
+          }
         out << '\n';
 
         ++current_element_index;
       }
   return current_element_index;
 }
+
 
 
 template <int dim, int spacedim>
@@ -4004,10 +3955,11 @@ GridOut::write_msh_lines(const Triangulation<dim, spacedim> &tria,
       if (cell->line(l)->at_boundary() && (cell->line(l)->boundary_id() != 0) &&
           (cell->line(l)->user_flag_set() == false))
         {
-          out << next_element_index << " 1 ";
+          out << next_element_index << ' '
+              << ReferenceCells::Line.gmsh_element_type() << ' ';
           out << static_cast<unsigned int>(cell->line(l)->boundary_id()) << ' '
               << static_cast<unsigned int>(cell->line(l)->boundary_id())
-              << " 2 ";
+              << " 2 "; // two vertex indices to follow
           // note: vertex numbers are 1-base
           for (unsigned int vertex = 0; vertex < 2; ++vertex)
             out << ' '
@@ -4411,55 +4363,124 @@ namespace internal
               (!cell->has_boundary_lines() &&
                !gnuplot_flags.curved_inner_cells))
             {
-              // front face
-              out << cell->vertex(0) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << cell->vertex(1) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << cell->vertex(5) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << cell->vertex(4) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << cell->vertex(0) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << '\n';
-              // back face
-              out << cell->vertex(2) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << cell->vertex(3) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << cell->vertex(7) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << cell->vertex(6) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << cell->vertex(2) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << '\n';
+              if (cell->reference_cell() == ReferenceCells::Hexahedron)
+                {
+                  // front face
+                  out << cell->vertex(0) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << cell->vertex(1) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << cell->vertex(5) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << cell->vertex(4) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << cell->vertex(0) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << '\n';
+                  // back face
+                  out << cell->vertex(2) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << cell->vertex(3) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << cell->vertex(7) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << cell->vertex(6) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << cell->vertex(2) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << '\n';
 
-              // now for the four connecting lines
-              out << cell->vertex(0) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << cell->vertex(2) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << '\n';
-              out << cell->vertex(1) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << cell->vertex(3) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << '\n';
-              out << cell->vertex(5) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << cell->vertex(7) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << '\n';
-              out << cell->vertex(4) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << cell->vertex(6) << ' ' << cell->level() << ' '
-                  << cell->material_id() << '\n'
-                  << '\n';
+                  // now for the four connecting lines
+                  out << cell->vertex(0) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << cell->vertex(2) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << '\n';
+                  out << cell->vertex(1) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << cell->vertex(3) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << '\n';
+                  out << cell->vertex(5) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << cell->vertex(7) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << '\n';
+                  out << cell->vertex(4) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << cell->vertex(6) << ' ' << cell->level() << ' '
+                      << cell->material_id() << '\n'
+                      << '\n';
+                }
+              else if (cell->reference_cell() == ReferenceCells::Tetrahedron)
+                {
+                  // Draw the tetrahedron as a two collections of lines.
+                  for (const unsigned int v : {0, 1, 2, 0, 3, 2})
+                    {
+                      out << cell->vertex(v) << ' ' << cell->level() << ' '
+                          << cell->material_id() << '\n';
+                    }
+                  out << '\n'; // end of first line
+
+                  for (const unsigned int v : {3, 1})
+                    {
+                      out << cell->vertex(v) << ' ' << cell->level() << ' '
+                          << cell->material_id() << '\n';
+                    }
+                  out << '\n'; // end of second line
+                }
+              else if (cell->reference_cell() == ReferenceCells::Wedge)
+                {
+                  // Draw the wedge as a collection of three
+                  // lines. The first one wraps around the base,
+                  // goes up to the top, and wraps around that. The
+                  // second and third are just individual lines
+                  // going from base to top.
+                  for (const unsigned int v : {0, 1, 2, 0, 3, 4, 5, 3})
+                    {
+                      out << cell->vertex(v) << ' ' << cell->level() << ' '
+                          << cell->material_id() << '\n';
+                    }
+                  out << '\n'; // end of first line
+
+                  for (const unsigned int v : {1, 4})
+                    {
+                      out << cell->vertex(v) << ' ' << cell->level() << ' '
+                          << cell->material_id() << '\n';
+                    }
+                  out << '\n'; // end of second line
+
+                  for (const unsigned int v : {2, 5})
+                    {
+                      out << cell->vertex(v) << ' ' << cell->level() << ' '
+                          << cell->material_id() << '\n';
+                    }
+                  out << '\n'; // end of third line
+                }
+              else if (cell->reference_cell() == ReferenceCells::Pyramid)
+                {
+                  // Draw the pyramid as a collections of two lines.
+                  for (const unsigned int v : {0, 1, 3, 2, 0, 4, 1})
+                    {
+                      out << cell->vertex(v) << ' ' << cell->level() << ' '
+                          << cell->material_id() << '\n';
+                    }
+                  out << '\n'; // end of first line
+
+                  for (const unsigned int v : {2, 4, 3})
+                    {
+                      out << cell->vertex(v) << ' ' << cell->level() << ' '
+                          << cell->material_id() << '\n';
+                    }
+                  out << '\n'; // end of second line
+                }
+              else
+                Assert(false, ExcNotImplemented());
             }
-          else
+          else // need to handle curved boundaries
             {
+              Assert(cell->reference_cell() == ReferenceCells::Hexahedron,
+                     ExcNotImplemented());
               for (const unsigned int face_no :
                    GeometryInfo<dim>::face_indices())
                 {

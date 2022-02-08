@@ -73,6 +73,9 @@
 #define DEAL_II_WITH_THREADS
 
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
+
+#cmakedefine DEAL_II_TBB_WITH_ONEAPI
+
 #endif
 
 /***********************************************************************
@@ -223,6 +226,9 @@
 
 /* cmake/modules/FindSYMENGINE.cmake */
 #cmakedefine DEAL_II_SYMENGINE_WITH_LLVM
+
+/* cmake/configure/configure_2_boost.cmake */
+#cmakedefine DEAL_II_BOOST_HAS_BROKEN_HEADER_DEPRECATIONS
 
 /* cmake/configure/configure_2_trilinos.cmake */
 #cmakedefine DEAL_II_TRILINOS_CXX_SUPPORTS_SACADO_COMPLEX_RAD

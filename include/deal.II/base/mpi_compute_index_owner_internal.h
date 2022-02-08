@@ -64,7 +64,9 @@ namespace Utilities
             , actually_owning_ranks(actually_owning_ranks)
             , local_range(local_range)
             , actually_owning_rank_list(actually_owning_rank_list)
-          {}
+          {
+            Assert(local_range.first <= local_range.second, ExcInternalError());
+          }
 
           /**
            * Implementation of
@@ -114,15 +116,19 @@ namespace Utilities
                 for (types::global_dof_index i = interval.first;
                      i < interval.second;
                      i++)
-                  Assert(actually_owning_ranks[i - local_range.first] ==
-                           numbers::invalid_unsigned_int,
-                         ExcInternalError());
-                Assert(interval.first >= local_range.first &&
-                         interval.first < local_range.second,
-                       ExcInternalError());
-                Assert(interval.second > local_range.first &&
-                         interval.second <= local_range.second,
-                       ExcInternalError());
+                  Assert(
+                    actually_owning_ranks[i - local_range.first] ==
+                      numbers::invalid_unsigned_int,
+                    ExcMessage(
+                      "Multiple processes seem to own the same global index. "
+                      "A possible reason is that the sets of locally owned "
+                      "indices are not distinct."));
+                Assert(interval.first < interval.second, ExcInternalError());
+                Assert(
+                  local_range.first <= interval.first &&
+                    interval.second <= local_range.second,
+                  ExcMessage(
+                    "The specified interval is not handled by the current process."));
 #endif
                 std::fill(actually_owning_ranks.data() + interval.first -
                             local_range.first,
@@ -762,24 +768,14 @@ namespace Utilities
 
           /**
            * Implementation of
-           * Utilities::MPI::ConsensusAlgorithms::Process::prepare_buffer_for_answer().
-           */
-          virtual void
-          prepare_buffer_for_answer(
-            const unsigned int         other_rank,
-            std::vector<unsigned int> &recv_buffer) override
-          {
-            recv_buffer.resize(recv_indices[other_rank].size());
-          }
-
-          /**
-           * Implementation of
            * Utilities::MPI::ConsensusAlgorithms::Process::read_answer().
            */
           virtual void
           read_answer(const unsigned int               other_rank,
                       const std::vector<unsigned int> &recv_buffer) override
           {
+            Assert(recv_buffer.size() == recv_indices[other_rank].size(),
+                   ExcInternalError());
             Assert(recv_indices[other_rank].size() == recv_buffer.size(),
                    ExcMessage("Sizes do not match!"));
 

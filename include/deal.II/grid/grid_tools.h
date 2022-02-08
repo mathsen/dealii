@@ -14,64 +14,64 @@
 // ---------------------------------------------------------------------
 
 #ifndef dealii_grid_tools_h
-#  define dealii_grid_tools_h
+#define dealii_grid_tools_h
 
 
-#  include <deal.II/base/config.h>
+#include <deal.II/base/config.h>
 
-#  include <deal.II/base/bounding_box.h>
-#  include <deal.II/base/geometry_info.h>
-#  include <deal.II/base/std_cxx17/optional.h>
+#include <deal.II/base/bounding_box.h>
+#include <deal.II/base/geometry_info.h>
+#include <deal.II/base/point.h>
+#include <deal.II/base/std_cxx17/optional.h>
 
-#  include <deal.II/boost_adaptors/bounding_box.h>
+#include <deal.II/boost_adaptors/bounding_box.h>
 
-#  include <deal.II/distributed/shared_tria.h>
+#include <deal.II/distributed/shared_tria.h>
 
-#  include <deal.II/dofs/dof_handler.h>
+#include <deal.II/dofs/dof_handler.h>
 
-#  include <deal.II/fe/fe_values.h>
-#  include <deal.II/fe/mapping.h>
-#  include <deal.II/fe/mapping_q1.h>
+#include <deal.II/fe/fe_values.h>
+#include <deal.II/fe/mapping.h>
+#include <deal.II/fe/mapping_q1.h>
 
-#  include <deal.II/grid/manifold.h>
-#  include <deal.II/grid/tria.h>
-#  include <deal.II/grid/tria_accessor.h>
-#  include <deal.II/grid/tria_iterator.h>
+#include <deal.II/grid/manifold.h>
+#include <deal.II/grid/tria.h>
+#include <deal.II/grid/tria_accessor.h>
+#include <deal.II/grid/tria_iterator.h>
 
-#  include <deal.II/hp/dof_handler.h>
+#include <deal.II/hp/dof_handler.h>
 
-#  include <deal.II/lac/la_parallel_vector.h>
-#  include <deal.II/lac/la_vector.h>
-#  include <deal.II/lac/petsc_vector.h>
-#  include <deal.II/lac/sparsity_tools.h>
-#  include <deal.II/lac/trilinos_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
+#include <deal.II/lac/la_vector.h>
+#include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/sparsity_tools.h>
+#include <deal.II/lac/trilinos_vector.h>
 
-#  include <deal.II/numerics/rtree.h>
+#include <deal.II/numerics/rtree.h>
 
 DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
-#  include <boost/archive/binary_iarchive.hpp>
-#  include <boost/archive/binary_oarchive.hpp>
-#  include <boost/geometry/index/rtree.hpp>
-#  include <boost/random/mersenne_twister.hpp>
-#  include <boost/serialization/array.hpp>
-#  include <boost/serialization/vector.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/serialization/array.hpp>
+#include <boost/serialization/vector.hpp>
 
-#  ifdef DEAL_II_WITH_ZLIB
-#    include <boost/iostreams/device/back_inserter.hpp>
-#    include <boost/iostreams/filter/gzip.hpp>
-#    include <boost/iostreams/filtering_stream.hpp>
-#    include <boost/iostreams/stream.hpp>
-#  endif
+#ifdef DEAL_II_WITH_ZLIB
+#  include <boost/iostreams/device/back_inserter.hpp>
+#  include <boost/iostreams/filter/gzip.hpp>
+#  include <boost/iostreams/filtering_stream.hpp>
+#  include <boost/iostreams/stream.hpp>
+#endif
 DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
-#  include <bitset>
-#  include <list>
-#  include <set>
+#include <bitset>
+#include <list>
+#include <set>
 
 DEAL_II_NAMESPACE_OPEN
 
 // Forward declarations
-#  ifndef DOXYGEN
+#ifndef DOXYGEN
 namespace parallel
 {
   namespace distributed
@@ -88,7 +88,7 @@ namespace hp
 }
 
 class SparsityPattern;
-#  endif
+#endif
 
 namespace internal
 {
@@ -96,14 +96,14 @@ namespace internal
   class ActiveCellIterator
   {
   public:
-#  ifndef _MSC_VER
+#ifndef _MSC_VER
     using type = typename MeshType::active_cell_iterator;
-#  else
+#else
     using type = TriaActiveIterator<dealii::CellAccessor<dim, spacedim>>;
-#  endif
+#endif
   };
 
-#  ifdef _MSC_VER
+#ifdef _MSC_VER
   template <int dim, int spacedim>
   class ActiveCellIterator<dim, spacedim, dealii::DoFHandler<dim, spacedim>>
   {
@@ -111,7 +111,7 @@ namespace internal
     using type =
       TriaActiveIterator<dealii::DoFCellAccessor<dim, spacedim, false>>;
   };
-#  endif
+#endif
 } // namespace internal
 
 /**
@@ -480,8 +480,9 @@ namespace GridTools
    * The transformation given as argument is used to transform each vertex.
    * Its respective type has to offer a function-like syntax, i.e. the
    * predicate is either an object of a type that has an <tt>operator()</tt>,
-   * or it is a pointer to the function. In either case, argument and return
-   * value have to be of type <tt>Point@<spacedim@></tt>.
+   * or it is a pointer to a non-member function, or it is a lambda function
+   * object. In either case, argument and return
+   * value have to be of type `Point@<spacedim@>`.
    *
    * @note The transformations that make sense to use with this function
    *   should have a Jacobian with a positive determinant. For example,
@@ -506,20 +507,28 @@ namespace GridTools
    * to the triangulation. For example, in order to refine the grid (using
    * manifolds) after the grid transformation, you have to make sure that
    * the original manifold is still valid for the transformed geometry. This
-   * does not hold in general, and it is necessary to clear the manifold and
-   * attach a new one for the transformed geometry in these cases.
-   * If you want to perform refinements according to the original
-   * manifold description attached to the triangulation, you should first do
-   * the refinements, subsequently deactivate all manifolds, and finally call
-   * the transform() function. The result is a triangulation with correctly
-   * transformed vertices, but otherwise straight-sided elements. The
-   * following procedure is recommended
+   * does not hold in general, and it is necessary to clear manifolds from
+   * the triangulation (for example, using Triangulation::clear_all_manifolds())
+   * before the transformation, and then attach new ones after the
+   * transformation that are valid for the transformed geometry. There are cases
+   * where this is awkward, most notably if you are using a mesh generated by
+   * the functions in GridGenerator which generally attach suitable manifolds
+   * upon mesh generation; in those cases, you will have to think about how
+   * these manifolds were constructed, and create a manifold that is constructed
+   * in a similar way but applies to the transformed geometry. As a consequence,
+   * if you only care about manifolds for mesh refinement, it is often simpler
+   * to just refine the original mesh before transformation as needed, and then
+   * simply forget about the manifolds. Of course, manifolds are also used for
+   * other cases (e.g., for normal vectors, curved edges and faces, and higher
+   * order mappings), and if these are relevant to what you are doing, then
+   * there is no alternative to building appropriate manifolds for the
+   * transformed geometry and attaching these to the transformed geometry. In
+   * general, detaching manifolds from a triangulation and then doing the
+   * transformation would look as follows:
    * @code
    * ...
-   * triangulation.refine_global(n_refinements);
    * triangulation.reset_all_manifolds();
-   * Transformation<dim> transformation;
-   * GridTools::transform(transformation, triangulation);
+   * GridTools::transform(MyTransformation<dim>(), triangulation);
    * ...
    * @endcode
    *
@@ -534,7 +543,8 @@ namespace GridTools
   /**
    * Shift each vertex of the triangulation by the given shift vector. This
    * function uses the transform() function above, so the requirements on the
-   * triangulation stated there hold for this function as well.
+   * triangulation stated there hold for this function as well; in particular,
+   * this is true about the discussion about manifolds.
    */
   template <int dim, int spacedim>
   void
@@ -547,7 +557,8 @@ namespace GridTools
    * counter-clockwise sense around the origin of the coordinate system by the
    * given angle (given in radians, rather than degrees). This function uses
    * the transform() function above, so the requirements on the triangulation
-   * stated there hold for this function as well.
+   * stated there hold for this function as well; in particular,
+   * this is true about the discussion about manifolds.
    *
    * @note This function is only supported for dim=2.
    */
@@ -557,8 +568,27 @@ namespace GridTools
 
   /**
    * Rotate all vertices of the given @p triangulation in counter-clockwise
+   * direction around the @p axis described by a unit vector. Otherwise like the
+   * function above; in particular, this function calls the transform() function
+   * and so the discussion about manifolds there also applies here.
+   *
+   * @param[in] angle Angle in radians to rotate the Triangulation by.
+   * @param[in] axis A unit vector that defines the axis of rotation.
+   * @param[in,out] triangulation The Triangulation object to rotate.
+   *
+   * @note Implemented for spacedim=3 and dim=1, 2, and 3.
+   */
+  template <int dim>
+  void
+  rotate(const Tensor<1, 3, double> &axis,
+         const double                angle,
+         Triangulation<dim, 3> &     triangulation);
+
+  /**
+   * Rotate all vertices of the given @p triangulation in counter-clockwise
    * direction around the axis with the given index. Otherwise like the
-   * function above.
+   * function above; in particular, this function calls the transform() function
+   * and so the discussion about manifolds there also applies here.
    *
    * @param[in] angle Angle in radians to rotate the Triangulation by.
    * @param[in] axis Index of the coordinate axis to rotate around, keeping
@@ -566,9 +596,11 @@ namespace GridTools
    * @param[in,out] triangulation The Triangulation object to rotate.
    *
    * @note Implemented for dim=1, 2, and 3.
+   *
+   * @deprecated Use the alternative with the unit vector instead.
    */
   template <int dim>
-  void
+  DEAL_II_DEPRECATED_EARLY void
   rotate(const double           angle,
          const unsigned int     axis,
          Triangulation<dim, 3> &triangulation);
@@ -904,14 +936,14 @@ namespace GridTools
    * the performance if the function is called only once on few points.
    */
   template <int dim, int spacedim>
-#  ifndef DOXYGEN
+#ifndef DOXYGEN
   std::tuple<
     std::vector<typename Triangulation<dim, spacedim>::active_cell_iterator>,
     std::vector<std::vector<Point<dim>>>,
     std::vector<std::vector<unsigned int>>>
-#  else
+#else
   return_type
-#  endif
+#endif
   compute_point_locations(
     const Cache<dim, spacedim> &        cache,
     const std::vector<Point<spacedim>> &points,
@@ -953,15 +985,15 @@ namespace GridTools
    * GridTools::compute_point_locations().
    */
   template <int dim, int spacedim>
-#  ifndef DOXYGEN
+#ifndef DOXYGEN
   std::tuple<
     std::vector<typename Triangulation<dim, spacedim>::active_cell_iterator>,
     std::vector<std::vector<Point<dim>>>,
     std::vector<std::vector<unsigned int>>,
     std::vector<unsigned int>>
-#  else
+#else
   return_type
-#  endif
+#endif
   compute_point_locations_try_all(
     const Cache<dim, spacedim> &        cache,
     const std::vector<Point<spacedim>> &points,
@@ -1039,16 +1071,16 @@ namespace GridTools
    * of this page.
    */
   template <int dim, int spacedim>
-#  ifndef DOXYGEN
+#ifndef DOXYGEN
   std::tuple<
     std::vector<typename Triangulation<dim, spacedim>::active_cell_iterator>,
     std::vector<std::vector<Point<dim>>>,
     std::vector<std::vector<unsigned int>>,
     std::vector<std::vector<Point<spacedim>>>,
     std::vector<std::vector<unsigned int>>>
-#  else
+#else
   return_type
-#  endif
+#endif
   distributed_compute_point_locations(
     const GridTools::Cache<dim, spacedim> &                cache,
     const std::vector<Point<spacedim>> &                   local_points,
@@ -1141,6 +1173,7 @@ namespace GridTools
       const GridTools::Cache<dim, spacedim> &                cache,
       const std::vector<Point<spacedim>> &                   points,
       const std::vector<std::vector<BoundingBox<spacedim>>> &global_bboxes,
+      const std::vector<bool> &                              marked_vertices,
       const double                                           tolerance,
       const bool                                             perform_handshake,
       const bool enforce_unique_mapping = false);
@@ -1285,13 +1318,13 @@ namespace GridTools
    * for this case.
    */
   template <int dim, template <int, int> class MeshType, int spacedim>
-#  ifndef _MSC_VER
+#ifndef _MSC_VER
   std::vector<typename MeshType<dim, spacedim>::active_cell_iterator>
-#  else
+#else
   std::vector<
     typename dealii::internal::
       ActiveCellIterator<dim, spacedim, MeshType<dim, spacedim>>::type>
-#  endif
+#endif
   find_cells_adjacent_to_vertex(const MeshType<dim, spacedim> &container,
                                 const unsigned int             vertex_index);
 
@@ -1358,13 +1391,13 @@ namespace GridTools
    * processor will return a locally owned cell and the other one a ghost cell.
    */
   template <int dim, template <int, int> class MeshType, int spacedim>
-#  ifndef _MSC_VER
+#ifndef _MSC_VER
   std::pair<typename MeshType<dim, spacedim>::active_cell_iterator, Point<dim>>
-#  else
+#else
   std::pair<typename dealii::internal::
               ActiveCellIterator<dim, spacedim, MeshType<dim, spacedim>>::type,
             Point<dim>>
-#  endif
+#endif
   find_active_cell_around_point(const Mapping<dim, spacedim> & mapping,
                                 const MeshType<dim, spacedim> &mesh,
                                 const Point<spacedim> &        p,
@@ -1379,12 +1412,12 @@ namespace GridTools
    * @return An iterator into the mesh that points to the surrounding cell.
    */
   template <int dim, template <int, int> class MeshType, int spacedim>
-#  ifndef _MSC_VER
+#ifndef _MSC_VER
   typename MeshType<dim, spacedim>::active_cell_iterator
-#  else
+#else
   typename dealii::internal::
     ActiveCellIterator<dim, spacedim, MeshType<dim, spacedim>>::type
-#  endif
+#endif
   find_active_cell_around_point(const MeshType<dim, spacedim> &mesh,
                                 const Point<spacedim> &        p,
                                 const std::vector<bool> &marked_vertices = {},
@@ -1481,13 +1514,13 @@ namespace GridTools
    * call the function above with argument `cache` in this case.
    */
   template <int dim, template <int, int> class MeshType, int spacedim>
-#  ifndef _MSC_VER
+#ifndef _MSC_VER
   std::pair<typename MeshType<dim, spacedim>::active_cell_iterator, Point<dim>>
-#  else
+#else
   std::pair<typename dealii::internal::
               ActiveCellIterator<dim, spacedim, MeshType<dim, spacedim>>::type,
             Point<dim>>
-#  endif
+#endif
   find_active_cell_around_point(
     const Mapping<dim, spacedim> & mapping,
     const MeshType<dim, spacedim> &mesh,
@@ -1529,15 +1562,15 @@ namespace GridTools
    * @endcode
    */
   template <int dim, template <int, int> class MeshType, int spacedim>
-#  ifndef _MSC_VER
+#ifndef _MSC_VER
   std::vector<std::pair<typename MeshType<dim, spacedim>::active_cell_iterator,
                         Point<dim>>>
-#  else
+#else
   std::vector<std::pair<
     typename dealii::internal::
       ActiveCellIterator<dim, spacedim, MeshType<dim, spacedim>>::type,
     Point<dim>>>
-#  endif
+#endif
   find_all_active_cells_around_point(
     const Mapping<dim, spacedim> & mapping,
     const MeshType<dim, spacedim> &mesh,
@@ -1553,15 +1586,15 @@ namespace GridTools
    * function find_all_active_cells_around_point() above.
    */
   template <int dim, template <int, int> class MeshType, int spacedim>
-#  ifndef _MSC_VER
+#ifndef _MSC_VER
   std::vector<std::pair<typename MeshType<dim, spacedim>::active_cell_iterator,
                         Point<dim>>>
-#  else
+#else
   std::vector<std::pair<
     typename dealii::internal::
       ActiveCellIterator<dim, spacedim, MeshType<dim, spacedim>>::type,
     Point<dim>>>
-#  endif
+#endif
   find_all_active_cells_around_point(
     const Mapping<dim, spacedim> & mapping,
     const MeshType<dim, spacedim> &mesh,
@@ -1908,13 +1941,13 @@ namespace GridTools
    * of this page.
    */
   template <int spacedim>
-#  ifndef DOXYGEN
+#ifndef DOXYGEN
   std::tuple<std::vector<std::vector<unsigned int>>,
              std::map<unsigned int, unsigned int>,
              std::map<unsigned int, std::vector<unsigned int>>>
-#  else
+#else
   return_type
-#  endif
+#endif
   guess_point_owner(
     const std::vector<std::vector<BoundingBox<spacedim>>> &global_bboxes,
     const std::vector<Point<spacedim>> &                   points);
@@ -1955,13 +1988,13 @@ namespace GridTools
    * of this page.
    */
   template <int spacedim>
-#  ifndef DOXYGEN
+#ifndef DOXYGEN
   std::tuple<std::map<unsigned int, std::vector<unsigned int>>,
              std::map<unsigned int, unsigned int>,
              std::map<unsigned int, std::vector<unsigned int>>>
-#  else
+#else
   return_type
-#  endif
+#endif
   guess_point_owner(
     const RTree<std::pair<BoundingBox<spacedim>, unsigned int>> &covering_rtree,
     const std::vector<Point<spacedim>> &                         points);
@@ -2742,7 +2775,7 @@ namespace GridTools
     std::bitset<3> &                                              orientation,
     const FaceIterator &                                          face1,
     const FaceIterator &                                          face2,
-    const int                                                     direction,
+    const unsigned int                                            direction,
     const Tensor<1, FaceIterator::AccessorType::space_dimension> &offset =
       Tensor<1, FaceIterator::AccessorType::space_dimension>(),
     const FullMatrix<double> &matrix = FullMatrix<double>());
@@ -2756,7 +2789,7 @@ namespace GridTools
   orthogonal_equality(
     const FaceIterator &                                          face1,
     const FaceIterator &                                          face2,
-    const int                                                     direction,
+    const unsigned int                                            direction,
     const Tensor<1, FaceIterator::AccessorType::space_dimension> &offset =
       Tensor<1, FaceIterator::AccessorType::space_dimension>(),
     const FullMatrix<double> &matrix = FullMatrix<double>());
@@ -2824,7 +2857,7 @@ namespace GridTools
     const MeshType &         mesh,
     const types::boundary_id b_id1,
     const types::boundary_id b_id2,
-    const int                direction,
+    const unsigned int       direction,
     std::vector<PeriodicFacePair<typename MeshType::cell_iterator>>
       &                                         matched_pairs,
     const Tensor<1, MeshType::space_dimension> &offset =
@@ -2859,7 +2892,7 @@ namespace GridTools
   collect_periodic_faces(
     const MeshType &         mesh,
     const types::boundary_id b_id,
-    const int                direction,
+    const unsigned int       direction,
     std::vector<PeriodicFacePair<typename MeshType::cell_iterator>>
       &                                                 matched_pairs,
     const dealii::Tensor<1, MeshType::space_dimension> &offset =
@@ -3254,7 +3287,7 @@ namespace GridTools
     void
     load(Archive &ar, const unsigned int version);
 
-#  ifdef DOXYGEN
+#ifdef DOXYGEN
     /**
      * Read or write the data of this object to or from a stream for the
      * purpose of serialization using the [BOOST serialization
@@ -3263,11 +3296,11 @@ namespace GridTools
     template <class Archive>
     void
     serialize(Archive &archive, const unsigned int version);
-#  else
+#else
     // This macro defines the serialize() method that is compatible with
     // the templated save() and load() method that have been implemented.
     BOOST_SERIALIZATION_SPLIT_MEMBER()
-#  endif
+#endif
   };
 
 
@@ -3424,7 +3457,7 @@ namespace GridTools
   DeclException1(ExcScalingFactorNotPositive,
                  double,
                  << "The scaling factor must be positive, but it is " << arg1
-                 << ".");
+                 << '.');
 
   /**
    * Exception
@@ -3455,7 +3488,7 @@ DeclExceptionMsg(ExcMeshNotOrientable,
 
 /* ----------------- Template function --------------- */
 
-#  ifndef DOXYGEN
+#ifndef DOXYGEN
 
 namespace GridTools
 {
@@ -4260,7 +4293,7 @@ namespace GridTools
                                           MeshType::space_dimension> &)>
         &compute_ghost_owners)
     {
-#    ifndef DEAL_II_WITH_MPI
+#  ifndef DEAL_II_WITH_MPI
       (void)mesh;
       (void)pack;
       (void)unpack;
@@ -4268,7 +4301,7 @@ namespace GridTools
       (void)process_cells;
       (void)compute_ghost_owners;
       Assert(false, ExcNeedsMPI());
-#    else
+#  else
       constexpr int dim      = MeshType::dimension;
       constexpr int spacedim = MeshType::space_dimension;
       auto          tria =
@@ -4490,7 +4523,7 @@ namespace GridTools
         }
 
 
-#    endif // DEAL_II_WITH_MPI
+#  endif // DEAL_II_WITH_MPI
     }
 
   } // namespace internal
@@ -4506,13 +4539,13 @@ namespace GridTools
     const std::function<bool(const typename MeshType::active_cell_iterator &)>
       &cell_filter)
   {
-#    ifndef DEAL_II_WITH_MPI
+#  ifndef DEAL_II_WITH_MPI
     (void)mesh;
     (void)pack;
     (void)unpack;
     (void)cell_filter;
     Assert(false, ExcNeedsMPI());
-#    else
+#  else
     internal::exchange_cell_data<DataType,
                                  MeshType,
                                  typename MeshType::active_cell_iterator>(
@@ -4526,7 +4559,7 @@ namespace GridTools
             process(cell, cell->subdomain_id());
       },
       [](const auto &tria) { return tria.ghost_owners(); });
-#    endif
+#  endif
   }
 
 
@@ -4542,13 +4575,13 @@ namespace GridTools
     const std::function<bool(const typename MeshType::level_cell_iterator &)>
       &cell_filter)
   {
-#    ifndef DEAL_II_WITH_MPI
+#  ifndef DEAL_II_WITH_MPI
     (void)mesh;
     (void)pack;
     (void)unpack;
     (void)cell_filter;
     Assert(false, ExcNeedsMPI());
-#    else
+#  else
     internal::exchange_cell_data<DataType,
                                  MeshType,
                                  typename MeshType::level_cell_iterator>(
@@ -4564,15 +4597,12 @@ namespace GridTools
             process(cell, cell->level_subdomain_id());
       },
       [](const auto &tria) { return tria.level_ghost_owners(); });
-#    endif
+#  endif
   }
 } // namespace GridTools
 
-#  endif
+#endif // DOXYGEN
 
 DEAL_II_NAMESPACE_CLOSE
 
-/*----------------------------   grid_tools.h     ---------------------------*/
-/* end of #ifndef dealii_grid_tools_h */
 #endif
-/*----------------------------   grid_tools.h     ---------------------------*/

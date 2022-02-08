@@ -2393,10 +2393,10 @@ namespace Euler_DG
       pcout << "Running with "
             << Utilities::MPI::n_mpi_processes(MPI_COMM_WORLD)
             << " MPI processes" << std::endl;
-      pcout << "Vectorization over " << n_vect_number << " "
+      pcout << "Vectorization over " << n_vect_number << ' '
             << (std::is_same<Number, double>::value ? "doubles" : "floats")
             << " = " << n_vect_bits << " bits ("
-            << Utilities::System::get_current_vectorization_level() << ")"
+            << Utilities::System::get_current_vectorization_level() << ')'
             << std::endl;
       */
     }
@@ -2424,10 +2424,10 @@ namespace Euler_DG
 #endif
 
     double min_vertex_distance = std::numeric_limits<double>::max();
-    for (const auto &cell : triangulation.active_cell_iterators())
-      if (cell->is_locally_owned())
-        min_vertex_distance =
-          std::min(min_vertex_distance, cell->minimum_vertex_distance());
+    for (const auto &cell : triangulation.active_cell_iterators() |
+                              IteratorFilters::LocallyOwnedCell())
+      min_vertex_distance =
+        std::min(min_vertex_distance, cell->minimum_vertex_distance());
     min_vertex_distance =
       Utilities::MPI::min(min_vertex_distance, MPI_COMM_WORLD);
 

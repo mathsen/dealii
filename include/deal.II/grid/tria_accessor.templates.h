@@ -1189,6 +1189,17 @@ TriaAccessor<structdim, dim, spacedim>::quad_index(const unsigned int i) const
 
 
 template <int structdim, int dim, int spacedim>
+inline unsigned char
+TriaAccessor<structdim, dim, spacedim>::combined_face_orientation(
+  const unsigned int face) const
+{
+  return this->face_orientation(face) + 4 * this->face_flip(face) +
+         2 * this->face_rotation(face);
+}
+
+
+
+template <int structdim, int dim, int spacedim>
 inline bool
 TriaAccessor<structdim, dim, spacedim>::face_orientation(
   const unsigned int face) const
@@ -1742,7 +1753,8 @@ TriaAccessor<structdim, dim, spacedim>::recursively_clear_user_pointer() const
 
 template <int structdim, int dim, int spacedim>
 void
-TriaAccessor<structdim, dim, spacedim>::set_user_index(unsigned int p) const
+TriaAccessor<structdim, dim, spacedim>::set_user_index(
+  const unsigned int p) const
 {
   Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
   this->objects().user_index(this->present_index) = p;
@@ -1773,7 +1785,7 @@ TriaAccessor<structdim, dim, spacedim>::user_index() const
 template <int structdim, int dim, int spacedim>
 void
 TriaAccessor<structdim, dim, spacedim>::recursively_set_user_index(
-  unsigned int p) const
+  const unsigned int p) const
 {
   set_user_index(p);
 
@@ -2528,6 +2540,16 @@ TriaAccessor<0, dim, spacedim>::measure() const
 
 
 template <int dim, int spacedim>
+inline unsigned char
+TriaAccessor<0, dim, spacedim>::combined_face_orientation(
+  const unsigned int /*face*/)
+{
+  return 0;
+}
+
+
+
+template <int dim, int spacedim>
 inline bool
 TriaAccessor<0, dim, spacedim>::face_orientation(const unsigned int /*face*/)
 {
@@ -2748,6 +2770,19 @@ TriaAccessor<0, 1, spacedim>::copy_from(const TriaAccessor &t)
 
 
 template <int spacedim>
+inline void
+TriaAccessor<0, 1, spacedim>::copy_from(
+  const TriaAccessorBase<0, 1, spacedim> &)
+{
+  // We cannot convert from TriaAccessorBase to
+  // TriaAccessor<0,1,spacedim> because the latter is not derived from
+  // the former. We should never get here.
+  Assert(false, ExcInternalError());
+}
+
+
+
+template <int spacedim>
 inline bool
 TriaAccessor<0, 1, spacedim>::operator<(
   const TriaAccessor<0, 1, spacedim> &other) const
@@ -2956,6 +2991,15 @@ TriaAccessor<0, 1, spacedim>::manifold_id() const
     return (*tria->vertex_to_manifold_id_map_1d)[this->vertex_index()];
   else
     return numbers::flat_manifold_id;
+}
+
+
+template <int spacedim>
+inline unsigned char
+TriaAccessor<0, 1, spacedim>::combined_face_orientation(
+  const unsigned int /*face*/)
+{
+  return 0;
 }
 
 
@@ -3784,6 +3828,19 @@ CellAccessor<dim, spacedim>::is_artificial() const
 
 
 template <int dim, int spacedim>
+inline bool
+CellAccessor<dim, spacedim>::is_artificial_on_level() const
+{
+#ifndef DEAL_II_WITH_MPI
+  return false;
+#else
+  return (is_locally_owned_on_level() || is_ghost_on_level()) == false;
+#endif
+}
+
+
+
+template <int dim, int spacedim>
 inline types::subdomain_id
 CellAccessor<dim, spacedim>::subdomain_id() const
 {
@@ -3817,6 +3874,42 @@ inline bool
 CellAccessor<dim, spacedim>::is_level_cell()
 {
   return false;
+}
+
+
+
+template <int dim, int spacedim>
+inline unsigned int
+CellAccessor<dim, spacedim>::active_cell_index() const
+{
+  Assert(this->is_active(), TriaAccessorExceptions::ExcCellNotActive());
+  return this->tria->levels[this->present_level]
+    ->active_cell_indices[this->present_index];
+}
+
+
+
+template <int dim, int spacedim>
+inline types::global_cell_index
+CellAccessor<dim, spacedim>::global_active_cell_index() const
+{
+  Assert(this->used(), TriaAccessorExceptions::ExcCellNotUsed());
+  Assert(this->is_active(),
+         ExcMessage(
+           "global_active_cell_index() can only be called on active cells!"));
+
+  return this->tria->levels[this->present_level]
+    ->global_active_cell_indices[this->present_index];
+}
+
+
+
+template <int dim, int spacedim>
+inline types::global_cell_index
+CellAccessor<dim, spacedim>::global_level_cell_index() const
+{
+  return this->tria->levels[this->present_level]
+    ->global_level_cell_indices[this->present_index];
 }
 
 

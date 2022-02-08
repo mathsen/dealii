@@ -18,6 +18,7 @@
 #include <deal.II/base/mpi.h>
 
 #include <deal.II/distributed/fully_distributed_tria.h>
+#include <deal.II/distributed/repartitioning_policy_tools.h>
 
 #include <deal.II/grid/grid_tools.h>
 
@@ -72,8 +73,9 @@ namespace parallel
       settings = construction_data.settings;
 
       // set the smoothing properties
-      if (settings &
-          TriangulationDescription::Settings::construct_multigrid_hierarchy)
+      if ((settings &
+           TriangulationDescription::Settings::construct_multigrid_hierarchy) !=
+          0)
         this->set_mesh_smoothing(
           static_cast<
             typename dealii::Triangulation<dim, spacedim>::MeshSmoothing>(
@@ -173,7 +175,7 @@ namespace parallel
 
           // 4a) set all cells artificial (and set the actual
           //     (level_)subdomain_ids in the next step)
-          for (auto cell = this->begin(); cell != this->end(); ++cell)
+          for (const auto &cell : this->cell_iterators())
             {
               if (cell->is_active())
                 cell->set_subdomain_id(
@@ -201,8 +203,8 @@ namespace parallel
                     cell->set_subdomain_id(cell_info->subdomain_id);
 
                   // level subdomain id
-                  if (settings & TriangulationDescription::Settings::
-                                   construct_multigrid_hierarchy)
+                  if ((settings & TriangulationDescription::Settings::
+                                    construct_multigrid_hierarchy) != 0)
                     cell->set_level_subdomain_id(cell_info->level_subdomain_id);
                 }
             }
@@ -312,6 +314,46 @@ namespace parallel
 
     template <int dim, int spacedim>
     void
+    Triangulation<dim, spacedim>::set_partitioner(
+      const RepartitioningPolicyTools::Base<dim, spacedim> &partitioner,
+      const TriangulationDescription::Settings &            settings)
+    {
+      this->partitioner_distributed = &partitioner;
+      this->settings                = settings;
+    }
+
+
+
+    template <int dim, int spacedim>
+    void
+    Triangulation<dim, spacedim>::repartition()
+    {
+      // signal that repartitioning has started
+      this->signals.pre_distributed_repartition();
+
+      // create construction_data with the help of the partitioner
+      const auto construction_data = TriangulationDescription::Utilities::
+        create_description_from_triangulation(
+          *this,
+          this->partitioner_distributed->partition(*this),
+          this->settings);
+
+      // clear old content
+      this->clear();
+      this->coarse_cell_id_to_coarse_cell_index_vector.clear();
+      this->coarse_cell_index_to_coarse_cell_id_vector.clear();
+
+      // use construction_data to set up new triangulation
+      this->create_triangulation(construction_data);
+
+      // signal that repartitioning has completed
+      this->signals.post_distributed_repartition();
+    }
+
+
+
+    template <int dim, int spacedim>
+    void
     Triangulation<dim, spacedim>::execute_coarsening_and_refinement()
     {
       Assert(false, ExcNotImplemented());
@@ -363,9 +405,8 @@ namespace parallel
     bool
     Triangulation<dim, spacedim>::is_multilevel_hierarchy_constructed() const
     {
-      return (
-        settings &
-        TriangulationDescription::Settings::construct_multigrid_hierarchy);
+      return (settings & TriangulationDescription::Settings::
+                           construct_multigrid_hierarchy) != 0;
     }
 
 

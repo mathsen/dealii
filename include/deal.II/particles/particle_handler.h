@@ -80,7 +80,7 @@ namespace Particles
      * A type for the storage container for particles.
      */
     using particle_container =
-      std::vector<std::vector<typename PropertyPool<dim, spacedim>::Handle>>;
+      typename ParticleAccessor<dim, spacedim>::particle_container;
 
     /**
      * Default constructor.
@@ -150,6 +150,23 @@ namespace Particles
      */
     void
     clear_particles();
+
+    /**
+     * This function can be used to preemptively reserve memory for particle
+     * data. Calling this function before inserting particles will reduce
+     * memory allocations and therefore increase the performance. Calling
+     * this function is optional; if memory is not already allocated it will
+     * be allocated automatically during the insertion. It is recommended to
+     * use this function if you know the number of particles that will be
+     * inserted, but cannot use one of the collective particle insertion
+     * functions.
+     *
+     * @param n_particles Number of particles to reserve memory for. Note that
+     * this is the total number of particles to be stored, not the number of
+     * particles to be newly inserted.
+     */
+    void
+    reserve(std::size_t n_particles);
 
     /**
      * Update all internally cached numbers. Note that all functions that
@@ -269,6 +286,29 @@ namespace Particles
     insert_particle(
       const Particle<dim, spacedim> &particle,
       const typename Triangulation<dim, spacedim>::active_cell_iterator &cell);
+
+    /**
+     * Insert a particle into the collection of particles given all the
+     * properties necessary for creating a particle. This function is used to
+     * efficiently generate particles without the detour through a Particle
+     * object.
+     *
+     * @param[in] position Initial position of the particle in real space.
+     * @param[in] reference_position Initial position of the particle
+     * in the coordinate system of the reference cell.
+     * @param[in] particle_index Globally unique identifier for this particle.
+     * @param[in] cell The cell in which the particle is located.
+     * @param[in] properties An optional ArrayView that describes the
+     * particle properties. If given this has to be of size
+     * n_properties_per_particle().
+     */
+    particle_iterator
+    insert_particle(
+      const Point<spacedim> &     position,
+      const Point<dim> &          reference_position,
+      const types::particle_index particle_index,
+      const typename Triangulation<dim, spacedim>::active_cell_iterator &cell,
+      const ArrayView<const double> &properties = {});
 
     /**
      * Insert a number of particles into the collection of particles.
@@ -865,18 +905,25 @@ namespace Particles
       const typename Triangulation<dim, spacedim>::active_cell_iterator &cell);
 
     /**
-     * Insert a particle into the collection of particles given all the
-     * properties necessary for a particle. This function is used internally to
-     * efficiently generate particles without the detour through a Particle
-     * object.
+     * Perform the local insertion operation into the particle container. This
+     * function is used in the higher-level functions inserting particles.
      */
     particle_iterator
     insert_particle(
-      const Point<spacedim> &     position,
-      const Point<dim> &          reference_position,
-      const types::particle_index particle_index,
-      const typename Triangulation<dim, spacedim>::active_cell_iterator &cell,
-      const ArrayView<const double> &properties = {});
+      const typename PropertyPool<dim, spacedim>::Handle          handle,
+      const typename Triangulation<dim, spacedim>::cell_iterator &cell);
+
+    /**
+     * Delete all entries in the particles container, and then set the three
+     * anchor entries used to distinguish between owned and ghost cells: We
+     * add one item to the front, one between and one as the last element in
+     * the particle container to be able to iterate across particles without
+     * `if` statements, solely relying on ParticleAccessor::operator== to
+     * terminate operations, and using the `cell_iterator` inside the particle
+     * container to check for valid states.
+     */
+    void
+    reset_particle_container(particle_container &particles);
 
     /**
      * Address of the triangulation to work on.
@@ -902,10 +949,23 @@ namespace Particles
     std::unique_ptr<PropertyPool<dim, spacedim>> property_pool;
 
     /**
-     * Set of particles currently living in the local domain including ghost
-     * cells, organized by the active cell index of the cell they are in.
+     * Set of particles currently living in the locally owned or ghost cells.
      */
     particle_container particles;
+
+    /**
+     * Iterator to the end of the list elements of particle_container which
+     * belong to locally owned elements. Made const to avoid accidental
+     * modification.
+     */
+    const typename particle_container::iterator owned_particles_end;
+
+    /**
+     * List from the active cells on the present MPI process to positions in
+     * either `owned_particles` or `ghost_particles` for fast $\mathcal O(1)$
+     * access to the particles of a cell.
+     */
+    std::vector<typename particle_container::iterator> cells_to_particle_cache;
 
     /**
      * This variable stores how many particles are stored globally. It is
@@ -997,14 +1057,10 @@ namespace Particles
      * Transfer particles that have crossed subdomain boundaries to other
      * processors.
      * All received particles and their new cells will be appended to the
-     * @p received_particles vector.
+     * class variable `particles` at the right slot.
      *
      * @param [in] particles_to_send All particles that should be sent and
      * their new subdomain_ids are in this map.
-     *
-     * @param [in,out] received_particles Particle container that stores all received
-     * particles. Note that it is not required nor checked that the container
-     * is empty, received particles are simply inserted into the container.
      *
      * @param [in] new_cells_for_particles Optional vector of cell
      * iterators with the same structure as @p particles_to_send. If this
@@ -1023,8 +1079,7 @@ namespace Particles
     void
     send_recv_particles(
       const std::map<types::subdomain_id, std::vector<particle_iterator>>
-        &                 particles_to_send,
-      particle_container &received_particles,
+        &particles_to_send,
       const std::map<
         types::subdomain_id,
         std::vector<
@@ -1036,27 +1091,20 @@ namespace Particles
       const bool enable_cache = false);
 
     /**
-     * Transfer ghost particles' position and properties assuming that
-     * the particles have not changed cells. This routine uses the
+     * Transfer ghost particles' position and properties assuming that the
+     * particles have not changed cells. This routine uses the
      * GhostParticlePartitioner as a caching structure to know which particles
-     * are ghost to other processes, and where they need to be sent.
-     * It inherently assumes that particles cannot have changed cell.
+     * are ghost to other processes, and where they need to be sent.  It
+     * inherently assumes that particles cannot have changed cell, and writes
+     * the result back to the `particles` member variable.
      *
      * @param [in] particles_to_send All particles for which information
      * should be sent and their new subdomain_ids are in this map.
-     *
-     * @param [in,out] received_particles A map with all received
-     * particles. Note that it is not required nor checked that the container
-     * is empty, received particles are simply inserted into
-     * the container.
-     *
      */
     void
     send_recv_particles_properties_and_location(
       const std::map<types::subdomain_id, std::vector<particle_iterator>>
-        &                 particles_to_send,
-      particle_container &received_particles);
-
+        &particles_to_send);
 
 #endif
 
@@ -1130,6 +1178,34 @@ namespace Particles
       const typename Triangulation<dim, spacedim>::CellStatus     status,
       const boost::iterator_range<std::vector<char>::const_iterator>
         &data_range);
+
+    /**
+     * Internal function returning an iterator to the begin of the container
+     * for owned particles.
+     */
+    typename particle_container::iterator
+    particle_container_owned_begin() const;
+
+    /**
+     * Internal function returning an iterator to the end of the container for
+     * owned particles.
+     */
+    typename particle_container::iterator
+    particle_container_owned_end() const;
+
+    /**
+     * Internal function returning an iterator to the begin of the container
+     * for ghost particles.
+     */
+    typename particle_container::iterator
+    particle_container_ghost_begin() const;
+
+    /**
+     * Internal function returning an iterator to the end of the container for
+     * ghost particles.
+     */
+    typename particle_container::iterator
+    particle_container_ghost_end() const;
   };
 
 
@@ -1150,15 +1226,9 @@ namespace Particles
   inline typename ParticleHandler<dim, spacedim>::particle_iterator
   ParticleHandler<dim, spacedim>::begin()
   {
-    if (particles.size() == 0)
-      return end();
-
-    for (const auto &cell : triangulation->active_cell_iterators())
-      if (cell->is_locally_owned() &&
-          particles[cell->active_cell_index()].size() != 0)
-        return particle_iterator(particles, *property_pool, cell, 0);
-
-    return end();
+    return particle_iterator(particle_container_owned_begin(),
+                             *property_pool,
+                             0);
   }
 
 
@@ -1176,10 +1246,7 @@ namespace Particles
   inline typename ParticleHandler<dim, spacedim>::particle_iterator
   ParticleHandler<dim, spacedim>::end()
   {
-    return particle_iterator(particles,
-                             *property_pool,
-                             triangulation->end(),
-                             0);
+    return particle_iterator(particle_container_owned_end(), *property_pool, 0);
   }
 
 
@@ -1197,15 +1264,9 @@ namespace Particles
   inline typename ParticleHandler<dim, spacedim>::particle_iterator
   ParticleHandler<dim, spacedim>::begin_ghost()
   {
-    if (particles.size() == 0)
-      return end();
-
-    for (const auto &cell : triangulation->active_cell_iterators())
-      if (cell->is_locally_owned() == false &&
-          particles[cell->active_cell_index()].size() != 0)
-        return particle_iterator(particles, *property_pool, cell, 0);
-
-    return end_ghost();
+    return particle_iterator(particle_container_ghost_begin(),
+                             *property_pool,
+                             0);
   }
 
 
@@ -1223,10 +1284,54 @@ namespace Particles
   inline typename ParticleHandler<dim, spacedim>::particle_iterator
   ParticleHandler<dim, spacedim>::end_ghost()
   {
-    return particle_iterator(particles,
-                             *property_pool,
-                             triangulation->end(),
-                             0);
+    return particle_iterator(particle_container_ghost_end(), *property_pool, 0);
+  }
+
+
+
+  template <int dim, int spacedim>
+  inline typename ParticleHandler<dim, spacedim>::particle_container::iterator
+  ParticleHandler<dim, spacedim>::particle_container_owned_begin() const
+  {
+    // We should always have at least the three anchor entries in the list of
+    // particles
+    Assert(!particles.empty(), ExcInternalError());
+    typename particle_container::iterator begin =
+      const_cast<particle_container &>(particles).begin();
+    return ++begin;
+  }
+
+
+
+  template <int dim, int spacedim>
+  inline typename ParticleHandler<dim, spacedim>::particle_container::iterator
+  ParticleHandler<dim, spacedim>::particle_container_owned_end() const
+  {
+    Assert(!particles.empty(), ExcInternalError());
+    return owned_particles_end;
+  }
+
+
+
+  template <int dim, int spacedim>
+  inline typename ParticleHandler<dim, spacedim>::particle_container::iterator
+  ParticleHandler<dim, spacedim>::particle_container_ghost_begin() const
+  {
+    Assert(!particles.empty(), ExcInternalError());
+    typename particle_container::iterator begin = owned_particles_end;
+    return ++begin;
+  }
+
+
+
+  template <int dim, int spacedim>
+  inline typename ParticleHandler<dim, spacedim>::particle_container::iterator
+  ParticleHandler<dim, spacedim>::particle_container_ghost_end() const
+  {
+    Assert(!particles.empty(), ExcInternalError());
+    typename particle_container::iterator end =
+      const_cast<particle_container &>(particles).end();
+    return --end;
   }
 
 

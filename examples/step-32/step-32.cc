@@ -1836,9 +1836,9 @@ namespace Step32
     const std::vector<types::global_dof_index> stokes_dofs_per_block =
       DoFTools::count_dofs_per_fe_block(stokes_dof_handler, stokes_sub_blocks);
 
-    const unsigned int n_u = stokes_dofs_per_block[0],
-                       n_p = stokes_dofs_per_block[1],
-                       n_T = temperature_dof_handler.n_dofs();
+    const types::global_dof_index n_u = stokes_dofs_per_block[0],
+                                  n_p = stokes_dofs_per_block[1],
+                                  n_T = temperature_dof_handler.n_dofs();
 
     std::locale s = pcout.get_stream().getloc();
     pcout.get_stream().imbue(std::locale(""));
@@ -1894,7 +1894,7 @@ namespace Step32
       DoFTools::make_hanging_node_constraints(stokes_dof_handler,
                                               stokes_constraints);
 
-      FEValuesExtractors::Vector velocity_components(0);
+      const FEValuesExtractors::Vector velocity_components(0);
       VectorTools::interpolate_boundary_values(
         stokes_dof_handler,
         0,
@@ -2162,8 +2162,8 @@ namespace Step32
 
     assemble_stokes_preconditioner();
 
-    std::vector<std::vector<bool>> constant_modes;
-    FEValuesExtractors::Vector     velocity_components(0);
+    std::vector<std::vector<bool>>   constant_modes;
+    const FEValuesExtractors::Vector velocity_components(0);
     DoFTools::extract_constant_modes(stokes_dof_handler,
                                      stokes_fe.component_mask(
                                        velocity_components),

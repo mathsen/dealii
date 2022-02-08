@@ -21,7 +21,13 @@
 #include <deal.II/grid/tria.h>
 
 DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
+#ifdef DEAL_II_BOOST_HAS_BROKEN_HEADER_DEPRECATIONS
+#  define BOOST_ALLOW_DEPRECATED_HEADERS
+#endif
 #include <boost/geometry.hpp>
+#ifdef DEAL_II_BOOST_HAS_BROKEN_HEADER_DEPRECATIONS
+#  undef BOOST_ALLOW_DEPRECATED_HEADERS
+#endif
 DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
 DEAL_II_NAMESPACE_OPEN
@@ -78,6 +84,20 @@ Mapping<dim, spacedim>::get_bounding_box(
     return cell->bounding_box();
   else
     return BoundingBox<spacedim>(get_vertices(cell));
+}
+
+
+
+template <int dim, int spacedim>
+void
+Mapping<dim, spacedim>::fill_fe_immersed_surface_values(
+  const typename Triangulation<dim, spacedim>::cell_iterator &,
+  const NonMatching::ImmersedSurfaceQuadrature<dim> &,
+  const typename Mapping<dim, spacedim>::InternalDataBase &,
+  dealii::internal::FEValuesImplementation::MappingRelatedData<dim, spacedim> &)
+  const
+{
+  AssertThrow(false, ExcNotImplemented());
 }
 
 

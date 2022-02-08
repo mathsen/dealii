@@ -617,7 +617,7 @@ public:
    */
   DeclException1(ExcUndefinedTexFormat,
                  std::string,
-                 << "<" << arg1 << "> is not a tex column format. Use "
+                 << '<' << arg1 << "> is not a tex column format. Use "
                  << "'l', 'c', or 'r' to indicate left, centered, or "
                  << "right aligned text.");
   //@}
@@ -964,7 +964,7 @@ TableHandler::add_value(const std::string &key, const T value)
           columns[key].max_length =
             std::max(columns[key].max_length,
                      static_cast<unsigned int>(
-                       entry.get_cached_string().length()));
+                       entry.get_cached_string().size()));
         }
     }
 
@@ -974,7 +974,7 @@ TableHandler::add_value(const std::string &key, const T value)
   entry.cache_string(columns[key].scientific, columns[key].precision);
   columns[key].max_length =
     std::max(columns[key].max_length,
-             static_cast<unsigned int>(entry.get_cached_string().length()));
+             static_cast<unsigned int>(entry.get_cached_string().size()));
 }
 
 

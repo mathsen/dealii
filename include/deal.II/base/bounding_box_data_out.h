@@ -28,8 +28,14 @@
 #include <deal.II/boost_adaptors/segment.h>
 
 DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
+#ifdef DEAL_II_BOOST_HAS_BROKEN_HEADER_DEPRECATIONS
+#  define BOOST_ALLOW_DEPRECATED_HEADERS
+#endif
 #include <boost/geometry/index/rtree.hpp>
 #include <boost/geometry/strategies/strategies.hpp>
+#ifdef DEAL_II_BOOST_HAS_BROKEN_HEADER_DEPRECATIONS
+#  undef BOOST_ALLOW_DEPRECATED_HEADERS
+#endif
 DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
 
@@ -141,9 +147,10 @@ BoundingBoxDataOut<dim>::build_patches(
       boost::geometry::convert(getter(*value), box);
       for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell; ++v)
         {
-          patches[i].vertices[v]          = box.vertex(v);
-          patches[i].patch_index          = i;
-          patches[i].n_subdivisions       = 1;
+          patches[i].vertices[v]    = box.vertex(v);
+          patches[i].patch_index    = i;
+          patches[i].n_subdivisions = 1;
+          patches[i].reference_cell = ReferenceCells::get_hypercube<dim>();
           patches[i].points_are_available = false;
         }
       ++i;

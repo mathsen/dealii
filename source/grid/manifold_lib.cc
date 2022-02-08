@@ -26,6 +26,8 @@
 
 #include <deal.II/lac/vector.h>
 
+#include <deal.II/physics/vector_relations.h>
+
 DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 #include <boost/container/small_vector.hpp>
 DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
@@ -136,7 +138,7 @@ template <int dim, int spacedim>
 std::unique_ptr<Manifold<dim, spacedim>>
 PolarManifold<dim, spacedim>::clone() const
 {
-  return std::make_unique<PolarManifold<dim, spacedim>>(center);
+  return std::make_unique<PolarManifold<dim, spacedim>>(*this);
 }
 
 
@@ -367,7 +369,7 @@ template <int dim, int spacedim>
 std::unique_ptr<Manifold<dim, spacedim>>
 SphericalManifold<dim, spacedim>::clone() const
 {
-  return std::make_unique<SphericalManifold<dim, spacedim>>(center);
+  return std::make_unique<SphericalManifold<dim, spacedim>>(*this);
 }
 
 
@@ -1064,6 +1066,7 @@ CylindricalManifold<dim, spacedim>::CylindricalManifold(
   , direction(direction / direction.norm())
   , point_on_axis(point_on_axis)
   , tolerance(tolerance)
+  , dxn(cross_product_3d(this->direction, normal_direction))
 {
   // do not use static_assert to make dimension-independent programming
   // easier.
@@ -1077,9 +1080,7 @@ template <int dim, int spacedim>
 std::unique_ptr<Manifold<dim, spacedim>>
 CylindricalManifold<dim, spacedim>::clone() const
 {
-  return std::make_unique<CylindricalManifold<dim, spacedim>>(direction,
-                                                              point_on_axis,
-                                                              tolerance);
+  return std::make_unique<CylindricalManifold<dim, spacedim>>(*this);
 }
 
 
@@ -1129,9 +1130,9 @@ CylindricalManifold<dim, spacedim>::pull_back(
 
   // Then compute the angle between the projection direction and
   // another vector orthogonal to the direction vector.
-  const double dot = normal_direction * p_diff;
-  const double det = direction * cross_product_3d(normal_direction, p_diff);
-  const double phi = std::atan2(det, dot);
+  const double phi = Physics::VectorRelations::signed_angle(normal_direction,
+                                                            p_diff,
+                                                            /*axis=*/direction);
 
   // Return distance from the axis, angle and signed distance on the axis.
   return Point<3>(p_diff.norm(), phi, lambda);
@@ -1148,9 +1149,8 @@ CylindricalManifold<dim, spacedim>::push_forward(
          ExcMessage("CylindricalManifold can only be used for spacedim==3!"));
 
   // Rotate the orthogonal direction by the given angle
-  const double sine_r           = std::sin(chart_point(1)) * chart_point(0);
-  const double cosine_r         = std::cos(chart_point(1)) * chart_point(0);
-  const Tensor<1, spacedim> dxn = cross_product_3d(direction, normal_direction);
+  const double sine_r   = std::sin(chart_point(1)) * chart_point(0);
+  const double cosine_r = std::cos(chart_point(1)) * chart_point(0);
   const Tensor<1, spacedim> intermediate =
     normal_direction * cosine_r + dxn * sine_r;
 
@@ -1173,7 +1173,6 @@ CylindricalManifold<dim, spacedim>::push_forward_gradient(
   // Rotate the orthogonal direction by the given angle
   const double              sine   = std::sin(chart_point(1));
   const double              cosine = std::cos(chart_point(1));
-  const Tensor<1, spacedim> dxn = cross_product_3d(direction, normal_direction);
   const Tensor<1, spacedim> intermediate =
     normal_direction * cosine + dxn * sine;
 
@@ -1236,10 +1235,7 @@ template <int dim, int spacedim>
 std::unique_ptr<Manifold<dim, spacedim>>
 EllipticalManifold<dim, spacedim>::clone() const
 {
-  const double eccentricity = 1.0 / cosh_u;
-  return std::make_unique<EllipticalManifold<dim, spacedim>>(center,
-                                                             direction,
-                                                             eccentricity);
+  return std::make_unique<EllipticalManifold<dim, spacedim>>(*this);
 }
 
 

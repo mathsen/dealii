@@ -287,8 +287,8 @@ public:
    * across MPI processes.
    *
    * This function does not imply a model of keeping data on different processes
-   * in sync, as parallel::distributed::Vector and other vector classes do where
-   * there exists a notion of certain elements of the vector owned by each
+   * in sync, as LinearAlgebra::distributed::Vector and other vector classes do
+   * where there exists a notion of certain elements of the vector owned by each
    * process and possibly ghost elements that are mirrored from its owning
    * process to other processes. Rather, the elements of the current object are
    * simply copied to the other processes, and it is useful to think of this
@@ -848,7 +848,7 @@ namespace internal
 
 
   /**
-   * A class that given a range of memory locations calls either calls
+   * A class that given a range of memory locations either calls
    * the placement-new operator on these memory locations (if
    * `initialize_memory==true`) or just copies the given initializer
    * into this memory location (if `initialize_memory==false`). The
@@ -1141,8 +1141,7 @@ AlignedVector<T>::Deleter::MPISharedMemDeleterAction::delete_array(
   ierr = MPI_Win_free(&shmem_window);
   AssertThrowMPI(ierr);
 
-  ierr = MPI_Comm_free(&shmem_group_communicator);
-  AssertThrowMPI(ierr);
+  Utilities::MPI::free_communicator(shmem_group_communicator);
 }
 
 #  endif
@@ -1199,11 +1198,22 @@ template <class T>
 inline AlignedVector<T> &
 AlignedVector<T>::operator=(const AlignedVector<T> &vec)
 {
+  const size_type new_size = vec.used_elements_end - vec.elements.get();
+
+  // First throw away everything and re-allocate memory but leave that
+  // memory uninitialized for now:
   resize(0);
-  resize_fast(vec.used_elements_end - vec.elements.get());
+  reserve(new_size);
+
+  // Then copy the elements over by using the copy constructor on these
+  // elements:
   internal::AlignedVectorCopyConstruct<T>(vec.elements.get(),
                                           vec.used_elements_end,
                                           elements.get());
+
+  // Finally adjust the pointer to the end of the elements that are used:
+  used_elements_end = elements.get() + new_size;
+
   return *this;
 }
 
@@ -1547,8 +1557,7 @@ AlignedVector<T>::replicate_across_communicator(const MPI_Comm &   communicator,
              ExcInternalError());
 
     // And get rid of the temporary communicator
-    ierr = MPI_Comm_free(&shmem_group_communicator_temp);
-    AssertThrowMPI(ierr);
+    Utilities::MPI::free_communicator(shmem_group_communicator_temp);
   }
   const bool is_shmem_root =
     Utilities::MPI::this_mpi_process(shmem_group_communicator) == 0;
@@ -1654,10 +1663,7 @@ AlignedVector<T>::replicate_across_communicator(const MPI_Comm &   communicator,
     }
 
   // We no longer need the shmem roots communicator, so get rid of it
-  {
-    const int ierr = MPI_Comm_free(&shmem_roots_communicator);
-    AssertThrowMPI(ierr);
-  }
+  Utilities::MPI::free_communicator(shmem_group_communicator);
 
 
   // **** Step 3 ****

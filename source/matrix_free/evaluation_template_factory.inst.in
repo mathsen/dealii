@@ -17,25 +17,23 @@
 for (deal_II_dimension : DIMENSIONS;
      deal_II_scalar_vectorized : REAL_SCALARS_VECTORIZED)
   {
-    template struct dealii::internal::FEEvaluationFactory<
+    template struct dealii::internal::
+      FEEvaluationFactory<deal_II_dimension, deal_II_scalar_vectorized>;
+
+    template struct dealii::internal::
+      FEFaceEvaluationFactory<deal_II_dimension, deal_II_scalar_vectorized>;
+
+    template struct dealii::internal::FEFaceEvaluationGatherFactory<
       deal_II_dimension,
-      deal_II_scalar_vectorized::value_type,
+      double,
       deal_II_scalar_vectorized>;
 
-    template struct dealii::internal::FEFaceEvaluationFactory<
+    template struct dealii::internal::FEFaceEvaluationGatherFactory<
       deal_II_dimension,
-      deal_II_scalar_vectorized::value_type,
+      float,
       deal_II_scalar_vectorized>;
 
     // inverse mass
-    template struct dealii::internal::CellwiseInverseMassFactory<
-      deal_II_dimension,
-      deal_II_scalar_vectorized::value_type,
-      deal_II_scalar_vectorized>;
-
-    // inverse mass
-    template struct dealii::internal::FEEvaluationHangingNodesFactory<
-      deal_II_dimension,
-      deal_II_scalar_vectorized::value_type,
-      deal_II_scalar_vectorized>;
+    template struct dealii::internal::
+      CellwiseInverseMassFactory<deal_II_dimension, deal_II_scalar_vectorized>;
   }

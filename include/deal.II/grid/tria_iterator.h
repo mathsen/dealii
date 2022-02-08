@@ -325,7 +325,7 @@ public:
    * like <tt>(*i).index ();</tt>
    *
    * This function has to be specialized explicitly for the different @p
-   * Pointees, to allow an
+   * Pointers, to allow an
    * <tt>iterator<1,TriangulationLevel<1>::LinesData></tt> to point to
    * <tt>tria->lines.cells[index]</tt> while for one dimension higher it has
    * to point to <tt>tria->quads.cells[index]</tt>.
@@ -1126,7 +1126,7 @@ inline void
 TriaRawIterator<Accessor>::print(StreamType &out) const
 {
   if (Accessor::structure_dimension == Accessor::dimension)
-    out << accessor.level() << "." << accessor.index();
+    out << accessor.level() << '.' << accessor.index();
   else
     out << accessor.index();
 }

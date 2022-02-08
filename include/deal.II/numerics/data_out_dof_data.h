@@ -66,7 +66,9 @@ namespace Exceptions
     DeclExceptionMsg(ExcNoTriangulationSelected,
                      "For the operation you are attempting, you first need to "
                      "tell the DataOut or related object which DoFHandler or "
-                     "triangulation you would like to work on.");
+                     "triangulation you would like to work on. This is "
+                     "generally done using the 'attach_dof_handler()' or "
+                     "'attach_triangulation()' member functions.");
 
     /**
      * Exception
@@ -74,7 +76,9 @@ namespace Exceptions
     DeclExceptionMsg(ExcNoDoFHandlerSelected,
                      "For the operation you are attempting, you first need to "
                      "tell the DataOut or related object which DoFHandler "
-                     "you would like to work on.");
+                     "you would like to work on. This is "
+                     "generally done using the 'attach_dof_handler()' "
+                     "member function.");
 
     /**
      * Exception
@@ -121,7 +125,7 @@ namespace Exceptions
                    int,
                    << "You have to give one name per component in your "
                    << "data vector. The number you gave was " << arg1
-                   << ", but the number of components is " << arg2 << ".");
+                   << ", but the number of components is " << arg2 << '.');
     /**
      * Exception
      */
@@ -729,8 +733,7 @@ public:
     const std::vector<std::string> &names,
     const DataVectorType            type = type_automatic,
     const std::vector<DataComponentInterpretation::DataComponentInterpretation>
-      &data_component_interpretation = std::vector<
-        DataComponentInterpretation::DataComponentInterpretation>());
+      &data_component_interpretation = {});
 
   /**
    * This function is an abbreviation to the above one (see there for a
@@ -755,8 +758,7 @@ public:
     const std::string &  name,
     const DataVectorType type = type_automatic,
     const std::vector<DataComponentInterpretation::DataComponentInterpretation>
-      &data_component_interpretation = std::vector<
-        DataComponentInterpretation::DataComponentInterpretation>());
+      &data_component_interpretation = {});
 
   /**
    * This function is an extension of the above one (see there for a
@@ -780,8 +782,7 @@ public:
     const VectorType &               data,
     const std::vector<std::string> & names,
     const std::vector<DataComponentInterpretation::DataComponentInterpretation>
-      &data_component_interpretation = std::vector<
-        DataComponentInterpretation::DataComponentInterpretation>());
+      &data_component_interpretation = {});
 
 
   /**
@@ -795,8 +796,7 @@ public:
     const VectorType &               data,
     const std::string &              name,
     const std::vector<DataComponentInterpretation::DataComponentInterpretation>
-      &data_component_interpretation = std::vector<
-        DataComponentInterpretation::DataComponentInterpretation>());
+      &data_component_interpretation = {});
 
   /**
    * This function is an alternative to the above ones, allowing the output of

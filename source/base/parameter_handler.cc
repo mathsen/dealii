@@ -457,15 +457,15 @@ ParameterHandler::parse_input(std::istream &     input,
 
       // If we see the line which is the same as @p last_line ,
       // terminate the parsing.
-      if (last_line.length() != 0 && input_line == last_line)
+      if (last_line.size() != 0 && input_line == last_line)
         break;
 
       // Check whether or not the current line should be joined with the next
       // line before calling scan_line.
-      if (input_line.length() != 0 &&
-          input_line.find_last_of('\\') == input_line.length() - 1)
+      if (input_line.size() != 0 &&
+          input_line.find_last_of('\\') == input_line.size() - 1)
         {
-          input_line.erase(input_line.length() - 1); // remove the last '\'
+          input_line.erase(input_line.size() - 1); // remove the last '\'
           is_concatenated = true;
 
           fully_concatenated_line += input_line;
@@ -1260,7 +1260,7 @@ ParameterHandler::print_parameters(std::ostream &    out,
   boost::property_tree::ptree current_entries = *entries.get();
 
   // Sort parameters alphabetically, if needed.
-  if (!(style & KeepDeclarationOrder))
+  if ((style & KeepDeclarationOrder) == 0)
     {
       // Dive recursively into the subsections,
       // starting from the top level.
@@ -1282,13 +1282,13 @@ ParameterHandler::print_parameters(std::ostream &    out,
   // first
 
   // explicitly compress the tree if requested
-  if ((style & Short) && (style & (XML | JSON)))
+  if (((style & Short) != 0) && ((style & (XML | JSON)) != 0))
     {
       // modify the copy of the tree
       recursively_compress_tree(current_entries);
     }
 
-  if (style & XML)
+  if ((style & XML) != 0)
     {
       // call the writer function and exit as there is nothing
       // further to do down in this function
@@ -1306,29 +1306,29 @@ ParameterHandler::print_parameters(std::ostream &    out,
       return out;
     }
 
-  if (style & JSON)
+  if ((style & JSON) != 0)
     {
       write_json(out, current_entries);
       return out;
     }
 
   // for all of the other formats, print a preamble:
-  if ((style & Short) && (style & Text))
+  if (((style & Short) != 0) && ((style & Text) != 0))
     {
       // nothing to do
     }
-  else if (style & Text)
+  else if ((style & Text) != 0)
     {
       out << "# Listing of Parameters" << std::endl
           << "# ---------------------" << std::endl;
     }
-  else if (style & LaTeX)
+  else if ((style & LaTeX) != 0)
     {
       out << "\\subsection{Global parameters}" << std::endl;
       out << "\\label{parameters:global}" << std::endl;
       out << std::endl << std::endl;
     }
-  else if (style & Description)
+  else if ((style & Description) != 0)
     {
       out << "Listing of Parameters:" << std::endl << std::endl;
     }
@@ -1393,9 +1393,9 @@ ParameterHandler::recursively_print_parameters(
 
   unsigned int overall_indent_level = indent_level;
 
-  const bool is_short = style & Short;
+  const bool is_short = (style & Short) != 0;
 
-  if (style & Text)
+  if ((style & Text) != 0)
     {
       // first find out the longest entry name to be able to align the
       // equal signs to do this loop over all nodes of the current
@@ -1409,10 +1409,9 @@ ParameterHandler::recursively_print_parameters(
       for (const auto &p : current_section)
         if (is_parameter_node(p.second) == true)
           {
-            longest_name = std::max(longest_name, demangle(p.first).length());
-            longest_value =
-              std::max(longest_value,
-                       p.second.get<std::string>("value").length());
+            longest_name  = std::max(longest_name, demangle(p.first).size());
+            longest_value = std::max(longest_value,
+                                     p.second.get<std::string>("value").size());
           }
 
       // print entries one by one
@@ -1448,8 +1447,7 @@ ParameterHandler::recursively_print_parameters(
             // print name and value of this entry
             out << std::setw(overall_indent_level * 2) << ""
                 << "set " << demangle(p.first)
-                << std::setw(longest_name - demangle(p.first).length() + 1)
-                << " "
+                << std::setw(longest_name - demangle(p.first).size() + 1) << " "
                 << "= " << value;
 
             // finally print the default value, but only if it differs
@@ -1457,7 +1455,7 @@ ParameterHandler::recursively_print_parameters(
             if (!is_short &&
                 value != p.second.get<std::string>("default_value"))
               {
-                out << std::setw(longest_value - value.length() + 1) << ' '
+                out << std::setw(longest_value - value.size() + 1) << ' '
                     << "# ";
                 out << "default: "
                     << p.second.get<std::string>("default_value");
@@ -1466,7 +1464,7 @@ ParameterHandler::recursively_print_parameters(
             out << '\n';
           }
     }
-  else if (style & LaTeX)
+  else if ((style & LaTeX) != 0)
     {
       auto escape = [](const std::string &input) {
         return Patterns::internal::escape(input, Patterns::PatternBase::LaTeX);
@@ -1598,14 +1596,14 @@ ParameterHandler::recursively_print_parameters(
           out << "\\end{itemize}" << '\n';
         }
     }
-  else if (style & Description)
+  else if ((style & Description) != 0)
     {
       // first find out the longest entry name to be able to align the
       // equal signs
       std::size_t longest_name = 0;
       for (const auto &p : current_section)
         if (is_parameter_node(p.second) == true)
-          longest_name = std::max(longest_name, demangle(p.first).length());
+          longest_name = std::max(longest_name, demangle(p.first).size());
 
       // print entries one by one
       for (const auto &p : current_section)
@@ -1614,8 +1612,7 @@ ParameterHandler::recursively_print_parameters(
             // print name and value
             out << std::setw(overall_indent_level * 2) << ""
                 << "set " << demangle(p.first)
-                << std::setw(longest_name - demangle(p.first).length() + 1)
-                << " "
+                << std::setw(longest_name - demangle(p.first).size() + 1) << " "
                 << " = ";
 
             // print possible values:
@@ -1640,7 +1637,7 @@ ParameterHandler::recursively_print_parameters(
 
             // if there is a documenting string, print it as well
             if (!is_short &&
-                p.second.get<std::string>("documentation").length() != 0)
+                p.second.get<std::string>("documentation").size() != 0)
               out << std::setw(overall_indent_level * 2 + longest_name + 10)
                   << ""
                   << "(" << p.second.get<std::string>("documentation") << ")"
@@ -1664,8 +1661,9 @@ ParameterHandler::recursively_print_parameters(
       else if (is_alias_node(p.second) == false)
         ++n_sections;
 
-    if (!(style & Description) && (!((style & Text) && is_short)) &&
-        (n_parameters != 0) && (n_sections != 0))
+    if (((style & Description) == 0) &&
+        (!(((style & Text) != 0) && is_short)) && (n_parameters != 0) &&
+        (n_sections != 0))
       out << "\n\n";
   }
 
@@ -1675,12 +1673,12 @@ ParameterHandler::recursively_print_parameters(
         (is_alias_node(p.second) == false))
       {
         // first print the subsection header
-        if ((style & Text) || (style & Description))
+        if (((style & Text) != 0) || ((style & Description) != 0))
           {
             out << std::setw(overall_indent_level * 2) << ""
                 << "subsection " << demangle(p.first) << '\n';
           }
-        else if (style & LaTeX)
+        else if ((style & LaTeX) != 0)
           {
             auto escape = [](const std::string &input) {
               return Patterns::internal::escape(input,
@@ -1717,13 +1715,13 @@ ParameterHandler::recursively_print_parameters(
         recursively_print_parameters(
           tree, directory_path, style, overall_indent_level + 1, out);
 
-        if (is_short && (style & Text))
+        if (is_short && ((style & Text) != 0))
           {
             // write end of subsection.
             out << std::setw(overall_indent_level * 2) << ""
                 << "end" << '\n';
           }
-        else if (style & Text)
+        else if ((style & Text) != 0)
           {
             // write end of subsection. one blank line after each
             // subsection
@@ -1736,11 +1734,11 @@ ParameterHandler::recursively_print_parameters(
             if (overall_indent_level == 0)
               out << '\n';
           }
-        else if (style & Description)
+        else if ((style & Description) != 0)
           {
             // nothing to do
           }
-        else if (style & LaTeX)
+        else if ((style & LaTeX) != 0)
           {
             // nothing to do
           }
@@ -1775,7 +1773,7 @@ ParameterHandler::log_parameters_section(LogStream &       out,
   boost::property_tree::ptree *current_entries = entries.get();
 
   // Sort parameters alphabetically, if needed.
-  if (!(style & KeepDeclarationOrder))
+  if ((style & KeepDeclarationOrder) == 0)
     {
       sorted_entries  = *entries;
       current_entries = &sorted_entries;
@@ -1831,7 +1829,7 @@ ParameterHandler::scan_line(std::string        line,
   line = Utilities::trim(line);
 
   // if line is now empty: leave
-  if (line.length() == 0)
+  if (line.size() == 0)
     {
       return;
     }
@@ -1840,7 +1838,7 @@ ParameterHandler::scan_line(std::string        line,
            Utilities::match_at_string_start(line, "subsection "))
     {
       // delete this prefix
-      line.erase(0, std::string("subsection").length() + 1);
+      line.erase(0, std::string("subsection").size() + 1);
 
       const std::string subsection = Utilities::trim(line);
 
@@ -1859,7 +1857,7 @@ ParameterHandler::scan_line(std::string        line,
            Utilities::match_at_string_start(line, "end"))
     {
       line.erase(0, 3);
-      while ((line.size() > 0) && (std::isspace(line[0])))
+      while ((line.size() > 0) && ((std::isspace(line[0])) != 0))
         line.erase(0, 1);
 
       AssertThrow(
@@ -1951,6 +1949,15 @@ ParameterHandler::scan_line(std::string        line,
 
           // finally write the new value into the database
           entries->put(path + path_separator + "value", entry_value);
+
+          auto map_iter = entries_set_status.find(path);
+          if (map_iter != entries_set_status.end())
+            map_iter->second =
+              std::pair<bool, bool>(map_iter->second.first, true);
+          else
+            AssertThrow(false,
+                        ExcMessage("Could not find parameter " + path +
+                                   " in map entries_set_status."));
         }
       else
         {
@@ -2278,13 +2285,13 @@ MultipleParameterLoop::Entry::split_different_values()
   // pair of braces
   if (multiple[0] == '{')
     multiple.erase(0, 1);
-  if (multiple[multiple.size() - 1] == '}')
+  if (multiple.back() == '}')
     multiple.erase(multiple.size() - 1, 1);
   // erase leading and trailing spaces
   // in multiple
-  while (std::isspace(multiple[0]))
+  while (std::isspace(multiple[0]) != 0)
     multiple.erase(0, 1);
-  while (std::isspace(multiple[multiple.size() - 1]))
+  while (std::isspace(multiple.back()) != 0)
     multiple.erase(multiple.size() - 1, 1);
 
   // delete spaces around '|'

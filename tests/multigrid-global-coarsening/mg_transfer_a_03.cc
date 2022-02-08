@@ -33,6 +33,7 @@
 #include <deal.II/fe/fe_tools.h>
 #include <deal.II/fe/mapping_q.h>
 
+#include <deal.II/grid/filtered_iterator.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
 
@@ -79,15 +80,15 @@ do_test(const FiniteElement<dim> &fe_fine, const FiniteElement<dim> &fe_coarse)
 
   // setup dof-handlers
   DoFHandler<dim> dof_handler_fine(tria_fine);
-  for (const auto &cell : dof_handler_fine.active_cell_iterators())
-    if (cell->is_locally_owned())
-      cell->set_active_fe_index(0);
+  for (const auto &cell : dof_handler_fine.active_cell_iterators() |
+                            IteratorFilters::LocallyOwnedCell())
+    cell->set_active_fe_index(0);
   dof_handler_fine.distribute_dofs(fe);
 
   DoFHandler<dim> dof_handler_coarse(tria_coarse);
-  for (const auto &cell : dof_handler_coarse.active_cell_iterators())
-    if (cell->is_locally_owned())
-      cell->set_active_fe_index(1);
+  for (const auto &cell : dof_handler_coarse.active_cell_iterators() |
+                            IteratorFilters::LocallyOwnedCell())
+    cell->set_active_fe_index(1);
   dof_handler_coarse.distribute_dofs(fe);
 
   // setup constraint matrix

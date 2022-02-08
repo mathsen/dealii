@@ -707,7 +707,7 @@ namespace Step19
                 const Tensor<1, dim> new_velocity =
                   old_velocity + acceleration * dt;
 
-                particle->set_properties(make_array_view(new_velocity));
+                particle->set_properties(new_velocity);
 
                 // With the new velocity, we can then also update the location
                 // of the particle and tell the particle about it.
@@ -943,7 +943,7 @@ namespace Step19
     // properties -- namely, as a single vector indicating the velocity, rather
     // than as `dim` scalar properties. The rest is then the same as above:
     {
-      Particles::DataOut<dim, dim> particle_out;
+      Particles::DataOut<dim> particle_out;
       particle_out.build_patches(
         particle_handler,
         std::vector<std::string>(dim, "velocity"),

@@ -25,6 +25,7 @@
 #include <deal.II/dofs/dof_accessor.templates.h>
 #include <deal.II/dofs/dof_handler.h>
 
+#include <deal.II/grid/filtered_iterator.h>
 #include <deal.II/grid/grid_refinement.h>
 #include <deal.II/grid/grid_tools.h>
 
@@ -301,7 +302,7 @@ namespace hp
       // 2.) Determine the number of cells for p-refinement and p-coarsening on
       //     basis of the flagged cells.
       //
-      // 3.) Find thresholds for p-refinment and p-coarsening on only those
+      // 3.) Find thresholds for p-refinement and p-coarsening on only those
       //     cells flagged for adaptation.
       //
       //     For cases in which no or all cells flagged for refinement and/or
@@ -577,85 +578,83 @@ namespace hp
       // deep copy error indicators
       predicted_errors = error_indicators;
 
-      for (const auto &cell : dof_handler.active_cell_iterators())
-        if (cell->is_locally_owned())
-          {
-            // current cell will not be adapted
-            if (!(cell->future_fe_index_set()) && !(cell->refine_flag_set()) &&
-                !(cell->coarsen_flag_set()))
-              {
-                predicted_errors[cell->active_cell_index()] *= gamma_n;
-                continue;
-              }
+      for (const auto &cell : dof_handler.active_cell_iterators() |
+                                IteratorFilters::LocallyOwnedCell())
+        {
+          // current cell will not be adapted
+          if (!(cell->future_fe_index_set()) && !(cell->refine_flag_set()) &&
+              !(cell->coarsen_flag_set()))
+            {
+              predicted_errors[cell->active_cell_index()] *= gamma_n;
+              continue;
+            }
 
-            // current cell will be adapted
-            // determine degree of its future finite element
-            if (cell->coarsen_flag_set())
-              {
-                // cell will be coarsened, thus determine future finite element
-                // on parent cell
-                const auto &parent = cell->parent();
-                if (future_fe_indices_on_coarsened_cells.find(parent) ==
-                    future_fe_indices_on_coarsened_cells.end())
-                  {
+          // current cell will be adapted
+          // determine degree of its future finite element
+          if (cell->coarsen_flag_set())
+            {
+              // cell will be coarsened, thus determine future finite element
+              // on parent cell
+              const auto &parent = cell->parent();
+              if (future_fe_indices_on_coarsened_cells.find(parent) ==
+                  future_fe_indices_on_coarsened_cells.end())
+                {
 #ifdef DEBUG
-                    for (const auto &child : parent->child_iterators())
-                      Assert(child->is_active() && child->coarsen_flag_set(),
-                             typename dealii::Triangulation<
-                               dim>::ExcInconsistentCoarseningFlags());
+                  for (const auto &child : parent->child_iterators())
+                    Assert(child->is_active() && child->coarsen_flag_set(),
+                           typename dealii::Triangulation<
+                             dim>::ExcInconsistentCoarseningFlags());
 #endif
 
-                    parent_future_fe_index =
-                      dealii::internal::hp::DoFHandlerImplementation::
-                        dominated_future_fe_on_children<dim, spacedim>(parent);
+                  parent_future_fe_index =
+                    dealii::internal::hp::DoFHandlerImplementation::
+                      dominated_future_fe_on_children<dim, spacedim>(parent);
 
-                    future_fe_indices_on_coarsened_cells.insert(
-                      {parent, parent_future_fe_index});
-                  }
-                else
-                  {
-                    parent_future_fe_index =
-                      future_fe_indices_on_coarsened_cells[parent];
-                  }
+                  future_fe_indices_on_coarsened_cells.insert(
+                    {parent, parent_future_fe_index});
+                }
+              else
+                {
+                  parent_future_fe_index =
+                    future_fe_indices_on_coarsened_cells[parent];
+                }
 
-                future_fe_degree =
-                  dof_handler.get_fe_collection()[parent_future_fe_index]
-                    .degree;
-              }
-            else
-              {
-                // future finite element on current cell is already set
-                future_fe_degree =
-                  dof_handler.get_fe_collection()[cell->future_fe_index()]
-                    .degree;
-              }
+              future_fe_degree =
+                dof_handler.get_fe_collection()[parent_future_fe_index].degree;
+            }
+          else
+            {
+              // future finite element on current cell is already set
+              future_fe_degree =
+                dof_handler.get_fe_collection()[cell->future_fe_index()].degree;
+            }
 
-            // step 1: exponential decay with p-adaptation
-            if (cell->future_fe_index_set())
-              {
-                predicted_errors[cell->active_cell_index()] *=
-                  std::pow(gamma_p,
-                           int(future_fe_degree) - int(cell->get_fe().degree));
-              }
+          // step 1: exponential decay with p-adaptation
+          if (cell->future_fe_index_set())
+            {
+              predicted_errors[cell->active_cell_index()] *=
+                std::pow(gamma_p,
+                         int(future_fe_degree) - int(cell->get_fe().degree));
+            }
 
-            // step 2: algebraic decay with h-adaptation
-            if (cell->refine_flag_set())
-              {
-                predicted_errors[cell->active_cell_index()] *=
-                  (gamma_h * std::pow(.5, future_fe_degree));
+          // step 2: algebraic decay with h-adaptation
+          if (cell->refine_flag_set())
+            {
+              predicted_errors[cell->active_cell_index()] *=
+                (gamma_h * std::pow(.5, future_fe_degree));
 
-                // predicted error will be split on children cells
-                // after adaptation via CellDataTransfer
-              }
-            else if (cell->coarsen_flag_set())
-              {
-                predicted_errors[cell->active_cell_index()] /=
-                  (gamma_h * std::pow(.5, future_fe_degree));
+              // predicted error will be split on children cells
+              // after adaptation via CellDataTransfer
+            }
+          else if (cell->coarsen_flag_set())
+            {
+              predicted_errors[cell->active_cell_index()] /=
+                (gamma_h * std::pow(.5, future_fe_degree));
 
-                // predicted error will be summed up on parent cell
-                // after adaptation via CellDataTransfer
-              }
-          }
+              // predicted error will be summed up on parent cell
+              // after adaptation via CellDataTransfer
+            }
+        }
     }
 
 
@@ -869,10 +868,10 @@ namespace hp
             dof_handler.get_triangulation().n_active_cells());
         }
 
-      for (const auto &cell : dof_handler.active_cell_iterators())
-        if (cell->is_locally_owned())
-          future_levels[cell->global_active_cell_index()] =
-            hierarchy_level_for_fe_index[cell->future_fe_index()];
+      for (const auto &cell : dof_handler.active_cell_iterators() |
+                                IteratorFilters::LocallyOwnedCell())
+        future_levels[cell->global_active_cell_index()] =
+          hierarchy_level_for_fe_index[cell->future_fe_index()];
 
 
       //
@@ -1041,22 +1040,22 @@ namespace hp
       while (levels_changed_in_cycle);
 
       // update future FE indices on locally owned cells
-      for (const auto &cell : dof_handler.active_cell_iterators())
-        if (cell->is_locally_owned())
-          {
-            const level_type cell_level = static_cast<level_type>(
-              future_levels[cell->global_active_cell_index()]);
+      for (const auto &cell : dof_handler.active_cell_iterators() |
+                                IteratorFilters::LocallyOwnedCell())
+        {
+          const level_type cell_level = static_cast<level_type>(
+            future_levels[cell->global_active_cell_index()]);
 
-            if (cell_level != invalid_level)
-              {
-                const unsigned int fe_index =
-                  fe_index_for_hierarchy_level[cell_level];
+          if (cell_level != invalid_level)
+            {
+              const unsigned int fe_index =
+                fe_index_for_hierarchy_level[cell_level];
 
-                // only update if necessary
-                if (fe_index != cell->active_fe_index())
-                  cell->set_future_fe_index(fe_index);
-              }
-          }
+              // only update if necessary
+              if (fe_index != cell->active_fe_index())
+                cell->set_future_fe_index(fe_index);
+            }
+        }
 
       return levels_changed;
     }

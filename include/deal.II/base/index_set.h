@@ -1723,7 +1723,7 @@ IndexSet::add_indices(const ForwardIterator &begin, const ForwardIterator &end)
       size_type       end_index   = begin_index + 1;
       ForwardIterator q           = p;
       ++q;
-      while ((q != end) && (*q == end_index))
+      while ((q != end) && (static_cast<size_type>(*q) == end_index))
         {
           ++end_index;
           ++q;
@@ -1736,7 +1736,7 @@ IndexSet::add_indices(const ForwardIterator &begin, const ForwardIterator &end)
       // than the end index of the one just identified, then we will have at
       // least one pair of ranges that are not sorted, and consequently the
       // whole collection of ranges is not sorted.
-      if (p != end && *p < end_index)
+      if (p != end && static_cast<size_type>(*p) < end_index)
         ranges_are_sorted = false;
     }
 
@@ -2020,19 +2020,19 @@ inline void
 IndexSet::print(StreamType &out) const
 {
   compress();
-  out << "{";
+  out << '{';
   std::vector<Range>::const_iterator p;
   for (p = ranges.begin(); p != ranges.end(); ++p)
     {
       if (p->end - p->begin == 1)
         out << p->begin;
       else
-        out << "[" << p->begin << "," << p->end - 1 << "]";
+        out << '[' << p->begin << ',' << p->end - 1 << ']';
 
       if (p != --ranges.end())
         out << ", ";
     }
-  out << "}" << std::endl;
+  out << '}' << std::endl;
 }
 
 

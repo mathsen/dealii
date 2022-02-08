@@ -28,6 +28,7 @@
 #include <deal.II/grid/tria_accessor.h>
 
 #include <deal.II/matrix_free/face_info.h>
+#include <deal.II/matrix_free/shape_info.h>
 #include <deal.II/matrix_free/task_info.h>
 
 #include <fstream>
@@ -82,6 +83,7 @@ namespace internal
         const dealii::Triangulation<dim> &triangulation,
         const unsigned int                mg_level,
         const bool                        hold_all_faces_to_owned_cells,
+        const bool                        build_inner_faces,
         std::vector<std::pair<unsigned int, unsigned int>> &cell_levels);
 
       /**
@@ -108,7 +110,8 @@ namespace internal
         const typename dealii::Triangulation<dim>::cell_iterator &cell,
         const unsigned int number_cell_interior,
         const typename dealii::Triangulation<dim>::cell_iterator &neighbor,
-        const unsigned int number_cell_exterior);
+        const unsigned int number_cell_exterior,
+        const bool         is_mixed_mesh);
 
       bool use_active_cells;
 
@@ -165,6 +168,7 @@ namespace internal
       const dealii::Triangulation<dim> &triangulation,
       const unsigned int                mg_level,
       const bool                        hold_all_faces_to_owned_cells,
+      const bool                        build_inner_faces,
       std::vector<std::pair<unsigned int, unsigned int>> &cell_levels)
     {
       use_active_cells = mg_level == numbers::invalid_unsigned_int;
@@ -583,6 +587,8 @@ namespace internal
               if (dcell->at_boundary(f) && !dcell->has_periodic_neighbor(f))
                 face_is_owned[dcell->face(f)->index()] =
                   FaceCategory::locally_active_at_boundary;
+              else if (!build_inner_faces)
+                continue;
 
               // treat boundaries of cells of different refinement level
               // inside the domain in case of multigrid separately
@@ -734,6 +740,8 @@ namespace internal
       const std::vector<std::pair<unsigned int, unsigned int>> &cell_levels,
       TaskInfo &                                                task_info)
     {
+      const bool is_mixed_mesh = triangulation.is_mixed_mesh();
+
       // step 1: create the inverse map between cell iterators and the
       // cell_level_index field
       std::map<std::pair<unsigned int, unsigned int>, unsigned int>
@@ -788,8 +796,10 @@ namespace internal
                         info.interior_face_no  = f;
                         info.exterior_face_no  = dcell->face(f)->boundary_id();
                         info.face_type =
-                          dcell->face(f)->reference_cell() !=
-                          dealii::ReferenceCells::get_hypercube<dim - 1>();
+                          is_mixed_mesh ?
+                            (dcell->face(f)->reference_cell() !=
+                             dealii::ReferenceCells::get_hypercube<dim - 1>()) :
+                            0;
                         info.subface_index =
                           GeometryInfo<dim>::max_children_per_cell;
                         info.face_orientation = 0;
@@ -838,7 +848,8 @@ namespace internal
                                           neighbor_c,
                                           map_to_vectorized[level_index],
                                           dcell,
-                                          cell));
+                                          cell,
+                                          is_mixed_mesh));
                                       }
                                     else if (face_is_owned[dcell->face(f)
                                                              ->child(c)
@@ -850,7 +861,8 @@ namespace internal
                                           neighbor_c,
                                           map_to_vectorized[level_index],
                                           dcell,
-                                          cell));
+                                          cell,
+                                          is_mixed_mesh));
                                       }
                                     else
                                       Assert(
@@ -897,7 +909,8 @@ namespace internal
                                       dcell,
                                       cell,
                                       neighbor,
-                                      map_to_vectorized[level_index]));
+                                      map_to_vectorized[level_index],
+                                      is_mixed_mesh));
                                   }
                                 else if (face_is_owned[dcell->face(f)
                                                          ->index()] ==
@@ -908,7 +921,8 @@ namespace internal
                                       dcell,
                                       cell,
                                       neighbor,
-                                      map_to_vectorized[level_index]));
+                                      map_to_vectorized[level_index],
+                                      is_mixed_mesh));
                                   }
                               }
                             else
@@ -929,7 +943,8 @@ namespace internal
                                               dcell,
                                               cell,
                                               neighbor,
-                                              refinement_edge_faces.size()));
+                                              refinement_edge_faces.size(),
+                                              is_mixed_mesh));
                               }
                           }
                       }
@@ -958,7 +973,8 @@ namespace internal
       const typename dealii::Triangulation<dim>::cell_iterator &cell,
       const unsigned int number_cell_interior,
       const typename dealii::Triangulation<dim>::cell_iterator &neighbor,
-      const unsigned int number_cell_exterior)
+      const unsigned int number_cell_exterior,
+      const bool         is_mixed_mesh)
     {
       FaceToCellTopology<1> info;
       info.cells_interior[0] = number_cell_interior;
@@ -969,8 +985,10 @@ namespace internal
       else
         info.exterior_face_no = cell->neighbor_face_no(face_no);
 
-      info.face_type = cell->face(face_no)->reference_cell() !=
-                       dealii::ReferenceCells::get_hypercube<dim - 1>();
+      info.face_type = is_mixed_mesh ?
+                         (cell->face(face_no)->reference_cell() !=
+                          dealii::ReferenceCells::get_hypercube<dim - 1>()) :
+                         0;
 
       info.subface_index = GeometryInfo<dim>::max_children_per_cell;
       Assert(neighbor->level() <= cell->level(), ExcInternalError());
@@ -1024,6 +1042,20 @@ namespace internal
         }
       else
         info.face_orientation = exterior_face_orientation;
+
+      // make sure to select correct subface index in case of non-standard
+      // orientation of the coarser neighbor face
+      if (cell->level() > neighbor->level() && exterior_face_orientation > 0)
+        {
+          const Table<2, unsigned int> orientation =
+            ShapeInfo<double>::compute_orientation_table(2);
+          const std::array<unsigned int, 8> inverted_orientations{
+            {0, 1, 2, 3, 6, 5, 4, 7}};
+          info.subface_index =
+            orientation[inverted_orientations[exterior_face_orientation]]
+                       [info.subface_index];
+        }
+
       return info;
     }
 

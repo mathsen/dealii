@@ -292,6 +292,18 @@ namespace MeshWorker
 
 
   template <int dim, int spacedim>
+  const FEInterfaceValues<dim, spacedim> &
+  ScratchData<dim, spacedim>::get_current_interface_fe_values() const
+  {
+    Assert(interface_fe_values != nullptr,
+           ExcMessage("You have to initialize the cache using one of the "
+                      "reinit functions first!"));
+    return *interface_fe_values;
+  }
+
+
+
+  template <int dim, int spacedim>
   const FEValuesBase<dim, spacedim> &
   ScratchData<dim, spacedim>::get_current_neighbor_fe_values() const
   {
@@ -389,6 +401,69 @@ namespace MeshWorker
   ScratchData<dim, spacedim>::get_mapping() const
   {
     return *mapping;
+  }
+
+
+
+  template <int dim, int spacedim>
+  const FiniteElement<dim, spacedim> &
+  ScratchData<dim, spacedim>::get_fe() const
+  {
+    return *fe;
+  }
+
+
+
+  template <int dim, int spacedim>
+  const Quadrature<dim> &
+  ScratchData<dim, spacedim>::get_cell_quadrature() const
+  {
+    return cell_quadrature;
+  }
+
+
+
+  template <int dim, int spacedim>
+  const Quadrature<dim - 1> &
+  ScratchData<dim, spacedim>::get_face_quadrature() const
+  {
+    return face_quadrature;
+  }
+
+
+
+  template <int dim, int spacedim>
+  UpdateFlags
+  ScratchData<dim, spacedim>::get_cell_update_flags() const
+  {
+    return cell_update_flags;
+  }
+
+
+
+  template <int dim, int spacedim>
+  UpdateFlags
+  ScratchData<dim, spacedim>::get_neighbor_cell_update_flags() const
+  {
+    return neighbor_cell_update_flags;
+  }
+
+
+
+  template <int dim, int spacedim>
+  UpdateFlags
+  ScratchData<dim, spacedim>::get_face_update_flags() const
+  {
+    return face_update_flags;
+  }
+
+
+
+  template <int dim, int spacedim>
+  UpdateFlags
+  ScratchData<dim, spacedim>::get_neighbor_face_update_flags() const
+  {
+    return neighbor_face_update_flags;
   }
 
 } // namespace MeshWorker

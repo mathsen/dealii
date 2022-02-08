@@ -385,7 +385,6 @@ namespace MatrixFreeOperators
     const std::shared_ptr<DiagonalMatrix<VectorType>> &
     get_matrix_diagonal() const;
 
-
     /**
      * Apply the Jacobi preconditioner, which multiplies every element of the
      * <tt>src</tt> vector by the inverse of the respective diagonal element and
@@ -1063,8 +1062,12 @@ namespace MatrixFreeOperators
     VectorizedArrayType>::apply(const VectorizedArrayType *in_array,
                                 VectorizedArrayType *      out_array) const
   {
-    internal::CellwiseInverseMassMatrixImplBasic<dim, VectorizedArrayType>::
-      template run<fe_degree>(n_components, fe_eval, in_array, out_array);
+    if (fe_degree > -1)
+      internal::CellwiseInverseMassMatrixImplBasic<dim, VectorizedArrayType>::
+        template run<fe_degree>(n_components, fe_eval, in_array, out_array);
+    else
+      internal::CellwiseInverseMassFactory<dim, VectorizedArrayType>::apply(
+        n_components, fe_eval, in_array, out_array);
   }
 
 
@@ -1085,9 +1088,21 @@ namespace MatrixFreeOperators
           const VectorizedArrayType *               in_array,
           VectorizedArrayType *                     out_array) const
   {
-    internal::CellwiseInverseMassMatrixImplFlexible<dim, VectorizedArrayType>::
-      template run<fe_degree>(
+    const unsigned int given_degree =
+      fe_eval.get_shape_info().data[0].fe_degree;
+    if (fe_degree > -1)
+      internal::CellwiseInverseMassMatrixImplFlexible<dim,
+                                                      VectorizedArrayType>::
+        template run<fe_degree>(
+          n_actual_components,
+          fe_eval.get_shape_info().data.front().inverse_shape_values_eo,
+          inverse_coefficients,
+          in_array,
+          out_array);
+    else
+      internal::CellwiseInverseMassFactory<dim, VectorizedArrayType>::apply(
         n_actual_components,
+        given_degree,
         fe_eval.get_shape_info().data.front().inverse_shape_values_eo,
         inverse_coefficients,
         in_array,
@@ -1122,10 +1137,8 @@ namespace MatrixFreeOperators
                                                           in_array,
                                                           out_array);
     else
-      internal::CellwiseInverseMassFactory<dim, Number, VectorizedArrayType>::
+      internal::CellwiseInverseMassFactory<dim, VectorizedArrayType>::
         transform_from_q_points_to_basis(n_actual_components,
-                                         fe_degree,
-                                         n_q_points_1d,
                                          fe_eval,
                                          in_array,
                                          out_array);
@@ -1946,7 +1959,7 @@ namespace MatrixFreeOperators
     // entries here.
     for (size_type i = 0; i < locally_owned_size; ++i)
       {
-        if (inverse_lumped_diagonal_vector.local_element(i) == Number(0.))
+        if (lumped_diagonal_vector.local_element(i) == Number(0.))
           inverse_lumped_diagonal_vector.local_element(i) = Number(1.);
         else
           inverse_lumped_diagonal_vector.local_element(i) =

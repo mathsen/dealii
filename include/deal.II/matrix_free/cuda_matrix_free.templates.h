@@ -23,6 +23,7 @@
 
 #ifdef DEAL_II_COMPILER_CUDA_AWARE
 
+#  include <deal.II/base/cuda.h>
 #  include <deal.II/base/cuda_size.h>
 #  include <deal.II/base/graph_coloring.h>
 
@@ -31,6 +32,7 @@
 #  include <deal.II/fe/fe_dgq.h>
 #  include <deal.II/fe/fe_values.h>
 
+#  include <deal.II/matrix_free/cuda_hanging_nodes_internal.h>
 #  include <deal.II/matrix_free/shape_info.h>
 
 #  include <cuda_runtime_api.h>
@@ -273,8 +275,10 @@ namespace CUDAWrappers
     {
       cudaError_t error_code = cudaMemcpyToSymbol(
         constraint_weights,
-        shape_info.data.front().subface_interpolation_matrix.data(),
-        sizeof(double) * fe.n_dofs_per_face(0) * fe.n_dofs_per_face(0));
+        shape_info.data.front().subface_interpolation_matrices[0].data(),
+        sizeof(double) *
+          shape_info.data.front().subface_interpolation_matrices[0].size());
+      AssertCuda(error_code);
 
       local_dof_indices.resize(data->dofs_per_cell);
       lexicographic_dof_indices.resize(dofs_per_cell);
@@ -383,7 +387,7 @@ namespace CUDAWrappers
 
       hanging_nodes.setup_constraints(cell,
                                       partitioner,
-                                      lexicographic_inv,
+                                      {lexicographic_inv},
                                       lexicographic_dof_indices,
                                       cell_id_view);
 
@@ -583,7 +587,7 @@ namespace CUDAWrappers
         local_cell + cells_per_block * (blockIdx.x + gridDim.x * blockIdx.y);
 
       Number *gq[dim];
-      for (int d = 0; d < dim; ++d)
+      for (unsigned int d = 0; d < dim; ++d)
         gq[d] = &gradients[d][local_cell * Functor::n_q_points];
 
       SharedData<dim, Number> shared_data(
@@ -707,10 +711,13 @@ namespace CUDAWrappers
   MatrixFree<dim, Number>::get_data(unsigned int color) const
   {
     Data data_copy;
-    data_copy.q_points        = q_points[color];
+    if (q_points.size() > 0)
+      data_copy.q_points = q_points[color];
+    if (inv_jacobian.size() > 0)
+      data_copy.inv_jacobian = inv_jacobian[color];
+    if (JxW.size() > 0)
+      data_copy.JxW = JxW[color];
     data_copy.local_to_global = local_to_global[color];
-    data_copy.inv_jacobian    = inv_jacobian[color];
-    data_copy.JxW             = JxW[color];
     data_copy.id              = my_id;
     data_copy.n_cells         = n_cells[color];
     data_copy.padding_length  = padding_length;
@@ -894,7 +901,9 @@ namespace CUDAWrappers
     if (typeid(Number) == typeid(double))
       cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
 
-    const UpdateFlags &update_flags = additional_data.mapping_update_flags;
+    UpdateFlags update_flags = additional_data.mapping_update_flags;
+    if (update_flags & update_gradients)
+      update_flags |= update_JxW_values;
 
     if (additional_data.parallelization_scheme != parallel_over_elem &&
         additional_data.parallelization_scheme != parallel_in_elem)

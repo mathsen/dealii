@@ -45,7 +45,7 @@ namespace hp
    * cells of a triangulation.
    *
    * This class has not yet been implemented for the use in the codimension
-   * one case (<tt>spacedim != dim </tt>).
+   * one case (<tt>spacedim != dim</tt>).
    *
    * @ingroup hp hpcollection
    */
@@ -301,6 +301,46 @@ namespace hp
     hp_constraints_are_implemented() const;
 
     /**
+     * This function combines the functionality of the
+     * FiniteElement::hp_vertex_dof_identities() into multi-way comparisons.
+     * Given a set of elements (whose indices are provided as argument), this
+     * function determines identities between degrees of freedom of these
+     * elements at a vertex.
+     *
+     * The function returns a vector of such identities, where each element of
+     * the vector is a set of pairs `(fe_index,dof_index)` that identifies
+     * the `fe_index` (an element of the `fes` argument to this function) of
+     * an element and the `dof_index` indicates the how-manyth degree of freedom
+     * of that element on a vertex participates in this identity. Now,
+     * every `fe_index` can appear only once in these sets (for each identity,
+     * only one degree of freedom of a finite element can be involved --
+     * otherwise we would have identities between different DoFs of the same
+     * element, which would make the element not unisolvent), and as a
+     * consequence the function does not actually return a set of
+     * `(fe_index,dof_index)` pairs for each identity, but instead a `std::map`
+     * from `fe_index` to `dof_index`, which is conceptually of course
+     * equivalent to a `std::set` of pairs, but in practice is easier to query.
+     */
+    std::vector<std::map<unsigned int, unsigned int>>
+    hp_vertex_dof_identities(const std::set<unsigned int> &fes) const;
+
+    /**
+     * Same as hp_vertex_dof_indices(), except that the function treats degrees
+     * of freedom on lines.
+     */
+    std::vector<std::map<unsigned int, unsigned int>>
+    hp_line_dof_identities(const std::set<unsigned int> &fes) const;
+
+    /**
+     * Same as hp_vertex_dof_indices(), except that the function treats degrees
+     * of freedom on quads.
+     */
+    std::vector<std::map<unsigned int, unsigned int>>
+    hp_quad_dof_identities(const std::set<unsigned int> &fes,
+                           const unsigned int            face_no = 0) const;
+
+
+    /**
      * Return the indices of finite elements in this FECollection that dominate
      * all elements associated with the provided set of indices @p fes.
      *
@@ -546,7 +586,7 @@ namespace hp
      * By default, the index succeeding @p fe_index will be returned. If @p fe_index
      * already corresponds to the last index, the last index will be returned.
      * A custom hierarchy can be supplied via the member function
-     * set_hierachy().
+     * set_hierarchy().
      */
     unsigned int
     next_in_hierarchy(const unsigned int fe_index) const;
@@ -558,7 +598,7 @@ namespace hp
      * By default, the index preceding @p fe_index will be returned. If @p fe_index
      * already corresponds to the first index, the first index will be returned.
      * A custom hierarchy can be supplied via the member function
-     * set_hierachy().
+     * set_hierarchy().
      */
     unsigned int
     previous_in_hierarchy(const unsigned int fe_index) const;

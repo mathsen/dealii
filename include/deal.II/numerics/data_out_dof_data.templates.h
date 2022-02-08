@@ -655,6 +655,33 @@ namespace internal
 {
   namespace DataOutImplementation
   {
+  /**
+   * Test if T has reinit member with three parameters, so that a reinit
+   * function with ghost cells is available for T.
+   */
+  template <typename T, typename = void>
+  struct has_ghost_init : std::false_type
+  {};
+
+  template <typename T>
+  struct has_ghost_init<T,
+                        decltype(
+                          void(std::declval<T &>().reinit(dealii::IndexSet(),
+                                                          dealii::IndexSet(),
+                                                          MPI_COMM_WORLD)))>
+    : std::true_type
+  {};
+
+  template <typename T>
+  struct has_ghost_init<
+    T,
+    decltype(void(std::declval<T &>().reinit(std::vector<dealii::IndexSet>(),
+                                             std::vector<dealii::IndexSet>(),
+                                             MPI_COMM_WORLD)))>
+    : std::true_type
+  {};
+
+
     /**
      * Extract the specified component of a number. This template is used when
      * the given value is assumed to be a real scalar, so asking for the real

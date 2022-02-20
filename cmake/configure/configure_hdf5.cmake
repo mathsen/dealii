@@ -25,17 +25,6 @@ MACRO(FEATURE_HDF5_FIND_EXTERNAL var)
   IF(HDF5_FOUND)
     SET(${var} TRUE)
 
-    IF(NOT HDF5_IS_PARALLEL)
-      MESSAGE(STATUS "Insufficient hdf5 installation found: "
-        "hdf5 has to be configured with MPI support."
-        )
-      SET(HDF5_ADDITIONAL_ERROR_STRING
-        "Insufficient hdf5 installation found!\n"
-        "hdf5 has to be configured with MPI support.\n"
-        )
-      SET(${var} FALSE)
-    ENDIF()
-
     CHECK_MPI_INTERFACE(HDF5 ${var})
   ENDIF()
 ENDMACRO()

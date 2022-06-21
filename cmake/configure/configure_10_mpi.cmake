@@ -27,28 +27,9 @@ SET(DEAL_II_WITH_MPI OFF CACHE BOOL "")
 MACRO(FEATURE_MPI_FIND_EXTERNAL var)
   FIND_PACKAGE(MPI)
 
-  IF(MPI_FOUND)
-    SET(${var} TRUE)
+  SET(${var} TRUE)
 
-    IF(NOT MPI_HAVE_MPI_SEEK_SET)
-      MESSAGE(STATUS
-        "Could not find a sufficient MPI version: "
-        "Your MPI implementation must define MPI_SEEK_SET.")
-      SET(MPI_ADDITIONAL_ERROR_STRING
-        "Your MPI implementation must define MPI_SEEK_SET.\n")
-      SET(${var} FALSE)
-    ENDIF()
 
-    IF(MPI_VERSION VERSION_LESS "3.0")
-      MESSAGE(STATUS
-        "Could not find a sufficient MPI version: "
-        "Your MPI implementation does not support the MPI 3.0 standard.")
-      SET(MPI_ADDITIONAL_ERROR_STRING
-        "Your MPI implementation does not support the MPI 3.0 standard.\n")
-      SET(${var} FALSE)
-    ENDIF()
-
-  ENDIF()
 ENDMACRO()
 
 MACRO(FEATURE_MPI_CONFIGURE_EXTERNAL)

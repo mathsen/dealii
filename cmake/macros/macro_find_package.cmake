@@ -25,8 +25,7 @@ MACRO(FIND_PACKAGE _package_name)
 
   IF( NOT DEFINED ${_package_name_uppercase}_FOUND AND
       NOT DEFINED ${_package_name_uppercase}_LIBRARIES )
-  #_FIND_PACKAGE (${_package_name} ${ARGN})
-    _FIND_PACKAGE (${_package_name})
+    _FIND_PACKAGE (${_package_name} ${ARGN})
   ELSE()
     IF(NOT DEFINED ${_package_name_uppercase}_FOUND)
       SET(${_package_name_uppercase}_FOUND TRUE)

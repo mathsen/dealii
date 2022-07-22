@@ -21,7 +21,7 @@
 
 MACRO(FIND_PACKAGE _package_name)
   STRING(TOUPPER ${_package_name} _package_name_uppercase)
-  cmake_policy(SET CMP0074 NEW)
+  #cmake_policy(SET CMP0074 NEW)
 
   IF( NOT DEFINED ${_package_name_uppercase}_FOUND AND
       NOT DEFINED ${_package_name_uppercase}_LIBRARIES )

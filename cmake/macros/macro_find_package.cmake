@@ -20,14 +20,19 @@
 #
 
 MACRO(FIND_PACKAGE _package_name)
-  STRING(TOUPPER ${_package_name} _package_name_uppercase)
+    STRING(TOUPPER ${_package_name} _package_name_uppercase)
 
-  IF( NOT DEFINED ${_package_name_uppercase}_FOUND AND
-      NOT DEFINED ${_package_name_uppercase}_LIBRARIES )
-    _FIND_PACKAGE (${_package_name} ${ARGN})
-  ELSE()
-    IF(NOT DEFINED ${_package_name_uppercase}_FOUND)
-      SET(${_package_name_uppercase}_FOUND TRUE)
+    IF(${_package_name_uppercase} STREQUAL "HDF5")
+        _FIND_PACKAGE (${_package_name} ${ARGN})
+    ELSE()
+        IF( NOT DEFINED ${_package_name_uppercase}_FOUND AND
+                NOT DEFINED ${_package_name_uppercase}_LIBRARIES )
+            _FIND_PACKAGE (${_package_name} ${ARGN})
+        ELSE()
+            IF(NOT DEFINED ${_package_name_uppercase}_FOUND)
+                SET(${_package_name_uppercase}_FOUND TRUE)
+            ENDIF()
+        ENDIF()
     ENDIF()
-  ENDIF()
 ENDMACRO()
+

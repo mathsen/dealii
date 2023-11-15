@@ -100,10 +100,6 @@ namespace BlockMatrixIterators
      * Block column into which we presently point.
      */
     unsigned int col_block;
-
-    // Let the iterator class be a friend.
-    template <typename>
-    friend class MatrixIterator;
   };
 
 
@@ -195,9 +191,12 @@ namespace BlockMatrixIterators
     operator==(const Accessor &a) const;
 
     template <typename>
-    friend class MatrixIterator;
+    friend class dealii::MatrixIterator;
+
     friend class Accessor<BlockMatrixType, true>;
   };
+
+
 
   /**
    * Block matrix accessor for constant matrices, implementing the stepping

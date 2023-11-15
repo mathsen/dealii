@@ -51,6 +51,7 @@
 
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/data_out_dof_data.h>
+#include <deal.II/lac/trilinos_vector.h>
 
 #include <algorithm>
 #include <memory>
@@ -60,26 +61,6 @@
 #include <type_traits>
 
 DEAL_II_NAMESPACE_OPEN
-
-// Define helper type for SFINAE
-template <typename, typename = void>
-struct has_ghost_init : std::false_type {};
-
-template <typename, typename = void>
-struct has_block_ghost_init : std::false_type {};
-
-// Specialization to check for the existence of a foo() member function with three parameters
-template <typename T>
-struct has_ghost_init<T, std::void_t<decltype(std::declval<T>().reinit(
-    std::declval<const IndexSet &>(), std::declval<const IndexSet &>(), std::declval<const MPI_Comm>()))>> : std::true_type {};
-
-// Specialization to check for the existence of a foo() member function with three parameters
-template <typename T>
-struct has_block_ghost_init<T, std::void_t<decltype(std::declval<T>().reinit(
-    std::declval<const std::vector< IndexSet > &>(), std::declval<const std::vector< IndexSet > &>(), std::declval<const MPI_Comm>()))>> : std::true_type {};
-
-
-
 
 namespace internal
 {
@@ -873,6 +854,43 @@ namespace internal
       }
 #endif
 
+#ifdef DEAL_II_WITH_TRILINOS
+      /**
+       * Create a ghosted-copy of a non-block dof vector.
+       */
+      template <int dim,
+                int spacedim,
+                typename Number>
+      void
+      create_dof_vector(
+        const DoFHandler<dim, spacedim>                 &dof_handler,
+        const TrilinosWrappers::MPI::Vector             &src,
+        LinearAlgebra::ReadWriteVector<Number> &dst,
+        const unsigned int level = numbers::invalid_unsigned_int)
+      {
+          const IndexSet &locally_owned_dofs =
+                  (level == numbers::invalid_unsigned_int) ?
+                      dof_handler.locally_owned_dofs() :
+                      dof_handler.locally_owned_mg_dofs(level);
+
+          const IndexSet locally_relevant_dofs =
+                  (level == numbers::invalid_unsigned_int) ?
+                      DoFTools::extract_locally_relevant_dofs(dof_handler) :
+                      DoFTools::extract_locally_relevant_level_dofs(dof_handler, level);
+
+          dst.reinit(locally_relevant_dofs);
+
+          TrilinosWrappers::MPI::Vector temp_ghosted;
+          temp_ghosted.reinit(locally_owned_dofs,
+                              locally_relevant_dofs,
+                              dof_handler.get_communicator());
+          temp_ghosted = src;
+
+          for (const auto i : dst.get_stored_elements())
+              dst[i] = temp_ghosted[i];
+      }
+#endif
+
       /**
        * Create a ghosted-copy of a block dof vector.
        */
@@ -909,55 +927,41 @@ namespace internal
 
         dst.reinit(locally_relevant_dofs);
 
-        if constexpr (has_block_ghost_init<VectorType>::value)
+        for (unsigned int b = 0; b < src.n_blocks(); ++b)
+            n_indices_per_block[b] = src.get_block_indices().block_size(b);
+
+        LinearAlgebra::distributed::BlockVector<Number> temp_ghosted;
+        temp_ghosted.reinit(src.n_blocks());
+
+        for (unsigned int b = 0; b < src.n_blocks(); ++b)
         {
-            VectorType temp_ghosted;
-            temp_ghosted.reinit(locally_owned_dofs_b,
-                                locally_relevant_dofs_b,
-                                dof_handler.get_communicator());
-            temp_ghosted = src;
+            Assert(src.block(b).locally_owned_elements().is_contiguous(),
+                   ExcMessage(
+                       "Using non-contiguous vector blocks is not currently "
+                       "supported by DataOut and related classes. The typical "
+                       "way you may end up with such vectors is if you order "
+                       "degrees of freedom via DoFRenumber::component_wise() "
+                       "but then group several vector components into one "
+                       "vector block -- for example, all 'dim' components "
+                       "of a velocity are grouped into the same vector block. "
+                       "If you do this, you don't want to renumber degrees "
+                       "of freedom based on vector component, but instead "
+                       "based on the 'blocks' you will later use for grouping "
+                       "things into vectors. Take a look at step-32 and step-55 "
+                       "and how they use the second argument of "
+                       "DoFRenumber::component_wise()."));
 
-            for (const auto i : dst.get_stored_elements())
-              dst[i] = temp_ghosted[i];
+            temp_ghosted.block(b).reinit(locally_owned_dofs_b[b],
+                                         locally_relevant_dofs_b[b],
+                                         dof_handler.get_communicator());
+            copy_locally_owned_data_from(src.block(b), temp_ghosted.block(b));
         }
-        else
-        {
-            for (unsigned int b = 0; b < src.n_blocks(); ++b)
-                n_indices_per_block[b] = src.get_block_indices().block_size(b);
 
-            LinearAlgebra::distributed::BlockVector<Number> temp_ghosted;
-            temp_ghosted.reinit(src.n_blocks());
+        temp_ghosted.collect_sizes();
+        temp_ghosted.update_ghost_values();
 
-            for (unsigned int b = 0; b < src.n_blocks(); ++b)
-            {
-                Assert(src.block(b).locally_owned_elements().is_contiguous(),
-                       ExcMessage(
-                           "Using non-contiguous vector blocks is not currently "
-                           "supported by DataOut and related classes. The typical "
-                           "way you may end up with such vectors is if you order "
-                           "degrees of freedom via DoFRenumber::component_wise() "
-                           "but then group several vector components into one "
-                           "vector block -- for example, all 'dim' components "
-                           "of a velocity are grouped into the same vector block. "
-                           "If you do this, you don't want to renumber degrees "
-                           "of freedom based on vector component, but instead "
-                           "based on the 'blocks' you will later use for grouping "
-                           "things into vectors. Take a look at step-32 and step-55 "
-                           "and how they use the second argument of "
-                           "DoFRenumber::component_wise()."));
-
-                temp_ghosted.block(b).reinit(locally_owned_dofs_b[b],
-                                             locally_relevant_dofs_b[b],
-                                             dof_handler.get_communicator());
-                copy_locally_owned_data_from(src.block(b), temp_ghosted.block(b));
-            }
-
-            temp_ghosted.collect_sizes();
-            temp_ghosted.update_ghost_values();
-
-            for (const auto i : dst.get_stored_elements())
-              dst[i] = temp_ghosted[i];
-        }
+        for (const auto i : dst.get_stored_elements())
+            dst[i] = temp_ghosted[i];
       }
 
       /**
@@ -973,51 +977,37 @@ namespace internal
       create_dof_vector(
         const DoFHandler<dim, spacedim>                 &dof_handler,
         const VectorType                                &src,
-        LinearAlgebra::ReadWriteVector<Number> &dst,
-        const unsigned int level = numbers::invalid_unsigned_int)
+              LinearAlgebra::ReadWriteVector<Number> &dst,
+              const unsigned int level = numbers::invalid_unsigned_int)
       {
-        const IndexSet &locally_owned_dofs =
-          (level == numbers::invalid_unsigned_int) ?
-            dof_handler.locally_owned_dofs() :
-            dof_handler.locally_owned_mg_dofs(level);
+          const IndexSet &locally_owned_dofs =
+                  (level == numbers::invalid_unsigned_int) ?
+                      dof_handler.locally_owned_dofs() :
+                      dof_handler.locally_owned_mg_dofs(level);
 
-        const IndexSet locally_relevant_dofs =
-          (level == numbers::invalid_unsigned_int) ?
-            DoFTools::extract_locally_relevant_dofs(dof_handler) :
-            DoFTools::extract_locally_relevant_level_dofs(dof_handler, level);
+          const IndexSet locally_relevant_dofs =
+                  (level == numbers::invalid_unsigned_int) ?
+                      DoFTools::extract_locally_relevant_dofs(dof_handler) :
+                      DoFTools::extract_locally_relevant_level_dofs(dof_handler, level);
 
-        dst.reinit(locally_relevant_dofs);
+          dst.reinit(locally_relevant_dofs);
 
-        if constexpr (has_ghost_init<VectorType>::value)
-        {
-            VectorType temp_ghosted;
-            temp_ghosted.reinit(locally_owned_dofs,
-                                locally_relevant_dofs,
-                                dof_handler.get_communicator());
-            temp_ghosted = src;
-
-            for (const auto i : dst.get_stored_elements())
-              dst[i] = temp_ghosted[i];
-        }
-        else
-        {
-            Assert(locally_owned_dofs.is_contiguous(),
-                   ExcMessage(
+          Assert(locally_owned_dofs.is_contiguous(),
+                 ExcMessage(
                      "You are trying to add a non-block vector with non-contiguous "
                      "locally-owned index sets. This is not possible. Please "
                      "consider to use an adequate block vector!"));
 
-            LinearAlgebra::distributed::Vector<Number> temp_ghosted;
-            temp_ghosted.reinit(locally_owned_dofs,
-                                locally_relevant_dofs,
-                                dof_handler.get_communicator());
-            copy_locally_owned_data_from(src, temp_ghosted);
+          LinearAlgebra::distributed::Vector<Number> temp_ghosted;
+          temp_ghosted.reinit(locally_owned_dofs,
+                              locally_relevant_dofs,
+                              dof_handler.get_communicator());
+          copy_locally_owned_data_from(src, temp_ghosted);
 
-            temp_ghosted.update_ghost_values();
+          temp_ghosted.update_ghost_values();
 
-            for (const auto i : dst.get_stored_elements())
+          for (const auto i : dst.get_stored_elements())
               dst[i] = temp_ghosted[i];
-        }
       }
 
       /**
@@ -1031,24 +1021,18 @@ namespace internal
       create_cell_vector(const VectorType                                &src,
                          LinearAlgebra::ReadWriteVector<Number> &dst)
       {
+          LinearAlgebra::distributed::BlockVector<Number> temp;
+          temp.reinit(src.n_blocks());
 
-          if constexpr (has_block_ghost_init<VectorType>::value)
+          for (unsigned int b = 0; b < src.n_blocks(); ++b)
           {
-
+              temp.block(b).reinit(src.get_block_indices().block_size(b));
+              copy_locally_owned_data_from(src.block(b), temp.block(b));
           }
-          else
-          {
-              LinearAlgebra::distributed::BlockVector<Number> temp;
-              temp.reinit(src.n_blocks());
 
-              for (unsigned int b = 0; b < src.n_blocks(); ++b)
-              {
-                  temp.block(b).reinit(src.get_block_indices().block_size(b));
-                  copy_locally_owned_data_from(src.block(b), temp.block(b));
-              }
-
-              temp.collect_sizes();
-          }
+          temp.collect_sizes();
+          for (const auto i : dst.get_stored_elements())
+              dst[i] = temp[i];
       }
 
 

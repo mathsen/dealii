@@ -76,8 +76,13 @@ DEAL_II_NAMESPACE_OPEN
  *   Lazy<FullMatrix<double>> prolongation_matrix;
  * };
  * ```
+ *
+ * @dealiiConceptRequires{std::is_move_constructible_v<T> &&
+                          std::is_move_assignable_v<T >}
  */
 template <typename T>
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
 class Lazy
 {
 public:
@@ -88,26 +93,40 @@ public:
 
 
   /**
-   * Copy constructor.
+   * Copy constructor. If the `other` object contains an initialized
+   * value, then that value will be copied into the current object. If the
+   * `other` object is uninitialized, then the current object will be as well.
    */
   Lazy(const Lazy &other);
 
 
   /**
-   * Move constructor.
+   * Move constructor. If the `other` object contains an initialized
+   * value, then that value will be moved into the current object, and the
+   * `other` object will end up being empty (as if default initialized). If the
+   * `other` object is uninitialized, then the current object will be as well.
    */
   Lazy(Lazy &&other) noexcept;
 
 
   /**
-   * Copy assignment.
+   * Copy assignment. If the `other` object contains an initialized
+   * value, then that value will be copied into the current object. If the
+   * `other` object is uninitialized, then the current object will be as well.
+   *
+   * Any content of the current object is lost in the assignment.
    */
   Lazy &
   operator=(const Lazy &other);
 
 
   /**
-   * Move assignment.
+   * Move assignment. If the `other` object contains an initialized
+   * value, then that value will be moved into the current object, and the
+   * `other` object will end up being empty (as if default initialized). If the
+   * `other` object is uninitialized, then the current object will be as well.
+   *
+   * Any content of the current object is lost in the move assignment.
    */
   Lazy &
   operator=(Lazy &&other) noexcept;
@@ -135,6 +154,8 @@ public:
    * of the calling threads and that after completion the initialization
    * result (which is stored in the std::optional) is visible on all
    * threads.
+   *
+   * @dealiiConceptRequires{std::is_invocable_r_v<T, Callable>}
    */
   template <typename Callable>
   void
@@ -184,6 +205,8 @@ public:
    *
    * @post The underlying object is initialized, meaning, has_value()
    * returns true.
+   *
+   * @dealiiConceptRequires{std::is_invocable_r_v<T, Callable>}
    */
   template <typename Callable>
   const T &
@@ -193,6 +216,8 @@ public:
 
   /**
    * Variant of above function that returns a non-const reference.
+   *
+   * @dealiiConceptRequires{std::is_invocable_r_v<T, Callable>}
    */
   template <typename Callable>
   DEAL_II_ALWAYS_INLINE inline T &
@@ -235,12 +260,16 @@ private:
 
 
 template <typename T>
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
 inline Lazy<T>::Lazy()
   : object_is_initialized(false)
 {}
 
 
 template <typename T>
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
 inline Lazy<T>::Lazy(const Lazy &other)
   : object(other.object)
 {
@@ -249,16 +278,27 @@ inline Lazy<T>::Lazy(const Lazy &other)
 
 
 template <typename T>
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
 inline Lazy<T>::Lazy(Lazy &&other) noexcept
-  : object(other.object)
+  : object(std::move(other.object))
 {
   object_is_initialized.store(other.object_is_initialized.load());
+
+  // Mark the other object as uninitialized. This is marginally non-trivial
+  // because moving from std::optional<T> does *not* result in an empty
+  // std::optional<T> but instead one that does contain a T, but one that
+  // has been moved from -- typically something akin to a default-initialized
+  // T. That seems undesirable, so reset everything to an empty state.
+  other.object_is_initialized.store(false);
+  other.object.reset();
 }
 
 
 template <typename T>
-inline Lazy<T> &
-Lazy<T>::operator=(const Lazy &other)
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
+inline Lazy<T> &Lazy<T>::operator=(const Lazy &other)
 {
   object = other.object;
   object_is_initialized.store(other.object_is_initialized.load());
@@ -267,18 +307,29 @@ Lazy<T>::operator=(const Lazy &other)
 
 
 template <typename T>
-inline Lazy<T> &
-Lazy<T>::operator=(Lazy &&other) noexcept
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
+inline Lazy<T> &Lazy<T>::operator=(Lazy &&other) noexcept
 {
-  object = other.object;
+  object = std::move(other.object);
   object_is_initialized.store(other.object_is_initialized.load());
+
+  // Mark the other object as uninitialized. This is marginally non-trivial
+  // because moving from std::optional<T> does *not* result in an empty
+  // std::optional<T> but instead one that does contain a T, but one that
+  // has been moved from -- typically something akin to a default-initialized
+  // T. That seems undesirable, so reset everything to an empty state.
+  other.object_is_initialized.store(false);
+  other.object.reset();
+
   return *this;
 }
 
 
 template <typename T>
-inline void
-Lazy<T>::reset() noexcept
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
+inline void Lazy<T>::reset() noexcept
 {
   object_is_initialized.store(false);
   object.reset();
@@ -286,9 +337,11 @@ Lazy<T>::reset() noexcept
 
 
 template <typename T>
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
 template <typename Callable>
-inline DEAL_II_ALWAYS_INLINE void
-Lazy<T>::ensure_initialized(const Callable &creator) const
+inline DEAL_II_ALWAYS_INLINE
+  void Lazy<T>::ensure_initialized(const Callable &creator) const
   DEAL_II_CXX20_REQUIRES((std::is_invocable_r_v<T, Callable>))
 {
   //
@@ -326,7 +379,8 @@ Lazy<T>::ensure_initialized(const Callable &creator) const
       //
       if (!object_is_initialized.load(std::memory_order_relaxed))
         {
-          object = std::move(creator());
+          Assert(object.has_value() == false, ExcInternalError());
+          object.emplace(std::move(creator()));
 
           //
           // Flip the object_is_initialized boolean with "release"
@@ -348,8 +402,9 @@ Lazy<T>::ensure_initialized(const Callable &creator) const
 
 
 template <typename T>
-inline DEAL_II_ALWAYS_INLINE bool
-Lazy<T>::has_value() const
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
+inline DEAL_II_ALWAYS_INLINE bool Lazy<T>::has_value() const
 {
   //
   // In principle it would be sufficient to solely check the atomic<bool>
@@ -357,13 +412,14 @@ Lazy<T>::has_value() const
   // semantics. But just in case let's check the object.has_value() boolean
   // as well:
   //
-  return object_is_initialized && object.has_value();
+  return (object_is_initialized && object.has_value());
 }
 
 
 template <typename T>
-inline DEAL_II_ALWAYS_INLINE const T &
-Lazy<T>::value() const
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
+inline DEAL_II_ALWAYS_INLINE const T &Lazy<T>::value() const
 {
   Assert(
     object_is_initialized && object.has_value(),
@@ -376,8 +432,9 @@ Lazy<T>::value() const
 
 
 template <typename T>
-inline DEAL_II_ALWAYS_INLINE T &
-Lazy<T>::value()
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
+inline DEAL_II_ALWAYS_INLINE T &Lazy<T>::value()
 {
   Assert(
     object_is_initialized && object.has_value(),
@@ -390,9 +447,11 @@ Lazy<T>::value()
 
 
 template <typename T>
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
 template <typename Callable>
-inline DEAL_II_ALWAYS_INLINE const T &
-Lazy<T>::value_or_initialize(const Callable &creator) const
+inline DEAL_II_ALWAYS_INLINE const T &Lazy<T>::value_or_initialize(
+  const Callable &creator) const
   DEAL_II_CXX20_REQUIRES((std::is_invocable_r_v<T, Callable>))
 {
   ensure_initialized(creator);
@@ -401,9 +460,11 @@ Lazy<T>::value_or_initialize(const Callable &creator) const
 
 
 template <typename T>
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
 template <typename Callable>
-inline DEAL_II_ALWAYS_INLINE T &
-Lazy<T>::value_or_initialize(const Callable &creator)
+inline DEAL_II_ALWAYS_INLINE T &Lazy<T>::value_or_initialize(
+  const Callable &creator)
   DEAL_II_CXX20_REQUIRES((std::is_invocable_r_v<T, Callable>))
 {
   ensure_initialized(creator);
@@ -412,8 +473,9 @@ Lazy<T>::value_or_initialize(const Callable &creator)
 
 
 template <typename T>
-std::size_t
-Lazy<T>::memory_consumption() const
+DEAL_II_CXX20_REQUIRES((std::is_move_constructible_v<T> &&
+                        std::is_move_assignable_v<T>))
+std::size_t Lazy<T>::memory_consumption() const
 {
   return MemoryConsumption::memory_consumption(object) + //
          sizeof(*this) - sizeof(object);

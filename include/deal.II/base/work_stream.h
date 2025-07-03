@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2009 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_work_stream_h
 #  define dealii_work_stream_h
@@ -52,7 +51,7 @@ DEAL_II_NAMESPACE_OPEN
  * individual subranges onto the available threads. For a lengthy discussion
  * of the rationale of this class, see the
  * @ref threads "Parallel computing with multiple processors"
- * module. It is used in the tutorial first in step-9, and again in step-13,
+ * topic. It is used in the tutorial first in step-9, and again in step-13,
  * step-14, step-32 and others.
  *
  * The class is built on the following premise: One frequently has some work
@@ -482,13 +481,13 @@ namespace WorkStream
                                                             ScratchData,
                                                             CopyData>::ItemType;
 
-        // Create the three stages of the pipeline:
+        // Define the three stages of the pipeline:
 
         //
         // ----- Stage 1 -----
         //
         // The first stage is the one that provides us with chunks of data
-        // to work on (the stream of "items"). This stage runs sequentially.
+        // to work on (the stream of "items"). This stage will run sequentially.
         IteratorRangeToItemStream<Iterator, ScratchData, CopyData>
              iterator_range_to_item_stream(begin,
                                         end,
@@ -496,33 +495,22 @@ namespace WorkStream
                                         chunk_size,
                                         sample_scratch_data,
                                         sample_copy_data);
-        auto tbb_item_stream_filter = tbb::make_filter<void, ItemType *>(
-#    ifdef DEAL_II_TBB_WITH_ONEAPI
-          tbb::filter_mode::serial_in_order,
-#    else
-          tbb::filter::serial,
-#    endif
-          [&](tbb::flow_control &fc) -> ItemType * {
-            if (const auto item = iterator_range_to_item_stream.get_item())
-              return item;
-            else
-              {
-                fc.stop();
-                return nullptr;
-              }
-          });
+        auto item_generator = [&](tbb::flow_control &fc) -> ItemType * {
+          if (const auto item = iterator_range_to_item_stream.get_item())
+            return item;
+          else
+            {
+              fc.stop();
+              return nullptr;
+            }
+        };
 
         //
         // ----- Stage 2 -----
         //
         // The second stage is the one that does the actual work. This is the
         // stage that runs in parallel
-        auto tbb_worker_filter = tbb::make_filter<ItemType *, ItemType *>(
-#    ifdef DEAL_II_TBB_WITH_ONEAPI
-          tbb::filter_mode::parallel,
-#    else
-          tbb::filter::parallel,
-#    endif
+        auto item_worker =
           [worker =
              std::function<void(const Iterator &, ScratchData &, CopyData &)>(
                worker),
@@ -561,7 +549,7 @@ namespace WorkStream
                   current_item->scratch_data->get().emplace_back(scratch_data,
                                                                  true);
                 }
-            }
+            };
 
             // then call the worker function on each element of the chunk we
             // were given. since these worker functions are called on separate
@@ -606,52 +594,66 @@ namespace WorkStream
             // Then return the original pointer
             // to the now modified object. The copier will work on it next.
             return current_item;
-          });
-
+          };
 
         //
         // ----- Stage 3 -----
         //
         // The last stage is the one that copies data from the CopyData objects
         // to the final destination. This stage runs sequentially again.
+        auto item_copier = [copier = std::function<void(const CopyData &)>(
+                              copier)](ItemType *current_item) {
+          if (copier)
+            {
+              // Initiate copying data. For the same reasons as in the worker
+              // class above, catch exceptions rather than letting them
+              // propagate into unknown territories:
+              for (unsigned int i = 0; i < current_item->n_iterators; ++i)
+                {
+                  try
+                    {
+                      copier(current_item->copy_datas[i]);
+                    }
+                  catch (const std::exception &exc)
+                    {
+                      Threads::internal::handle_std_exception(exc);
+                    }
+                  catch (...)
+                    {
+                      Threads::internal::handle_unknown_exception();
+                    }
+                }
+            }
+          // mark current item as usable again
+          current_item->currently_in_use = false;
+        };
+
+
+        // Now we just have to set up the pipeline and run it:
+        auto tbb_item_stream_filter = tbb::make_filter<void, ItemType *>(
+#    ifdef DEAL_II_TBB_WITH_ONEAPI
+          tbb::filter_mode::serial_in_order,
+#    else
+          tbb::filter::serial,
+#    endif
+          item_generator);
+
+        auto tbb_worker_filter = tbb::make_filter<ItemType *, ItemType *>(
+#    ifdef DEAL_II_TBB_WITH_ONEAPI
+          tbb::filter_mode::parallel,
+#    else
+          tbb::filter::parallel,
+#    endif
+          item_worker);
+
         auto tbb_copier_filter = tbb::make_filter<ItemType *, void>(
 #    ifdef DEAL_II_TBB_WITH_ONEAPI
           tbb::filter_mode::serial_in_order,
 #    else
           tbb::filter::serial,
 #    endif
-          [copier = std::function<void(const CopyData &)>(copier)](
-            ItemType *current_item) {
-            if (copier)
-              {
-                // Initiate copying data. For the same reasons as in the worker
-                // class above, catch exceptions rather than letting them
-                // propagate into unknown territories:
-                for (unsigned int i = 0; i < current_item->n_iterators; ++i)
-                  {
-                    try
-                      {
-                        copier(current_item->copy_datas[i]);
-                      }
-                    catch (const std::exception &exc)
-                      {
-                        Threads::internal::handle_std_exception(exc);
-                      }
-                    catch (...)
-                      {
-                        Threads::internal::handle_unknown_exception();
-                      }
-                  }
-              }
-            // mark current item as usable again
-            current_item->currently_in_use = false;
-          });
+          item_copier);
 
-
-        //
-        // ----- The pipeline -----
-        //
-        // Now create a pipeline from these stages and execute it:
         tbb::parallel_pipeline(queue_length,
                                tbb_item_stream_filter & tbb_worker_filter &
                                  tbb_copier_filter);

@@ -1,17 +1,16 @@
-/* ---------------------------------------------------------------------
+/* ------------------------------------------------------------------------
  *
- * Copyright (C) 2009 - 2023 by the deal.II authors
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * Copyright (C) 2009 - 2024 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
- * The deal.II library is free software; you can use it, redistribute
- * it, and/or modify it under the terms of the GNU Lesser General
- * Public License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * The full text of the license can be found in the file LICENSE.md at
- * the top level directory of deal.II.
+ * Part of the source code is dual licensed under Apache-2.0 WITH
+ * LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+ * governing the source code and code contributions can be found in
+ * LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
  *
- * ---------------------------------------------------------------------
+ * ------------------------------------------------------------------------
  *
  * Author: Yaqi Wang, Texas A&M University, 2009, 2010
  */
@@ -1132,7 +1131,7 @@ namespace Step28
   // several places, we have to do something for all energy groups, in which
   // case we will start tasks for each group to let these things run in
   // parallel if deal.II was configured for multithreading.  For strategies of
-  // parallelization, take a look at the @ref threads module.
+  // parallelization, take a look at the @ref threads topic.
   //
   // The biggest difference to previous example programs is that we also
   // declare a nested class that has member variables for all the run-time
@@ -1195,7 +1194,7 @@ namespace Step28
     // all energy groups:
     const Parameters  &parameters;
     const MaterialData material_data;
-    FE_Q<dim>          fe;
+    const FE_Q<dim>    fe;
 
     // Furthermore, we have (iv) the value of the computed eigenvalue at the
     // present iteration. This is, in fact, the only part of the solution that

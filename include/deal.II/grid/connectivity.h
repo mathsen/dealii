@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2020 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2020 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_tria_connectivity_h
 #define dealii_tria_connectivity_h
@@ -50,7 +49,7 @@ namespace internal
       virtual unsigned int
       n_entities(const unsigned int d) const
       {
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
         (void)d;
 
         return 0;
@@ -62,7 +61,7 @@ namespace internal
       virtual dealii::ArrayView<const unsigned int>
       vertices_of_entity(const unsigned int d, const unsigned int e) const
       {
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
         (void)d;
         (void)e;
 
@@ -75,7 +74,7 @@ namespace internal
       virtual ReferenceCell
       type_of_entity(const unsigned int d, const unsigned int e) const
       {
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
         (void)d;
         (void)e;
 
@@ -88,7 +87,7 @@ namespace internal
       virtual unsigned int
       n_lines_of_surface(const unsigned int face) const
       {
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
         (void)face;
 
         return 0;
@@ -101,7 +100,7 @@ namespace internal
       nth_line_of_surface(const unsigned int line,
                           const unsigned int face) const
       {
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
         (void)line;
         (void)face;
 
@@ -115,7 +114,7 @@ namespace internal
       vertices_of_nth_line_of_surface(const unsigned int line,
                                       const unsigned int face) const
       {
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
         (void)line;
         (void)face;
 
@@ -147,7 +146,7 @@ namespace internal
             return {table};
           }
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return {};
       }
@@ -160,7 +159,7 @@ namespace internal
         if (d == 1)
           return ReferenceCells::Line;
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return ReferenceCells::Vertex;
       }
@@ -201,7 +200,7 @@ namespace internal
             return {table[e]};
           }
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return {};
       }
@@ -217,7 +216,7 @@ namespace internal
         if (d == 1)
           return ReferenceCells::Line;
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return ReferenceCells::Vertex;
       }
@@ -258,7 +257,7 @@ namespace internal
             return {table[e]};
           }
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return {};
       }
@@ -274,7 +273,7 @@ namespace internal
         if (d == 1)
           return ReferenceCells::Line;
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return ReferenceCells::Vertex;
       }
@@ -323,7 +322,7 @@ namespace internal
             return {table[e]};
           }
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return {};
       }
@@ -342,7 +341,7 @@ namespace internal
         if (d == 1)
           return ReferenceCells::Line;
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return ReferenceCells::Vertex;
       }
@@ -434,7 +433,7 @@ namespace internal
             return {table[e]};
           }
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return {};
       }
@@ -455,7 +454,7 @@ namespace internal
         if (d == 1)
           return ReferenceCells::Line;
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return ReferenceCells::Vertex;
       }
@@ -560,7 +559,7 @@ namespace internal
             return {table[e]};
           }
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return {};
       }
@@ -581,7 +580,7 @@ namespace internal
         if (d == 1)
           return ReferenceCells::Line;
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return ReferenceCells::Vertex;
       }
@@ -688,7 +687,7 @@ namespace internal
             return {table[e]};
           }
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return {};
       }
@@ -707,7 +706,7 @@ namespace internal
         if (d == 1)
           return ReferenceCells::Line;
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return ReferenceCells::Vertex;
       }
@@ -890,7 +889,7 @@ namespace internal
         else if (from == 1 && to == 0)
           return line_vertices;
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return cell_entities;
       }
@@ -909,7 +908,7 @@ namespace internal
         else if (from == 1 && to == 0)
           return line_vertices;
 
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
         return cell_entities;
       }
@@ -1120,7 +1119,7 @@ namespace internal
                 {
                   ref_key = std::get<0>(keys[i]);
 
-                  n_unique_entities++;
+                  ++n_unique_entities;
                   n_unique_entity_vertices +=
                     cell_types[static_cast<types::geometric_entity_type>(
                                  ad_entity_types[offset_i])]
@@ -1151,7 +1150,7 @@ namespace internal
           if (ref_key != std::get<0>(keys[i]))
             {
               // new key: default orientation is correct
-              counter++;
+              ++counter;
               ref_key     = std::get<0>(keys[i]);
               ref_indices = ad_entity_vertices[offset_i];
 

@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2009 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_parallel_h
 #define dealii_parallel_h
@@ -148,7 +147,7 @@ namespace parallel
    * For a discussion of the kind of problems to which this function is
    * applicable, see the
    * @ref threads "Parallel computing with multiple processors"
-   * module.
+   * topic.
    *
    * @dealiiConceptRequires{(std::invocable<Function,
    *    decltype(*std::declval<InputIterator>())> &&
@@ -215,7 +214,7 @@ namespace parallel
    * For a discussion of the kind of problems to which this function is
    * applicable, see the
    * @ref threads "Parallel computing with multiple processors"
-   * module.
+   * topic.
    *
    * @dealiiConceptRequires{(std::invocable<Function,
    *    decltype(*std::declval<InputIterator1>()),
@@ -292,7 +291,7 @@ namespace parallel
    * For a discussion of the kind of problems to which this function is
    * applicable, see the
    * @ref threads "Parallel computing with multiple processors"
-   * module.
+   * topic.
    *
    * @dealiiConceptRequires{(std::invocable<Function,
    *    decltype(*std::declval<InputIterator1>()),
@@ -444,7 +443,7 @@ namespace parallel
    * For a discussion of the kind of problems to which this function is
    * applicable, see also the
    * @ref threads "Parallel computing with multiple processors"
-   * module.
+   * topic.
    *
    * @dealiiConceptRequires{(std::invocable<Function, Iterator, Iterator>)}
    */
@@ -594,7 +593,7 @@ namespace parallel
    * For a discussion of the kind of problems to which this function is
    * applicable, see also the
    * @ref threads "Parallel computing with multiple processors"
-   * module.
+   * topic.
    *
    * @dealiiConceptRequires{(std::invocable<Function, Iterator, Iterator> &&
    *    std::convertible_to<std::invoke_result_t<Function, Iterator, Iterator>,
@@ -675,7 +674,8 @@ namespace parallel
        * again.
        */
       void
-      release_one_partitioner(std::shared_ptr<tbb::affinity_partitioner> &p);
+      release_one_partitioner(
+        const std::shared_ptr<tbb::affinity_partitioner> &p);
 
     private:
       /**

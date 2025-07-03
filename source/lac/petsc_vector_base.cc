@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
+// SPDX-License-Identifier: LGPL-2.1-or-later
 // Copyright (C) 2004 - 2023 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #include <deal.II/lac/petsc_vector_base.h>
 
@@ -540,6 +539,13 @@ namespace PETScWrappers
   void
   VectorBase::compress(const VectorOperation::values operation)
   {
+    Assert(has_ghost_elements() == false,
+           ExcMessage("Calling compress() is only useful if a vector "
+                      "has been written into, but this is a vector with ghost "
+                      "elements and consequently is read-only. It does "
+                      "not make sense to call compress() for such "
+                      "vectors."));
+
     {
 #  ifdef DEBUG
       // Check that all processors agree that last_action is the same (or none!)
@@ -630,7 +636,7 @@ namespace PETScWrappers
       // allowing pipelined commands to be
       // executed in parallel
       const PetscScalar *ptr  = start_ptr;
-      const PetscScalar *eptr = ptr + (size() / 4) * 4;
+      const PetscScalar *eptr = ptr + (locally_owned_size() / 4) * 4;
       while (ptr != eptr)
         {
           sum0 += *ptr++;
@@ -639,10 +645,12 @@ namespace PETScWrappers
           sum3 += *ptr++;
         }
       // add up remaining elements
-      while (ptr != start_ptr + size())
+      while (ptr != start_ptr + locally_owned_size())
         sum0 += *ptr++;
 
-      mean = (sum0 + sum1 + sum2 + sum3) / static_cast<PetscReal>(size());
+      mean =
+        Utilities::MPI::sum(sum0 + sum1 + sum2 + sum3, get_mpi_communicator()) /
+        static_cast<PetscReal>(size());
     }
 
     // restore the representation of the
@@ -697,7 +705,7 @@ namespace PETScWrappers
       // allowing pipelined commands to be
       // executed in parallel
       const PetscScalar *ptr  = start_ptr;
-      const PetscScalar *eptr = ptr + (size() / 4) * 4;
+      const PetscScalar *eptr = ptr + (locally_owned_size() / 4) * 4;
       while (ptr != eptr)
         {
           sum0 += std::pow(numbers::NumberTraits<value_type>::abs(*ptr++), p);
@@ -706,10 +714,12 @@ namespace PETScWrappers
           sum3 += std::pow(numbers::NumberTraits<value_type>::abs(*ptr++), p);
         }
       // add up remaining elements
-      while (ptr != start_ptr + size())
+      while (ptr != start_ptr + locally_owned_size())
         sum0 += std::pow(numbers::NumberTraits<value_type>::abs(*ptr++), p);
 
-      norm = std::pow(sum0 + sum1 + sum2 + sum3, 1. / p);
+      norm = std::pow(Utilities::MPI::sum(sum0 + sum1 + sum2 + sum3,
+                                          get_mpi_communicator()),
+                      1. / p);
     }
 
     // restore the representation of the
@@ -950,11 +960,13 @@ namespace PETScWrappers
 
     // Set options
     PetscErrorCode ierr =
-      PetscViewerSetFormat(PETSC_VIEWER_STDOUT_(comm), format);
+      PetscViewerPushFormat(PETSC_VIEWER_STDOUT_(comm), format);
     AssertThrow(ierr == 0, ExcPETScError(ierr));
 
     // Write to screen
     ierr = VecView(vector, PETSC_VIEWER_STDOUT_(comm));
+    AssertThrow(ierr == 0, ExcPETScError(ierr));
+    ierr = PetscViewerPopFormat(PETSC_VIEWER_STDOUT_(comm));
     AssertThrow(ierr == 0, ExcPETScError(ierr));
   }
 

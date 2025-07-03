@@ -1,17 +1,16 @@
-## ---------------------------------------------------------------------
+## ------------------------------------------------------------------------
 ##
-## Copyright (C) 2012 - 2023 by the deal.II authors
+## SPDX-License-Identifier: LGPL-2.1-or-later
+## Copyright (C) 2012 - 2024 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
-## The deal.II library is free software; you can use it, redistribute
-## it, and/or modify it under the terms of the GNU Lesser General
-## Public License as published by the Free Software Foundation; either
-## version 2.1 of the License, or (at your option) any later version.
-## The full text of the license can be found in the file LICENSE.md at
-## the top level directory of deal.II.
+## Part of the source code is dual licensed under Apache-2.0 WITH
+## LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+## governing the source code and code contributions can be found in
+## LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 ##
-## ---------------------------------------------------------------------
+## ------------------------------------------------------------------------
 
 #
 # General setup for GCC and compilers sufficiently close to GCC
@@ -96,7 +95,7 @@ enable_if_supported(DEAL_II_WARNING_FLAGS "-Wno-literal-suffix")
 #
 enable_if_supported(DEAL_II_WARNING_FLAGS "-Wno-psabi")
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
   # Enable warnings for conversion from real types to integer types.
   # The warning is too noisy in gcc and therefore only enabled for clang.
   enable_if_supported(DEAL_II_WARNING_FLAGS "-Wfloat-conversion")
@@ -135,7 +134,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   endif()
 
   #
-  # Clang-14.0.5 complaines loudly about not being able to vectorize some
+  # Clang-14.0.5 complains loudly about not being able to vectorize some
   # of our loops that we have annotated with DEAL_II_OPENMP_SIMD:
   #
   #     warning: loop not vectorized: the optimizer was unable to perform

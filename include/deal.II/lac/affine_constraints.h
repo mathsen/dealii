@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 1998 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_affine_constraints_h
 #define dealii_affine_constraints_h
@@ -436,7 +435,7 @@ namespace internal
  * constraints on degrees of freedom. The concept and origin of such
  * constraints is extensively described in the
  * @ref constraints
- * module. The class is meant to deal with a limited number of constraints
+ * topic. The class is meant to deal with a limited number of constraints
  * relative to the total number of degrees of freedom, for example a few per
  * cent up to maybe 30 per cent; and with a linear combination of <i>M</i>
  * other degrees of freedom where <i>M</i> is also relatively small (no larger
@@ -449,7 +448,7 @@ namespace internal
  * There is also a significant amount of documentation on how to use this
  * class in the
  * @ref constraints
- * module.
+ * topic.
  *
  *
  * <h3>Description of constraints</h3>
@@ -581,7 +580,7 @@ public:
    *   both of its arguments equal to the index set provided here. This
    *   is not wrong, but inefficient. Use the following constructor instead.
    */
-  DEAL_II_DEPRECATED_EARLY_WITH_COMMENT(
+  DEAL_II_DEPRECATED_WITH_COMMENT(
     "Use the constructor with two index set arguments.")
   explicit AffineConstraints(const IndexSet &locally_stored_constraints);
 
@@ -678,7 +677,7 @@ public:
    *
    * @deprecated Use the reinit() function with two index set arguments instead.
    */
-  DEAL_II_DEPRECATED_EARLY_WITH_COMMENT(
+  DEAL_II_DEPRECATED_WITH_COMMENT(
     "Use the reinit() function with two index set arguments.")
   void
   reinit(const IndexSet &locally_stored_constraints);
@@ -754,7 +753,7 @@ public:
    *   that should probably be considered a bug. Use get_view() and merge()
    *   instead.
    */
-  DEAL_II_DEPRECATED_EARLY_WITH_COMMENT("Use get_view() and merge() instead.")
+  DEAL_II_DEPRECATED_WITH_COMMENT("Use get_view() and merge() instead.")
   void
   add_selected_constraints(const AffineConstraints &constraints_in,
                            const IndexSet          &filter);
@@ -849,9 +848,9 @@ public:
    * This function essentially exists to allow adding several constraints of
    * the form <i>x<sub>i</sub></i>=0 all at once, where the set of indices
    * <i>i</i> for which these constraints should be added are given by the
-   * argument of this function. On the other hand, just as if the single-
-   * argument add_line() function were called repeatedly, the constraints can
-   * later be modified to include linear dependencies using the add_entry()
+   * argument of this function. On the other hand, just as if the
+   * single-argument add_line() function were called repeatedly, the constraints
+   * can later be modified to include linear dependencies using the add_entry()
    * function as well as inhomogeneities using set_inhomogeneity().
    */
   void
@@ -864,9 +863,9 @@ public:
    * This function essentially exists to allow adding several constraints of
    * the form <i>x<sub>i</sub></i>=0 all at once, where the set of indices
    * <i>i</i> for which these constraints should be added are given by the
-   * argument of this function. On the other hand, just as if the single-
-   * argument add_line() function were called repeatedly, the constraints can
-   * later be modified to include linear dependencies using the add_entry()
+   * argument of this function. On the other hand, just as if the
+   * single-argument add_line() function were called repeatedly, the constraints
+   * can later be modified to include linear dependencies using the add_entry()
    * function as well as inhomogeneities using set_inhomogeneity().
    */
   void
@@ -879,9 +878,9 @@ public:
    * This function essentially exists to allow adding several constraints of
    * the form <i>x<sub>i</sub></i>=0 all at once, where the set of indices
    * <i>i</i> for which these constraints should be added are given by the
-   * argument of this function. On the other hand, just as if the single-
-   * argument add_line() function were called repeatedly, the constraints can
-   * later be modified to include linear dependencies using the add_entry()
+   * argument of this function. On the other hand, just as if the
+   * single-argument add_line() function were called repeatedly, the constraints
+   * can later be modified to include linear dependencies using the add_entry()
    * function as well as inhomogeneities using set_inhomogeneity().
    */
   void
@@ -1158,8 +1157,8 @@ public:
   max_constraint_indirections() const;
 
   /**
-   * Return <tt>true</tt> in case the dof is constrained and there is a non-
-   * trivial inhomogeneous values set to the dof.
+   * Return <tt>true</tt> in case the dof is constrained and there is a
+   * non-trivial inhomogeneous values set to the dof.
    */
   bool
   is_inhomogeneously_constrained(const size_type index) const;
@@ -1682,7 +1681,7 @@ public:
    * This function can correctly handle inhomogeneous constraints as well. For
    * the parameter use_inhomogeneities_for_rhs see the documentation in
    * @ref constraints
-   * module.
+   * topic.
    *
    * @note This function in itself is thread-safe, i.e., it works properly
    * also when several threads call it simultaneously. However, the function
@@ -1927,7 +1926,7 @@ public:
      * Swap function.
      */
     friend void
-    swap(ConstraintLine &l1, ConstraintLine &l2)
+    swap(ConstraintLine &l1, ConstraintLine &l2) noexcept
     {
       std::swap(l1.index, l2.index);
       std::swap(l1.entries, l2.entries);
@@ -1962,18 +1961,18 @@ public:
    *
    * This method checks if all processors agree on the constraints for their
    * local lines as given by @p locally_active_dofs. This method is a collective
-   * operation and will return @p true only if all processors are consistent.
+   * operation and will return `true` only if all processors are consistent.
    *
    * Please supply the owned DoFs per processor as returned by
-   * Utilities::MPI::all_gather(MPI_Comm, DoFHandler::locally_owned_dofs()) as
+   * `Utilities::MPI::all_gather(MPI_Comm, DoFHandler::locally_owned_dofs())` as
    * @p locally_owned_dofs and the result of
    * DoFTools::extract_locally_active_dofs() as
    * @p locally_active_dofs. The former is used to determine ownership of the
    * specific DoF, while the latter is used as the set of rows that need to be
    * checked.
    *
-   * If @p verbose is set to @p true, additional debug information is written
-   * to std::cout.
+   * If @p verbose is set to `true`, additional debug information is written
+   * to `std::cout`.
    *
    * @note This method exchanges all constraint information of locally active
    * lines and is as such slow for large computations and should probably
@@ -1991,13 +1990,38 @@ public:
                             const bool                   verbose = false) const;
 
   /**
-   * Make the current object consistent on all processors
-   * in a distributed computation. One should call this function before
-   * calling close().
+   * Make the constraints that are locally stored on the current object
+   * consistent on all MPI processes in a distributed computation.
+   *
+   * The IndexSet @p locally_owned_dofs conforms to all DoFs that are locally
+   * owned on the current process, i.e., DoFHandler::locally_owned_dofs().
+   *
+   * The IndexSet @p constraints_to_make_consistent shall contain all DoF
+   * indices for which we want to store the complete constraints for. Which DoFs
+   * these might be depends on your actual use case: For most applications in
+   * which you are using continuous Galerkin methods, you would want to use
+   * locally active DoFs here, obtained via
+   * DoFTools::extract_locally_active_dofs(). However in discontinuous Galerkin
+   * methods, you might need consistent information on all locally relevant
+   * DoFs due to the need to compute face integrals against ghosted cells,
+   * for which you need DoFTools::extract_locally_relevant_dofs().
+   *
+   * This function updates the locally stored constraints (or local_lines) of
+   * this object, whenever a DoF is constrained against another that we have not
+   * known of before. After calling this function, it might be necessary to use
+   * the IndexSet retrieved by get_local_lines() when initializing data
+   * structures built on top of the AffineConstraints object, for example:
+   * @code
+   * DynamicSparsityPattern dsp(constraints.get_local_lines());
+   * LinearAlgebra::distributed::Vector<double> solution(
+   *   locally_owned_dofs, constraints.get_local_lines(), mpi_communicator);
+   * @endcode
+   *
+   * @note One should call this function before calling close().
    */
   void
   make_consistent_in_parallel(const IndexSet &locally_owned_dofs,
-                              const IndexSet &locally_relevant_dofs,
+                              const IndexSet &constraints_to_make_consistent,
                               const MPI_Comm  mpi_communicator);
 
   /**
@@ -2029,7 +2053,7 @@ public:
    *
    * @ingroup Exceptions
    */
-  DeclException1(ExcLineInexistant,
+  DeclException1(ExcLineInexistent,
                  size_type,
                  << "The specified line " << arg1 << " does not exist.");
   /**
@@ -2629,6 +2653,7 @@ AffineConstraints<number>::distribute_local_to_global(
   const std::vector<size_type> &local_dof_indices,
   OutVector                    &global_vector) const
 {
+  Assert(global_vector.has_ghost_elements() == false, ExcGhostsPresent());
   Assert(local_vector.size() == local_dof_indices.size(),
          ExcDimensionMismatch(local_vector.size(), local_dof_indices.size()));
   distribute_local_to_global(local_vector.begin(),
@@ -2756,7 +2781,7 @@ AffineConstraints<number>::copy_from(
   lines.clear();
   lines.reserve(other.lines.size());
 
-  for (const auto l : other.lines)
+  for (const auto &l : other.lines)
     lines.emplace_back(l.index,
                        typename ConstraintLine::Entries(l.entries.begin(),
                                                         l.entries.end()),
@@ -2905,7 +2930,7 @@ AffineConstraints<number>::merge(
                   break;
 
                 default:
-                  Assert(false, ExcNotImplemented());
+                  DEAL_II_NOT_IMPLEMENTED();
               }
           }
       }

@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2002 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_table_h
 #define dealii_table_h
@@ -104,8 +103,8 @@ namespace internal
 
     /**
      * @internal Have a class which declares some nested alias, depending
-     * on its template parameters. Specialization for accessors to non-
-     * constant objects.
+     * on its template parameters. Specialization for accessors to
+     * non-constant objects.
      */
     template <int N, typename T>
     struct Types<N, T, false>
@@ -741,7 +740,7 @@ public:
    * functions.
    */
   void
-  swap(TableBase<N, T> &v);
+  swap(TableBase<N, T> &v) noexcept;
 
   /**
    * Determine an estimate for the memory consumption (in bytes) of this
@@ -987,8 +986,8 @@ namespace MatrixTableIterators
     /**
      * Type of the stored pointer to the table.
      */
-    using container_pointer_type = typename std::
-      conditional<Constness, const TableType *, TableType *>::type;
+    using container_pointer_type =
+      std::conditional_t<Constness, const TableType *, TableType *>;
 
     /**
      * Value type of the underlying container.
@@ -1199,8 +1198,8 @@ namespace MatrixTableIterators
     /**
      * Type of the stored pointer to the table.
      */
-    using container_pointer_type = typename std::
-      conditional<Constness, const TableType *, TableType *>::type;
+    using container_pointer_type =
+      std::conditional_t<Constness, const TableType *, TableType *>;
 
     /**
      * Constructor from an accessor.
@@ -1563,8 +1562,8 @@ public:
   using TableBase<3, T>::reinit;
 
   /**
-   * Access operator. Generate an object that accesses the requested two-
-   * dimensional subobject of this three-dimensional table. Range checks are
+   * Access operator. Generate an object that accesses the requested
+   * two-dimensional subobject of this three-dimensional table. Range checks are
    * performed.
    *
    * This version of the function only allows read access.
@@ -1573,9 +1572,9 @@ public:
   operator[](const size_type i) const;
 
   /**
-   * Access operator. Generate an object that accesses the requested two-
-   * dimensional subobject of this three-dimensional table. Range checks are
-   * performed.
+   * Access operator. Generate an object that accesses the requested
+   * two-dimensional subobject of this three-dimensional table. Range
+   * checks are performed.
    *
    * This version of the function allows read-write access.
    */
@@ -1641,9 +1640,9 @@ public:
         const size_type size4);
 
   /**
-   * Access operator. Generate an object that accesses the requested three-
-   * dimensional subobject of this four-dimensional table. Range checks are
-   * performed.
+   * Access operator. Generate an object that accesses the requested
+   * three-dimensional subobject of this four-dimensional table. Range checks
+   * are performed.
    *
    * This version of the function only allows read access.
    */
@@ -1651,9 +1650,9 @@ public:
   operator[](const size_type i) const;
 
   /**
-   * Access operator. Generate an object that accesses the requested three-
-   * dimensional subobject of this four-dimensional table. Range checks are
-   * performed.
+   * Access operator. Generate an object that accesses the requested
+   * three-dimensional subobject of this four-dimensional table. Range checks
+   * are performed.
    *
    * This version of the function allows read-write access.
    */
@@ -1727,8 +1726,8 @@ public:
         const size_type size5);
 
   /**
-   * Access operator. Generate an object that accesses the requested four-
-   * dimensional subobject of this five-dimensional table. Range checks are
+   * Access operator. Generate an object that accesses the requested
+   * four-dimensional subobject of this five-dimensional table. Range checks are
    * performed.
    *
    * This version of the function only allows read access.
@@ -1737,8 +1736,8 @@ public:
   operator[](const size_type i) const;
 
   /**
-   * Access operator. Generate an object that accesses the requested four-
-   * dimensional subobject of this five-dimensional table. Range checks are
+   * Access operator. Generate an object that accesses the requested
+   * four-dimensional subobject of this five-dimensional table. Range checks are
    * performed.
    *
    * This version of the function allows read-write access.
@@ -1814,8 +1813,8 @@ public:
         const size_type size6);
 
   /**
-   * Access operator. Generate an object that accesses the requested five-
-   * dimensional subobject of this six-dimensional table. Range checks are
+   * Access operator. Generate an object that accesses the requested
+   * five-dimensional subobject of this six-dimensional table. Range checks are
    * performed.
    *
    * This version of the function only allows read access.
@@ -1824,8 +1823,8 @@ public:
   operator[](const size_type i) const;
 
   /**
-   * Access operator. Generate an object that accesses the requested five-
-   * dimensional subobject of this six-dimensional table. Range checks are
+   * Access operator. Generate an object that accesses the requested
+   * five-dimensional subobject of this six-dimensional table. Range checks are
    * performed.
    *
    * This version of the function allows read-write access.
@@ -1903,8 +1902,8 @@ public:
         const size_type size7);
 
   /**
-   * Access operator. Generate an object that accesses the requested six-
-   * dimensional subobject of this seven-dimensional table. Range checks are
+   * Access operator. Generate an object that accesses the requested
+   * six-dimensional subobject of this seven-dimensional table. Range checks are
    * performed.
    *
    * This version of the function only allows read access.
@@ -1913,8 +1912,8 @@ public:
   operator[](const size_type i) const;
 
   /**
-   * Access operator. Generate an object that accesses the requested six-
-   * dimensional subobject of this seven-dimensional table. Range checks are
+   * Access operator. Generate an object that accesses the requested
+   * six-dimensional subobject of this seven-dimensional table. Range checks are
    * performed.
    *
    * This version of the function allows read-write access.
@@ -2533,7 +2532,7 @@ namespace internal
     void
     fill_Fortran_style(InputIterator, TableBase<N, T> &)
     {
-      Assert(false, ExcNotImplemented());
+      DEAL_II_NOT_IMPLEMENTED();
     }
   } // namespace TableImplementation
 } // namespace internal
@@ -2559,7 +2558,7 @@ TableBase<N, T>::fill(InputIterator entries, const bool C_style_indexing)
 
 template <int N, typename T>
 inline void
-TableBase<N, T>::swap(TableBase<N, T> &v)
+TableBase<N, T>::swap(TableBase<N, T> &v) noexcept
 {
   values.swap(v.values);
   std::swap(table_size, v.table_size);
@@ -2873,7 +2872,7 @@ namespace MatrixTableIterators
           case Storage::column_major:
             return linear_index % container->n_rows();
           default:
-            Assert(false, ExcInternalError());
+            DEAL_II_ASSERT_UNREACHABLE();
         }
       return {};
     }
@@ -2892,7 +2891,7 @@ namespace MatrixTableIterators
           case Storage::column_major:
             return linear_index / container->n_rows();
           default:
-            Assert(false, ExcInternalError());
+            DEAL_II_ASSERT_UNREACHABLE();
         }
       return {};
     }
@@ -3713,7 +3712,7 @@ Table<7, T>::operator()(const size_type i,
  */
 template <int N, typename T>
 inline void
-swap(TableBase<N, T> &u, TableBase<N, T> &v)
+swap(TableBase<N, T> &u, TableBase<N, T> &v) noexcept
 {
   u.swap(v);
 }

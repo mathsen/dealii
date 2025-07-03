@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2018 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #include <deal.II/base/geometry_info.h>
 #include <deal.II/base/point.h>
@@ -271,23 +270,26 @@ namespace GridTools
               // (possibly) coarser neighbor. if this is the case,
               // then we need to also add this neighbor
               if (dim >= 2)
-                for (const auto face :
-                     cell->reference_cell().faces_for_given_vertex(v))
-                  if (!cell->at_boundary(face) &&
-                      cell->neighbor(face)->is_active())
-                    {
-                      // there is a (possibly) coarser cell behind a
-                      // face to which the vertex belongs. the
-                      // vertex we are looking at is then either a
-                      // vertex of that coarser neighbor, or it is a
-                      // hanging node on one of the faces of that
-                      // cell. in either case, it is adjacent to the
-                      // vertex, so add it to the list as well (if
-                      // the cell was already in the list then the
-                      // std::set makes sure that we get it only
-                      // once)
-                      adjacent_cells.insert(cell->neighbor(face));
-                    }
+                {
+                  const auto reference_cell = cell->reference_cell();
+                  for (const auto face :
+                       reference_cell.faces_for_given_vertex(v))
+                    if (!cell->at_boundary(face) &&
+                        cell->neighbor(face)->is_active())
+                      {
+                        // there is a (possibly) coarser cell behind a
+                        // face to which the vertex belongs. the
+                        // vertex we are looking at is then either a
+                        // vertex of that coarser neighbor, or it is a
+                        // hanging node on one of the faces of that
+                        // cell. in either case, it is adjacent to the
+                        // vertex, so add it to the list as well (if
+                        // the cell was already in the list then the
+                        // std::set makes sure that we get it only
+                        // once)
+                        adjacent_cells.insert(cell->neighbor(face));
+                      }
+                }
 
               // in any case, we have found a cell, so go to the next cell
               goto next_cell;
@@ -711,7 +713,7 @@ namespace GridTools
                     vertex_indices[count_vertex_indices].first = d;
                     vertex_indices[count_vertex_indices].second =
                       unit_point[d] > 0.5 ? 1 : 0;
-                    count_vertex_indices++;
+                    ++count_vertex_indices;
                   }
                 else
                   free_direction = d;
@@ -824,13 +826,24 @@ namespace GridTools
     std::vector<bool> locally_active_vertices_on_subdomain(
       mesh.get_triangulation().n_vertices(), false);
 
+    std::map<unsigned int, std::vector<unsigned int>> coinciding_vertex_groups;
+    std::map<unsigned int, unsigned int> vertex_to_coinciding_vertex_group;
+    GridTools::collect_coinciding_vertices(mesh.get_triangulation(),
+                                           coinciding_vertex_groups,
+                                           vertex_to_coinciding_vertex_group);
+
     // Find the cells for which the predicate is true
     // These are the cells around which we wish to construct
     // the halo layer
     for (const auto &cell : mesh.active_cell_iterators())
       if (predicate(cell)) // True predicate --> Part of subdomain
         for (const auto v : cell->vertex_indices())
-          locally_active_vertices_on_subdomain[cell->vertex_index(v)] = true;
+          {
+            locally_active_vertices_on_subdomain[cell->vertex_index(v)] = true;
+            for (const auto vv : coinciding_vertex_groups
+                   [vertex_to_coinciding_vertex_group[cell->vertex_index(v)]])
+              locally_active_vertices_on_subdomain[vv] = true;
+          }
 
     // Find the cells that do not conform to the predicate
     // but share a vertex with the selected subdomain
@@ -985,7 +998,7 @@ namespace GridTools
         {
           for (const unsigned int v : cell->vertex_indices())
             vertices_outside_subdomain[cell->vertex_index(v)] = true;
-          n_non_predicate_cells++;
+          ++n_non_predicate_cells;
         }
 
     // If all the active cells conform to the predicate
@@ -2153,7 +2166,7 @@ namespace GridTools
             const CellIterator cell2     = it2->first;
             const unsigned int face_idx1 = it1->second;
             const unsigned int face_idx2 = it2->second;
-            if (const std::optional<std::bitset<3>> orientation =
+            if (const std::optional<unsigned char> orientation =
                   GridTools::orthogonal_equality(cell1->face(face_idx1),
                                                  cell2->face(face_idx2),
                                                  direction,
@@ -2387,7 +2400,7 @@ namespace GridTools
     if (matrix.m() == spacedim)
       for (unsigned int i = 0; i < spacedim; ++i)
         for (unsigned int j = 0; j < spacedim; ++j)
-          distance(i) += matrix(i, j) * point1(j);
+          distance[i] += matrix(i, j) * point1[j];
     else
       distance = point1;
 
@@ -2399,7 +2412,7 @@ namespace GridTools
         if (i == direction)
           continue;
 
-        if (std::abs(distance(i)) > 1.e-10)
+        if (std::abs(distance[i]) > 1.e-10)
           return false;
       }
 
@@ -2409,7 +2422,7 @@ namespace GridTools
 
 
   template <typename FaceIterator>
-  std::optional<std::bitset<3>>
+  std::optional<unsigned char>
   orthogonal_equality(
     const FaceIterator                                           &face1,
     const FaceIterator                                           &face2,
@@ -2426,6 +2439,9 @@ namespace GridTools
 
     std::array<unsigned int, GeometryInfo<dim>::vertices_per_face>
       face1_vertices, face2_vertices;
+
+    face1_vertices.fill(numbers::invalid_unsigned_int);
+    face2_vertices.fill(numbers::invalid_unsigned_int);
 
     AssertDimension(face1->n_vertices(), face2->n_vertices());
 
@@ -2453,60 +2469,28 @@ namespace GridTools
           }
       }
 
-    // And finally, a lookup to determine the ordering bitmask:
     if (face2_vertices_set.empty())
       {
-        const auto combined_orientation =
-          face1->reference_cell().get_combined_orientation(
-            make_array_view(face1_vertices.cbegin(),
-                            face1_vertices.cbegin() + face1->n_vertices()),
-            make_array_view(face2_vertices.cbegin(),
-                            face2_vertices.cbegin() + face2->n_vertices()));
-        std::bitset<3> orientation;
-        if (dim == 1)
-          {
-            // In 1D things are always well-oriented
-            orientation = ReferenceCell::default_combined_face_orientation();
-          }
-        // The original version of this doesn't use the standardized orientation
-        // value so we have to do an additional translation step
-        else if (dim == 2)
-          {
-            // In 2D, calls in set_periodicity_constraints() ultimately require
-            // calling FiniteElement::face_to_cell_index(), which in turn (for
-            // hypercubes) calls GeometryInfo<2>::child_cell_on_face(). The
-            // final function assumes that orientation in 2D is encoded solely
-            // in face_flip (the second bit) whereas the orientation bit is
-            // ignored. Hence, the backwards orientation is 1 + 2 and the
-            // standard orientation is 1 + 0.
-            constexpr std::array<unsigned int, 2> translation{{3, 1}};
-            AssertIndexRange(combined_orientation, translation.size());
-            orientation =
-              translation[std::min<unsigned int>(combined_orientation, 1u)];
-          }
-        else
-          {
-            Assert(dim == 3, ExcInternalError());
-            // There are two differences between the orientation implementation
-            // used in the periodicity code and that used in ReferenceCell:
-            //
-            // 1. The bitset is unpacked as (orientation, flip, rotation)
-            //    instead of the standard (orientation, rotation, flip).
-            //
-            // 2. The 90 degree rotations are always clockwise, so the third and
-            //    seventh (in the combined orientation) are switched.
-            //
-            // Both translations are encoded in this table. This matches
-            // OrientationLookupTable<3> which was present in previous revisions
-            // of this file.
-            constexpr std::array<unsigned int, 8> translation{
-              {0, 1, 4, 7, 2, 3, 6, 5}};
-            AssertIndexRange(combined_orientation, translation.size());
-            orientation =
-              translation[std::min<unsigned int>(combined_orientation, 7u)];
-          }
+        // Just to be sure, did we fill both arrays with sensible data?
+        Assert(face1_vertices.end() ==
+                 std::find(face1_vertices.begin(),
+                           face1_vertices.begin() + face1->n_vertices(),
+                           numbers::invalid_unsigned_int),
+               ExcInternalError());
+        Assert(face2_vertices.end() ==
+                 std::find(face2_vertices.begin(),
+                           face2_vertices.begin() + face1->n_vertices(),
+                           numbers::invalid_unsigned_int),
+               ExcInternalError());
 
-        return std::make_optional(orientation);
+        const auto reference_cell = face1->reference_cell();
+        // We want the relative orientation of face1 with respect to face2 so
+        // the order is flipped here:
+        return std::make_optional(reference_cell.get_combined_orientation(
+          make_array_view(face2_vertices.cbegin(),
+                          face2_vertices.cbegin() + face2->n_vertices()),
+          make_array_view(face1_vertices.cbegin(),
+                          face1_vertices.cbegin() + face1->n_vertices())));
       }
     else
       return std::nullopt;

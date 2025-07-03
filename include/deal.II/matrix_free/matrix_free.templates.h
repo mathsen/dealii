@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2012 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_matrix_free_templates_h
 #define dealii_matrix_free_templates_h
@@ -1044,6 +1043,7 @@ namespace internal
                                         > &map,
     DynamicSparsityPattern                &connectivity_direct)
   {
+    const unsigned int locally_owned_size = connectivity_direct.n_rows();
     std::vector<types::global_dof_index> new_indices;
     for (unsigned int cell = begin; cell < end; ++cell)
       {
@@ -1064,7 +1064,8 @@ namespace internal
                 if (it != map.end())
                   {
                     const unsigned int neighbor_cell = it->second;
-                    if (neighbor_cell != cell)
+                    if (neighbor_cell != cell &&
+                        neighbor_cell < locally_owned_size)
                       new_indices.push_back(neighbor_cell);
                   }
               }
@@ -1881,6 +1882,24 @@ MatrixFree<dim, Number, VectorizedArrayType>::initialize_indices(
             b);
   }
 
+  bool overlap_communication_computation =
+    additional_data.overlap_communication_computation;
+
+  if (overlap_communication_computation)
+    {
+      for (unsigned int no = 0; no < dof_handlers.size(); ++no)
+        for (unsigned int fe_no = 0;
+             fe_no < dof_handlers[no]->get_fe_collection().size();
+             ++fe_no)
+          if ((additional_data.mapping_update_flags_inner_faces !=
+               update_default) &&
+              (dof_handlers[no]->get_fe(fe_no).n_dofs_per_cell() == 0))
+            // disable overlapping of communication and computation if
+            // FE_Nothing is used and face integrals are performed
+            // see #14342 and #14553.
+            overlap_communication_computation = false;
+    }
+
   const unsigned int n_lanes     = VectorizedArrayType::size();
   task_info.vectorization_length = n_lanes;
   internal::MatrixFreeFunctions::ConstraintValues<double> constraint_values;
@@ -1896,7 +1915,7 @@ MatrixFree<dim, Number, VectorizedArrayType>::initialize_indices(
     additional_data.cell_vectorization_categories_strict,
     do_face_integrals,
     additional_data.mapping_update_flags_inner_faces != update_default,
-    additional_data.overlap_communication_computation,
+    overlap_communication_computation,
     task_info,
     cell_level_index,
     dof_info,

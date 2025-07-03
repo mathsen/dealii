@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2019 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2019 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_base_mpi_compute_index_owner_internal_h
 #define dealii_base_mpi_compute_index_owner_internal_h
@@ -258,9 +257,10 @@ namespace Utilities
           const unsigned int n_procs;
 
           /**
-           * Controls whether the origin of ghost owner should also be
-           * stored. If true, it will be added into `requesters` and can be
-           * queried by `get_requesters()`.
+           * Controls whether we should record a list of ranks who sent
+           * requests to the present MPI process when looking up their remote
+           * indices, and what those indices were. If true, it will be added
+           * into `requesters` and can be queried by `get_requesters()`.
            */
           const bool track_index_requests;
 
@@ -282,7 +282,8 @@ namespace Utilities
            */
           std::vector<std::vector<
             std::pair<unsigned int,
-                      std::vector<std::pair<unsigned int, unsigned int>>>>>
+                      std::vector<std::pair<types::global_dof_index,
+                                            types::global_dof_index>>>>>
             requesters;
 
           /**
@@ -366,10 +367,11 @@ namespace Utilities
            * therefore only need to append at the end.
            */
           void
-          append_index_origin(const unsigned int index_within_dictionary,
-                              const unsigned int rank_of_request,
-                              const unsigned int rank_of_owner,
-                              unsigned int      &owner_index_guess);
+          append_index_origin(
+            const types::global_dof_index index_within_dictionary,
+            const unsigned int            rank_of_request,
+            const unsigned int            rank_of_owner,
+            unsigned int                 &owner_index_guess);
         };
 
         /* ------------------------- inline functions ----------------------- */

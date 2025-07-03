@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 1999 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/template_constraints.h>
@@ -724,12 +723,26 @@ namespace DoFRenumbering
         renumbering, start, end, component_order_arg, true);
     (void)result;
 
-    Assert(result == 0 || result == dof_handler.n_dofs(level),
+    // If we don't have a renumbering (i.e., when there is 1 component) then
+    // return
+    if (Utilities::MPI::max(renumbering.size(),
+                            dof_handler.get_communicator()) == 0)
+      return;
+
+    // verify that the last numbered
+    // degree of freedom is either
+    // equal to the number of degrees
+    // of freedom in total (the
+    // sequential case) or in the
+    // distributed case at least
+    // makes sense
+    Assert((result == dof_handler.locally_owned_mg_dofs(level).n_elements()) ||
+             ((dof_handler.locally_owned_mg_dofs(level).n_elements() <
+               dof_handler.n_dofs(level)) &&
+              (result <= dof_handler.n_dofs(level))),
            ExcInternalError());
 
-    if (Utilities::MPI::max(renumbering.size(),
-                            dof_handler.get_communicator()) > 0)
-      dof_handler.renumber_dofs(level, renumbering);
+    dof_handler.renumber_dofs(level, renumbering);
   }
 
 
@@ -940,7 +953,7 @@ namespace DoFRenumbering
           }
 #else
         (void)tria;
-        Assert(false, ExcInternalError());
+        DEAL_II_ASSERT_UNREACHABLE();
 #endif
       }
     else
@@ -1201,7 +1214,7 @@ namespace DoFRenumbering
           }
 #else
         (void)tria;
-        Assert(false, ExcInternalError());
+        DEAL_II_ASSERT_UNREACHABLE();
 #endif
       }
     else
@@ -1406,7 +1419,7 @@ namespace DoFRenumbering
                                                   renumbering);
           }
 #else
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 #endif
       }
     else
@@ -1888,7 +1901,7 @@ namespace DoFRenumbering
         std::vector<std::pair<Point<spacedim>, unsigned int>>
           support_point_list(n_dofs);
 
-        Quadrature<dim>         q_dummy(dof.get_fe().get_unit_support_points());
+        const Quadrature<dim>   q_dummy(dof.get_fe().get_unit_support_points());
         FEValues<dim, spacedim> fe_values(dof.get_fe(),
                                           q_dummy,
                                           update_quadrature_points);

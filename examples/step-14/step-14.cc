@@ -1,17 +1,16 @@
-/* ---------------------------------------------------------------------
+/* ------------------------------------------------------------------------
  *
- * Copyright (C) 2002 - 2021 by the deal.II authors
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * Copyright (C) 2002 - 2024 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
- * The deal.II library is free software; you can use it, redistribute
- * it, and/or modify it under the terms of the GNU Lesser General
- * Public License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * The full text of the license can be found in the file LICENSE.md at
- * the top level directory of deal.II.
+ * Part of the source code is dual licensed under Apache-2.0 WITH
+ * LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+ * governing the source code and code contributions can be found in
+ * LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
  *
- * ---------------------------------------------------------------------
+ * ------------------------------------------------------------------------
  *
  * Author: Wolfgang Bangerth, ETH Zurich, 2002
  */
@@ -20,7 +19,6 @@
 // Start out with well known things...
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/thread_management.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/lac/vector.h>
@@ -203,7 +201,7 @@ namespace Step14
 
       // ...then have some objects of which the meaning will become clear
       // below...
-      QTrapezoid<dim>             vertex_quadrature;
+      const QTrapezoid<dim>       vertex_quadrature;
       FEValues<dim>               fe_values(dof_handler.get_fe(),
                               vertex_quadrature,
                               update_gradients | update_quadrature_points);
@@ -1529,7 +1527,7 @@ namespace Step14
       // Initialize a <code>FEValues</code> object with a quadrature formula,
       // have abbreviations for the number of quadrature points and shape
       // functions...
-      QGauss<dim>        quadrature(dof_handler.get_fe().degree + 1);
+      const QGauss<dim>  quadrature(dof_handler.get_fe().degree + 1);
       FEValues<dim>      fe_values(dof_handler.get_fe(),
                               quadrature,
                               update_gradients | update_quadrature_points |

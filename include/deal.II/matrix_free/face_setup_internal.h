@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2018 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2018 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 #ifndef dealii_face_setup_internal_h
@@ -1005,21 +1004,16 @@ namespace internal
       // special treatment of periodic boundaries
       if (dim == 3 && cell->has_periodic_neighbor(face_no))
         {
-          const unsigned int exterior_face_orientation =
-            !cell->get_triangulation()
-               .get_periodic_face_map()
-               .at({cell, face_no})
-               .second[0] +
-            2 * cell->get_triangulation()
-                  .get_periodic_face_map()
-                  .at({cell, face_no})
-                  .second[1] +
-            4 * cell->get_triangulation()
-                  .get_periodic_face_map()
-                  .at({cell, face_no})
-                  .second[2];
+          unsigned char exterior_face_orientation = cell->get_triangulation()
+                                                      .get_periodic_face_map()
+                                                      .at({cell, face_no})
+                                                      .second;
+          const auto [orientation, rotation, flip] =
+            ::dealii::internal::split_face_orientation(
+              exterior_face_orientation);
 
-          info.face_orientation = exterior_face_orientation;
+          info.face_orientation =
+            (orientation ? 0u : 1u) + 2 * flip + 4 * rotation;
 
           return info;
         }

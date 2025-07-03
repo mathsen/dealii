@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2020 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2020 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 // Test that we execute the loop in the same order on the CPU and the GPU
 
@@ -24,7 +23,7 @@
 #include <deal.II/lac/cuda_vector.h>
 #include <deal.II/lac/la_parallel_vector.h>
 
-#include <deal.II/matrix_free/cuda_matrix_free.templates.h>
+#include <deal.II/matrix_free/portable_matrix_free.templates.h>
 
 #include "../tests.h"
 
@@ -38,12 +37,11 @@ public:
   DummyOperator() = default;
 
   DEAL_II_HOST_DEVICE void
-  operator()(
-    const unsigned int                                          cell,
-    const typename CUDAWrappers::MatrixFree<dim, double>::Data *gpu_data,
-    CUDAWrappers::SharedData<dim, double>                      *shared_data,
-    const double                                               *src,
-    double                                                     *dst) const;
+  operator()(const unsigned int                                      cell,
+             const typename Portable::MatrixFree<dim, double>::Data *gpu_data,
+             Portable::SharedData<dim, double> *shared_data,
+             const double                      *src,
+             double                            *dst) const;
 
   static const unsigned int n_dofs_1d = fe_degree + 1;
   static const unsigned int n_local_dofs =
@@ -57,9 +55,9 @@ public:
 template <int dim, int fe_degree>
 DEAL_II_HOST_DEVICE void
 DummyOperator<dim, fe_degree>::operator()(
-  const unsigned int                                          cell,
-  const typename CUDAWrappers::MatrixFree<dim, double>::Data *gpu_data,
-  CUDAWrappers::SharedData<dim, double>                      *shared_data,
+  const unsigned int                                      cell,
+  const typename Portable::MatrixFree<dim, double>::Data *gpu_data,
+  Portable::SharedData<dim, double>                      *shared_data,
   const double *,
   double *dst) const
 {
@@ -71,7 +69,7 @@ DummyOperator<dim, fe_degree>::operator()(
 
       auto point = gpu_data->get_quadrature_point(cell, q_point);
       dst[pos] =
-        dim == 2 ? point(0) + point(1) : point(0) + point(1) + point(2);
+        dim == 2 ? point[0] + point[1] : point[0] + point[1] + point[2];
     });
 }
 
@@ -81,20 +79,20 @@ template <int dim, int fe_degree>
 class DummyMatrixFree : public Subscriptor
 {
 public:
-  DummyMatrixFree(const CUDAWrappers::MatrixFree<dim, double> &data_in,
-                  const unsigned int                           size);
+  DummyMatrixFree(const Portable::MatrixFree<dim, double> &data_in,
+                  const unsigned int                       size);
   void
   eval(LinearAlgebra::distributed::Vector<double, MemorySpace::Default> &dst)
     const;
 
 private:
-  const CUDAWrappers::MatrixFree<dim, double> &data;
+  const Portable::MatrixFree<dim, double> &data;
 };
 
 template <int dim, int fe_degree>
 DummyMatrixFree<dim, fe_degree>::DummyMatrixFree(
-  const CUDAWrappers::MatrixFree<dim, double> &data_in,
-  const unsigned int                           size)
+  const Portable::MatrixFree<dim, double> &data_in,
+  const unsigned int                       size)
   : data(data_in)
 {}
 
@@ -124,10 +122,9 @@ test()
   constraints.close();
 
   // Computation on the device
-  MappingQ<dim>                         mapping(fe_degree);
-  CUDAWrappers::MatrixFree<dim, double> mf_data;
-  typename CUDAWrappers::MatrixFree<dim, double>::AdditionalData
-    additional_data;
+  MappingQ<dim>                                              mapping(fe_degree);
+  Portable::MatrixFree<dim, double>                          mf_data;
+  typename Portable::MatrixFree<dim, double>::AdditionalData additional_data;
   additional_data.mapping_update_flags = update_values | update_gradients |
                                          update_JxW_values |
                                          update_quadrature_points;
@@ -154,10 +151,10 @@ test()
   const unsigned int n_colors = graph.size();
   for (unsigned int color = 0; color < n_colors; ++color)
     {
-      typename CUDAWrappers::MatrixFree<dim, double>::Data gpu_data =
+      typename Portable::MatrixFree<dim, double>::Data gpu_data =
         mf_data.get_data(color);
       const unsigned int n_cells = gpu_data.n_cells;
-      auto gpu_data_host = CUDAWrappers::copy_mf_data_to_host<dim, double>(
+      auto gpu_data_host         = Portable::copy_mf_data_to_host<dim, double>(
         gpu_data, additional_data.mapping_update_flags);
       for (unsigned int cell_id = 0; cell_id < n_cells; ++cell_id)
         {
@@ -166,7 +163,7 @@ test()
               const unsigned int pos =
                 gpu_data_host.local_q_point_id(cell_id, n_q_points_per_cell, i);
               auto         p = gpu_data_host.get_quadrature_point(cell_id, i);
-              const double p_val = dim == 2 ? p(0) + p(1) : p(0) + p(1) + p(2);
+              const double p_val = dim == 2 ? p[0] + p[1] : p[0] + p[1] + p[2];
               AssertThrow(std::abs(coef[pos] - p_val) < 1e-12,
                           ExcInternalError());
             }

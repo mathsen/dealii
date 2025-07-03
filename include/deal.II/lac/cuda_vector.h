@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2016 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2016 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_cuda_vector_h
 #define dealii_cuda_vector_h
@@ -48,6 +47,24 @@ namespace LinearAlgebra
      * This class implements a vector using CUDA for use on Nvidia GPUs.
      *
      * @note Only float and double are supported.
+     *
+     * <h4>Moving data</h4>
+     * You can move data to/from the device as follows:
+     * @code
+     *   unsigned int size = 10;
+     *   LinearAlgebra::ReadWriteVector<double> rw_vector(size);
+     *
+     *   ...do something with the rw_vector...
+     *
+     *   // Move the data to the device:
+     *   LinearAlgebra::CUDAWrappers::Vector<double> vector_dev(size);
+     *   vector_dev.import_elements(rw_vector, VectorOperations::insert);
+     *
+     *   ...do some computations on the device...
+     *
+     *   // Move the data back to the host:
+     *   rw_vector.import_elements(vector_dev, VectorOperations::insert);
+     * @endcode
      *
      * @see CUDAWrappers
      * @ingroup Vectors
@@ -116,8 +133,8 @@ namespace LinearAlgebra
 
       /**
        * Reinit functionality. The flag <tt>omit_zeroing_entries</tt>
-       * determines whether the vector should be filled with zero (false) or
-       * left untouched (true).
+       * determines whether the vector should be filled with zeros (`false`) or
+       * left in an undetermined state (`true`).
        */
       void
       reinit(const size_type n, const bool omit_zeroing_entries = false);

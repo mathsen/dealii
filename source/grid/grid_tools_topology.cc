@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2023 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #include <deal.II/base/bounding_box.h>
 #include <deal.II/base/floating_point_comparator.h>
@@ -518,7 +517,7 @@ namespace GridTools
     if (dim == 1)
       return 0;
     if (dim == 2 && spacedim == 3)
-      Assert(false, ExcNotImplemented());
+      DEAL_II_NOT_IMPLEMENTED();
 
     std::size_t n_negative_cells = 0;
     std::size_t cell_no          = 0;
@@ -1378,7 +1377,7 @@ namespace GridTools
                                 throw ExcMeshNotOrientable();
                             }
                           else
-                            Assert(false, ExcNotImplemented());
+                            DEAL_II_NOT_IMPLEMENTED();
                         }
                     }
                 }
@@ -1445,7 +1444,7 @@ namespace GridTools
                         starting_vertex_of_edge[3]))
                 origin_vertex_of_cell = starting_vertex_of_edge[1];
               else
-                Assert(false, ExcInternalError());
+                DEAL_II_ASSERT_UNREACHABLE();
 
               break;
             }
@@ -1472,7 +1471,7 @@ namespace GridTools
             }
 
           default:
-            Assert(false, ExcNotImplemented());
+            DEAL_II_NOT_IMPLEMENTED();
         }
 
       // now rotate raw_cells[cell_index] in such a way that its orientation
@@ -1536,7 +1535,7 @@ namespace GridTools
 
           default:
             {
-              Assert(false, ExcNotImplemented());
+              DEAL_II_NOT_IMPLEMENTED();
             }
         }
     }
@@ -1684,7 +1683,7 @@ namespace GridTools
     while (continue_refinement && (iter < max_iterations))
       {
         if (max_iterations != numbers::invalid_unsigned_int)
-          iter++;
+          ++iter;
         continue_refinement = false;
 
         for (const auto &cell : tria.active_cell_iterators())
@@ -1718,7 +1717,7 @@ namespace GridTools
 
     while (continue_refinement && (iter < max_iterations))
       {
-        iter++;
+        ++iter;
         continue_refinement = false;
         for (const auto &cell : tria.active_cell_iterators())
           {

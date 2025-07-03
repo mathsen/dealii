@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2017 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2017 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 
@@ -70,12 +69,19 @@ namespace SUNDIALS
   {
     set_functions_to_trigger_an_assert();
 
-#  if DEAL_II_SUNDIALS_VERSION_GTE(6, 0, 0)
     // SUNDIALS will always duplicate communicators if we provide them. This
     // can cause problems if SUNDIALS is configured with MPI and we pass along
     // MPI_COMM_SELF in a serial application as MPI won't be
     // initialized. Hence, work around that by just not providing a
     // communicator in that case.
+#  if DEAL_II_SUNDIALS_VERSION_GTE(7, 0, 0)
+    const int status =
+      SUNContext_Create(mpi_communicator == MPI_COMM_SELF ? SUN_COMM_NULL :
+                                                            mpi_communicator,
+                        &arkode_ctx);
+    (void)status;
+    AssertARKode(status);
+#  elif DEAL_II_SUNDIALS_VERSION_GTE(6, 0, 0)
     const int status =
       SUNContext_Create(mpi_communicator == MPI_COMM_SELF ? nullptr :
                                                             &mpi_communicator,
@@ -136,7 +142,7 @@ namespace SUNDIALS
 
 
   template <typename VectorType>
-  int
+  unsigned int
   ARKode<VectorType>::do_evolve_time(VectorType   &solution,
                                      DiscreteTime &time,
                                      const bool    do_reset)
@@ -172,7 +178,7 @@ namespace SUNDIALS
         time.set_desired_next_step_size(data.output_period);
 
         // Having set up all of the ancillary things, finally call the main
-        // ARKode function. One we return, check that what happened:
+        // ARKode function. Once we return, check what happened:
         // - If we have a pending recoverable exception, ignore it if SUNDIAL's
         //   return code was zero -- in that case, SUNDIALS managed to indeed
         //   recover and we no longer need the exception
@@ -225,7 +231,13 @@ namespace SUNDIALS
                       time.get_step_number());
       }
     last_end_time = time.get_current_time();
-    return time.get_step_number();
+
+    long int   n_steps;
+    const auto status = ARKStepGetNumSteps(arkode_mem, &n_steps);
+    (void)status;
+    AssertARKode(status);
+
+    return n_steps;
   }
 
 
@@ -240,9 +252,20 @@ namespace SUNDIALS
     int status;
     (void)status;
 
-#  if DEAL_II_SUNDIALS_VERSION_GTE(6, 0, 0)
+#  if DEAL_II_SUNDIALS_VERSION_GTE(7, 0, 0)
     status = SUNContext_Free(&arkode_ctx);
     AssertARKode(status);
+
+    // Same comment applies as in class constructor:
+    status =
+      SUNContext_Create(mpi_communicator == MPI_COMM_SELF ? SUN_COMM_NULL :
+                                                            mpi_communicator,
+                        &arkode_ctx);
+    AssertARKode(status);
+#  elif DEAL_II_SUNDIALS_VERSION_GTE(6, 0, 0)
+    status = SUNContext_Free(&arkode_ctx);
+    AssertARKode(status);
+
     // Same comment applies as in class constructor:
     status =
       SUNContext_Create(mpi_communicator == MPI_COMM_SELF ? nullptr :
@@ -410,7 +433,7 @@ namespace SUNDIALS
 #  else
             sun_linear_solver =
               SUNLinSol_SPGMR(y_template,
-                              PREC_NONE,
+                              SUN_PREC_NONE,
                               0 /*krylov subvectors, 0 uses default*/,
                               arkode_ctx);
 #  endif
@@ -503,13 +526,14 @@ namespace SUNDIALS
                 lr);
             };
 
-            auto jacobian_solver_setup_callback = [](SUNDIALS::realtype t,
-                                                     N_Vector           y,
-                                                     N_Vector           fy,
-                                                     booleantype        jok,
-                                                     booleantype       *jcurPtr,
-                                                     SUNDIALS::realtype gamma,
-                                                     void *user_data) -> int {
+            auto jacobian_solver_setup_callback =
+              [](SUNDIALS::realtype  t,
+                 N_Vector            y,
+                 N_Vector            fy,
+                 SUNDIALS::booltype  jok,
+                 SUNDIALS::booltype *jcurPtr,
+                 SUNDIALS::realtype  gamma,
+                 void               *user_data) -> int {
               Assert(user_data != nullptr, ExcInternalError());
               ARKode<VectorType> &solver =
                 *static_cast<ARKode<VectorType> *>(user_data);
@@ -613,13 +637,15 @@ namespace SUNDIALS
 #  else
             sun_mass_linear_solver =
               SUNLinSol_SPGMR(y_template,
-                              PREC_NONE,
+                              SUN_PREC_NONE,
                               0 /*krylov subvectors, 0 uses default*/,
                               arkode_ctx);
 #  endif
           }
-        booleantype mass_time_dependent =
+
+        SUNDIALS::booltype mass_time_dependent =
           data.mass_is_time_independent ? SUNFALSE : SUNTRUE;
+
         status = ARKStepSetMassLinearSolver(arkode_mem,
                                             sun_mass_linear_solver,
                                             nullptr,

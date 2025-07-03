@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2017 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2020 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 // Reproduce a bug where only one matrix-free object is valid
 
@@ -167,9 +166,9 @@ main()
     FE_Q<2>                fe_1(fe_degree_1);
     DoFHandler<2>          dof_1(tria);
     dof_1.distribute_dofs(fe_1);
-    MappingQ<2>                                         mapping_1(fe_degree_1);
-    CUDAWrappers::MatrixFree<2, double>                 mf_data_1;
-    CUDAWrappers::MatrixFree<2, double>::AdditionalData additional_data_1;
+    MappingQ<2>                                     mapping_1(fe_degree_1);
+    Portable::MatrixFree<2, double>                 mf_data_1;
+    Portable::MatrixFree<2, double>::AdditionalData additional_data_1;
     additional_data_1.mapping_update_flags = update_values | update_gradients |
                                              update_JxW_values |
                                              update_quadrature_points;
@@ -192,9 +191,9 @@ main()
     FE_Q<2>                fe_2(fe_degree_2);
     DoFHandler<2>          dof_2(tria);
     dof_2.distribute_dofs(fe_2);
-    MappingQ<2>                                         mapping_2(fe_degree_2);
-    CUDAWrappers::MatrixFree<2, double>                 mf_data_2;
-    CUDAWrappers::MatrixFree<2, double>::AdditionalData additional_data_2;
+    MappingQ<2>                                     mapping_2(fe_degree_2);
+    Portable::MatrixFree<2, double>                 mf_data_2;
+    Portable::MatrixFree<2, double>::AdditionalData additional_data_2;
     additional_data_2.mapping_update_flags = update_values | update_gradients |
                                              update_JxW_values |
                                              update_quadrature_points;

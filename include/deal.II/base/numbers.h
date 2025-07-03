@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2006 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_numbers_h
 #define dealii_numbers_h
@@ -341,7 +340,7 @@ namespace numbers
    * of @p value_1.
    */
   template <typename Number1, typename Number2>
-  bool
+  constexpr bool
   values_are_not_equal(const Number1 &value_1, const Number2 &value_2);
 
   /**
@@ -436,8 +435,8 @@ namespace numbers
     /**
      * For this data type, alias the corresponding real type. Since the
      * general template is selected for all data types that are not
-     * specializations of std::complex<T>, the underlying type must be real-
-     * values, so the real_type is equal to the underlying type.
+     * specializations of std::complex<T>, the underlying type must be
+     * real-values, so the real_type is equal to the underlying type.
      */
     using real_type = number;
 
@@ -925,7 +924,7 @@ namespace numbers
 
 
   template <typename Number1, typename Number2>
-  inline bool
+  inline constexpr bool
   values_are_not_equal(const Number1 &value_1, const Number2 &value_2)
   {
     return !(values_are_equal(value_1, value_2));

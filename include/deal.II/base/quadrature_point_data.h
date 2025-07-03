@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2016 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2016 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_quadrature_point_data_h
 #define dealii_quadrature_point_data_h
@@ -111,9 +110,10 @@ public:
    */
   template <typename T = DataType>
   void
-  initialize(const CellIteratorType &cell_start,
-             const CellIteratorType &cell_end,
-             const unsigned int      number_of_data_points_per_cell);
+  initialize(
+    const CellIteratorType                                          &cell_start,
+    const typename std_cxx20::type_identity<CellIteratorType>::type &cell_end,
+    const unsigned int number_of_data_points_per_cell);
 
   /**
    * Removes data stored at the @p cell. Returns true if the data was removed.
@@ -631,9 +631,9 @@ template <typename CellIteratorType, typename DataType>
 template <typename T>
 inline void
 CellDataStorage<CellIteratorType, DataType>::initialize(
-  const CellIteratorType &cell_start,
-  const CellIteratorType &cell_end,
-  const unsigned int      number)
+  const CellIteratorType                                          &cell_start,
+  const typename std_cxx20::type_identity<CellIteratorType>::type &cell_end,
+  const unsigned int                                               number)
 {
   for (CellIteratorType it = cell_start; it != cell_end; ++it)
     if (it->is_locally_owned())

@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 1998 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_dof_handler_h
 #define dealii_dof_handler_h
@@ -167,7 +166,7 @@ namespace parallel
  * parallel::distributed::Triangulation (see, for example, step-32, step-40
  * and in particular the
  * @ref distributed
- * module) in which case the DoFHandler object will proceed to only manage
+ * topic) in which case the DoFHandler object will proceed to only manage
  * degrees of freedom on locally owned and ghost cells. This process is
  * entirely transparent to the used.
  *
@@ -325,7 +324,7 @@ public:
   /**
    * An alias that is used to identify cell iterators in DoFHandler objects.
    * The concept of iterators is discussed at length in the
-   * @ref Iterators "iterators documentation module".
+   * @ref Iterators "iterators documentation topic".
    *
    * The current alias works, in essence, like the corresponding
    * Triangulation::cell_accessor alias. However, it also makes available
@@ -339,7 +338,7 @@ public:
   /**
    * An alias that is used to identify iterators that point to faces.
    * The concept of iterators is discussed at length in the
-   * @ref Iterators "iterators documentation module".
+   * @ref Iterators "iterators documentation topic".
    *
    * The current alias works, in essence, like the corresponding
    * Triangulation::face_accessor alias. However, it also makes available
@@ -422,7 +421,7 @@ public:
    * An alias that is used to identify
    * @ref GlossActive "active cell iterators".
    * The concept of iterators is discussed at length in the
-   * @ref Iterators "iterators documentation module".
+   * @ref Iterators "iterators documentation topic".
    *
    * The current alias identifies active cells in a DoFHandler object. While
    * the actual data type of the alias is hidden behind a few layers of
@@ -443,7 +442,7 @@ public:
   /**
    * An alias that is used to identify cell iterators. The concept of
    * iterators is discussed at length in the
-   * @ref Iterators "iterators documentation module".
+   * @ref Iterators "iterators documentation topic".
    *
    * The current alias identifies cells in a DoFHandler object. Some of
    * these cells may in fact be active (see
@@ -471,7 +470,7 @@ public:
   /**
    * An alias that is used to identify iterators that point to faces.
    * The concept of iterators is discussed at length in the
-   * @ref Iterators "iterators documentation module".
+   * @ref Iterators "iterators documentation topic".
    *
    * While the actual data type of the alias is hidden behind a few layers
    * of (unfortunately necessary) indirections, it is in essence
@@ -522,33 +521,9 @@ public:
   static const types::fe_index default_fe_index = 0;
 
   /**
-   * Invalid index of the finite element to be used on a given cell.
-   *
-   * @deprecated Use numbers::invalid_fe_index instead.
-   */
-  static const unsigned int invalid_fe_index DEAL_II_DEPRECATED =
-    numbers::invalid_fe_index;
-
-  /**
-   * The type in which we store the active FE index.
-   *
-   * @deprecated Use types::fe_index instead.
-   */
-  using active_fe_index_type DEAL_II_DEPRECATED = types::fe_index;
-
-  /**
    * The type in which we store the offsets in the CRS data structures.
    */
   using offset_type = unsigned int;
-
-  /**
-   * Invalid active FE index which will be used as a default value to determine
-   * whether a future FE index has been set or not.
-   *
-   * @deprecated Use numbers::invalid_fe_index instead.
-   */
-  static const types::fe_index invalid_active_fe_index DEAL_II_DEPRECATED =
-    numbers::invalid_fe_index;
 
   /**
    * Standard constructor, not initializing any data. After constructing an
@@ -864,7 +839,7 @@ public:
    * use an intermediate compressed sparsity pattern that only allocates
    * memory on demand. Refer to the step-2 and step-11 example programs on how
    * to do this. The problem is also discussed in the documentation of the
-   * module on
+   * topic on
    * @ref Sparsity.
    */
   unsigned int
@@ -1498,8 +1473,8 @@ private:
   BlockInfo block_info_object;
 
   /**
-   * Boolean indicating whether or not the current DoFHandler has hp-
-   * capabilities.
+   * Boolean indicating whether or not the current DoFHandler has
+   * hp-capabilities.
    */
   bool hp_capability_enabled;
 
@@ -1783,7 +1758,7 @@ namespace internal
        * @note This function can only be called on direct parent cells, i.e.,
        * non-active cells whose children are all active.
        *
-       * @note On parallel::shared::Triangulation objects where sibling cells
+       * @note On parallel Triangulation objects where sibling cells
        * can be ghost cells, make sure that future FE indices have been properly
        * communicated with communicate_future_fe_indices() first. Otherwise,
        * results might differ on different processors. There is no check for

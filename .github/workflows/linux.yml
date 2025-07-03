@@ -68,6 +68,7 @@ jobs:
       run: |
         cd build
         make -j2 \
+          setup_tests_a-framework \
           setup_tests_examples \
           setup_tests_quick_tests
         ctest --output-on-failure -j2 -VV
@@ -131,11 +132,79 @@ jobs:
 
         cd build
         make -j2 \
+          setup_tests_a-framework \
           setup_tests_examples \
           setup_tests_quick_tests \
           setup_tests_simplex \
           setup_tests_vtk
         ctest --output-on-failure -j2 -VV
+
+  ###############################
+  # linux-debug-parallel-tpetra #
+  ###############################
+
+  linux-debug-parallel-tpetra:
+    # simple parallel debug build using g++ and trilinos+tpetra
+
+    name: linux debug parallel tpetra
+    runs-on: [ubuntu-22.04]
+
+    #
+    # The following condition only runs the workflow on 'push' or if the
+    # 'pull_request' is not a draft. This is only useful for hackathons or
+    # other situations when the CI is massively overburdened with pull
+    # requests.
+    #
+    # if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
+
+    container:
+      image: dealii/dependencies:jammy
+      options: --user root --env OMPI_ALLOW_RUN_AS_ROOT=1 --env OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: info
+      run: |
+        mpicc -v
+        cmake --version
+    - name: configure deal.II
+      run: |
+        mkdir build
+        cd build
+        cmake -D CMAKE_BUILD_TYPE=Debug \
+              -D DEAL_II_CXX_FLAGS='-std=c++20' \
+              -D DEAL_II_EARLY_DEPRECATIONS=ON \
+              -D DEAL_II_COMPONENT_EXAMPLES="OFF" \
+              -D DEAL_II_WITH_64BIT_INDICES="ON" \
+              -D DEAL_II_WITH_MPI="ON" \
+              -D DEAL_II_WITH_P4EST="ON" \
+              -D DEAL_II_WITH_TRILINOS="ON" \
+              ..
+    - name: print detailed.log
+      run: cat build/detailed.log
+    - name: build
+      run: |
+        cd build
+        make VERBOSE=1 -j2
+    - name: test
+      run: |
+        # Remove warning: "A high-performance Open MPI point-to-point
+        # messaging module was unable to find any relevant network
+        # interfaces."
+        export OMPI_MCA_btl_base_warn_component_unused='0'
+
+        cd build
+        make VERBOSE=1 -j2
+    - name: test
+      run: |
+        # Remove warning: "A high-performance Open MPI point-to-point
+        # messaging module was unable to find any relevant network
+        # interfaces."
+        export OMPI_MCA_btl_base_warn_component_unused='0'
+
+        cd build
+        make -j2 setup_tests
+        ctest --output-on-failure -j2 -VV -R "tpetra"
 
   ############################
   # linux-debug-intel-oneapi #
@@ -160,35 +229,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: setup apt repo
-      run: |
-        # download the key to system keyring
-        wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
-        # add signed entry to apt sources and configure the APT client to use Intel repository:
-        echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
-        sudo apt-get update
-    - name: collect versioned dependencies of apt packages
-      run : |
-        # oneapi-ci/scripts/apt_depends.sh
-        apt-cache depends intel-oneapi-compiler-dpcpp-cpp \
-                          intel-oneapi-mpi-devel \
-                          intel-oneapi-mkl-devel \
-                          intel-oneapi-tbb-devel | tee dependencies.txt
-    - name: cache install
-      id: cache-install
-      uses: actions/cache@v3
+    - uses: rscohn2/setup-oneapi@v0
       with:
-        path: /opt/intel/oneapi
-        key: install-${{ hashFiles('**/dependencies.txt') }}
-    - name: install
-      if: steps.cache-install.outputs.cache-hit != 'true'
-      run: |
-        # oneapi-ci/scripts/install_linux_apt.sh
-        sudo apt-get install -y intel-oneapi-compiler-dpcpp-cpp \
-                                intel-oneapi-mpi-devel \
-                                intel-oneapi-mkl-devel \
-                                intel-oneapi-tbb-devel
-        sudo apt-get clean
+        components: |
+          icx
+          impi
+          mkl
+          tbb
     - name: info
       run: |
         source /opt/intel/oneapi/setvars.sh
@@ -224,6 +271,7 @@ jobs:
         source /opt/intel/oneapi/setvars.sh
         cd build
         make -j2 \
+          setup_tests_a-framework \
           setup_tests_examples \
           setup_tests_quick_tests
         ctest --output-on-failure -j2 -VV
@@ -267,6 +315,29 @@ jobs:
             numdiff \
             openmpi-bin \
             libboost-all-dev
+    # https://github.com/apache/flink/blob/master/tools/azure-pipelines/free_disk_space.sh
+    - name: remove unused large packages
+      run : |
+        echo "=============================================================================="
+        echo "Freeing up disk space on CI system"
+        echo "=============================================================================="
+
+        echo "Listing 100 largest packages"
+        dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 100
+        df -h
+        echo "Removing large packages"
+        sudo apt-get remove -y '^dotnet-.*'
+        sudo apt-get remove -y '^llvm-.*'
+        sudo apt-get remove -y 'php.*'
+        sudo apt-get remove -y azure-cli google-cloud-sdk hhvm google-chrome-stable firefox powershell mono-devel
+        sudo apt-get autoremove -y
+        sudo apt-get clean
+        df -h
+        echo "Removing large directories"
+        # deleting 15GB
+        rm -rf /usr/share/dotnet/
+        df -h
+    - uses: lukka/get-cmake@v3.27.9
     - name: info
       run: |
         mpicc -v
@@ -315,8 +386,10 @@ jobs:
     - name: build CUDA tests
       run: |
         cd build
-        make -j2 setup_tests_cuda
+        make -j2 setup_tests_cuda setup_tests_matrix_free_kokkos
         cd tests/cuda
+        make -j2 compile_test_executables
+        cd ../matrix_free_kokkos
         make -j2 compile_test_executables
 
   #############################
@@ -359,6 +432,7 @@ jobs:
             numdiff \
             openmpi-bin \
             libboost-all-dev
+    - uses: lukka/get-cmake@v3.27.9
     - name: info
       run: |
         mpicc -v
@@ -399,7 +473,7 @@ jobs:
               ..
         cat detailed.log
     - name: archive detailed.log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: linux-cuda-clang-detailed.log
         path: build/detailed.log
@@ -410,6 +484,8 @@ jobs:
     - name: build CUDA tests
       run: |
         cd build
-        make -j 2 setup_tests_cuda
+        make -j2 setup_tests_cuda setup_tests_matrix_free_kokkos
         cd tests/cuda
+        make -j2 compile_test_executables
+        cd ../matrix_free_kokkos
         make -j2 compile_test_executables

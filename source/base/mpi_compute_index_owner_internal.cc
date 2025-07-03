@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2019 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2022 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #include <deal.II/base/config.h>
 
@@ -55,7 +54,7 @@ namespace Utilities
 
           // in case we have contiguous indices, only fill the vector upon
           // first request in `fill`
-          if (!index_range_contiguous)
+          if (use_vector && !index_range_contiguous)
             data.resize(size, invalid_index_value);
         }
 
@@ -115,10 +114,8 @@ namespace Utilities
             }
           else
             {
-              if (data_map.find(index) == data_map.end())
-                data_map[index] = invalid_index_value;
-
-              return data_map[index];
+              return data_map.try_emplace(index, invalid_index_value)
+                .first->second;
             }
         }
 
@@ -529,7 +526,7 @@ namespace Utilities
                   indices.first.push_back(i);
                   indices.second.push_back(index);
                 }
-              index++;
+              ++index;
             }
 
           Assert(targets.size() == indices_to_look_up_by_dict_rank.size(),
@@ -606,7 +603,8 @@ namespace Utilities
           // sent in total can be deduced both via the MPI status message at
           // the receiver site as well as be counting the buckets from
           // different requesters.
-          std::vector<std::vector<unsigned int>> send_data(requesters.size());
+          std::vector<std::vector<types::global_dof_index>> send_data(
+            requesters.size());
           for (unsigned int i = 0; i < requesters.size(); ++i)
             {
               // special code for our own indices
@@ -636,13 +634,15 @@ namespace Utilities
                         }
                     }
                   send_requests.push_back(MPI_Request());
-                  const int ierr = MPI_Isend(send_data[i].data(),
-                                             send_data[i].size(),
-                                             MPI_UNSIGNED,
-                                             dict.actually_owning_rank_list[i],
-                                             mpi_tag,
-                                             comm,
-                                             &send_requests.back());
+                  const int ierr =
+                    MPI_Isend(send_data[i].data(),
+                              send_data[i].size(),
+                              Utilities::MPI::mpi_type_id_for_type<
+                                types::global_dof_index>,
+                              dict.actually_owning_rank_list[i],
+                              mpi_tag,
+                              comm,
+                              &send_requests.back());
                   AssertThrowMPI(ierr);
                 }
             }
@@ -657,20 +657,25 @@ namespace Utilities
 
               // retrieve size of incoming message
               int number_amount;
-              ierr = MPI_Get_count(&status, MPI_UNSIGNED, &number_amount);
+              ierr = MPI_Get_count(
+                &status,
+                Utilities::MPI::mpi_type_id_for_type<types::global_dof_index>,
+                &number_amount);
               AssertThrowMPI(ierr);
 
               // receive message
               Assert(number_amount % 2 == 0, ExcInternalError());
-              std::vector<std::pair<unsigned int, unsigned int>> buffer(
-                number_amount / 2);
-              ierr = MPI_Recv(buffer.data(),
-                              number_amount,
-                              MPI_UNSIGNED,
-                              status.MPI_SOURCE,
-                              status.MPI_TAG,
-                              comm,
-                              &status);
+              std::vector<
+                std::pair<types::global_dof_index, types::global_dof_index>>
+                buffer(number_amount / 2);
+              ierr = MPI_Recv(
+                buffer.data(),
+                number_amount,
+                Utilities::MPI::mpi_type_id_for_type<types::global_dof_index>,
+                status.MPI_SOURCE,
+                status.MPI_TAG,
+                comm,
+                &status);
               AssertThrowMPI(ierr);
 
               // unpack the message and translate the dictionary-local
@@ -733,10 +738,10 @@ namespace Utilities
 
         void
         ConsensusAlgorithmsPayload::append_index_origin(
-          const unsigned int index_within_dict,
-          const unsigned int rank_of_request,
-          const unsigned int rank_of_owner,
-          unsigned int      &owner_index_guess)
+          const types::global_dof_index index_within_dict,
+          const unsigned int            rank_of_request,
+          const unsigned int            rank_of_owner,
+          unsigned int                 &owner_index_guess)
         {
           // remember who requested which index. We want to use an
           // std::vector with simple addressing, via a good guess from the
@@ -749,7 +754,8 @@ namespace Utilities
           if (request.empty() || request.back().first != rank_of_request)
             request.emplace_back(
               rank_of_request,
-              std::vector<std::pair<unsigned int, unsigned int>>());
+              std::vector<
+                std::pair<types::global_dof_index, types::global_dof_index>>());
 
           auto &intervals = request.back().second;
           if (intervals.empty() || intervals.back().second != index_within_dict)

@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2021 - 2022 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2021 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 // Step-31 on a simplex mesh. Following incompatible modifications had to be
@@ -67,7 +66,6 @@
 
 namespace Step31
 {
-  using namespace dealii;
   namespace EquationData
   {
     constexpr double eta     = 1;
@@ -602,8 +600,8 @@ namespace Step31
     deallog << "   Rebuilding Stokes preconditioner..." << std::flush;
     assemble_stokes_preconditioner();
     Amg_preconditioner = std::make_shared<TrilinosWrappers::PreconditionAMG>();
-    std::vector<std::vector<bool>> constant_modes;
-    FEValuesExtractors::Vector     velocity_components(0);
+    std::vector<std::vector<bool>>   constant_modes;
+    const FEValuesExtractors::Vector velocity_components(0);
     DoFTools::extract_constant_modes(stokes_dof_handler,
                                      stokes_fe.component_mask(
                                        velocity_components),
@@ -1085,7 +1083,6 @@ main(int argc, char *argv[])
 {
   try
     {
-      using namespace dealii;
       using namespace Step31;
       Utilities::MPI::MPI_InitFinalize mpi_initialization(
         argc, argv, numbers::invalid_unsigned_int);

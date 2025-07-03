@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2015 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 #include <deal.II/base/array_view.h>
@@ -75,12 +74,11 @@ MappingFE<dim, spacedim>::InternalData::memory_consumption() const
 }
 
 
+
 template <int dim, int spacedim>
 void
-MappingFE<dim, spacedim>::InternalData::initialize(
-  const UpdateFlags      update_flags,
-  const Quadrature<dim> &q,
-  const unsigned int     n_original_q_points)
+MappingFE<dim, spacedim>::InternalData::reinit(const UpdateFlags update_flags,
+                                               const Quadrature<dim> &q)
 {
   // store the flags in the internal data object so we can access them
   // in fill_fe_*_values()
@@ -89,13 +87,13 @@ MappingFE<dim, spacedim>::InternalData::initialize(
   const unsigned int n_q_points = q.size();
 
   if (this->update_each & update_covariant_transformation)
-    covariant.resize(n_original_q_points);
+    covariant.resize(n_q_points);
 
   if (this->update_each & update_contravariant_transformation)
-    contravariant.resize(n_original_q_points);
+    contravariant.resize(n_q_points);
 
   if (this->update_each & update_volume_elements)
-    volume_elements.resize(n_original_q_points);
+    volume_elements.resize(n_q_points);
 
   // see if we need the (transformation) shape function values
   // and/or gradients and resize the necessary arrays
@@ -140,7 +138,7 @@ MappingFE<dim, spacedim>::InternalData::initialize_face(
   const Quadrature<dim> &q,
   const unsigned int     n_original_q_points)
 {
-  initialize(update_flags, q, n_original_q_points);
+  reinit(update_flags, q);
 
   if (this->update_each &
       (update_boundary_forms | update_normal_vectors | update_jacobians |
@@ -1060,9 +1058,7 @@ MappingFE<dim, spacedim>::get_data(const UpdateFlags      update_flags,
 {
   std::unique_ptr<typename Mapping<dim, spacedim>::InternalDataBase> data_ptr =
     std::make_unique<InternalData>(*this->fe);
-  auto &data = dynamic_cast<InternalData &>(*data_ptr);
-  data.initialize(this->requires_update_flags(update_flags), q, q.size());
-
+  data_ptr->reinit(this->requires_update_flags(update_flags), q);
   return data_ptr;
 }
 
@@ -1420,7 +1416,7 @@ namespace internal
                               cross_product_3d(data.aux[0][i], data.aux[1][i]);
                             break;
                           default:
-                            Assert(false, ExcNotImplemented());
+                            DEAL_II_NOT_IMPLEMENTED();
                         }
                   }
                 else //(dim < spacedim)
@@ -1478,7 +1474,7 @@ namespace internal
                           cell->subface_case(face_no), subface_no);
                        output_data.JxW_values[i] *= area_ratio;
 #else
-                      Assert(false, ExcNotImplemented());
+                      DEAL_II_NOT_IMPLEMENTED();
 #endif
                     }
                 }
@@ -1617,9 +1613,8 @@ MappingFE<dim, spacedim>::fill_fe_face_values(
     numbers::invalid_unsigned_int,
     QProjector<dim>::DataSetDescriptor::face(this->fe->reference_cell(),
                                              face_no,
-                                             cell->face_orientation(face_no),
-                                             cell->face_flip(face_no),
-                                             cell->face_rotation(face_no),
+                                             cell->combined_face_orientation(
+                                               face_no),
                                              quadrature),
     quadrature[quadrature.size() == 1 ? 0 : face_no],
     data,
@@ -1665,9 +1660,8 @@ MappingFE<dim, spacedim>::fill_fe_subface_values(
     QProjector<dim>::DataSetDescriptor::subface(this->fe->reference_cell(),
                                                 face_no,
                                                 subface_no,
-                                                cell->face_orientation(face_no),
-                                                cell->face_flip(face_no),
-                                                cell->face_rotation(face_no),
+                                                cell->combined_face_orientation(
+                                                  face_no),
                                                 quadrature.size(),
                                                 cell->subface_case(face_no)),
     quadrature,
@@ -1763,7 +1757,7 @@ namespace internal
               }
 
             default:
-              Assert(false, ExcNotImplemented());
+              DEAL_II_NOT_IMPLEMENTED();
           }
       }
 
@@ -1865,7 +1859,7 @@ namespace internal
               }
 
             default:
-              Assert(false, ExcNotImplemented());
+              DEAL_II_NOT_IMPLEMENTED();
           }
       }
 
@@ -2035,7 +2029,7 @@ namespace internal
               }
 
             default:
-              Assert(false, ExcNotImplemented());
+              DEAL_II_NOT_IMPLEMENTED();
           }
       }
 
@@ -2075,7 +2069,7 @@ namespace internal
                 return;
               }
             default:
-              Assert(false, ExcNotImplemented());
+              DEAL_II_NOT_IMPLEMENTED();
           }
       }
     } // namespace
@@ -2142,7 +2136,7 @@ MappingFE<dim, spacedim>::transform(
                                                                output);
         return;
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 }
 
@@ -2191,7 +2185,7 @@ MappingFE<dim, spacedim>::transform(
         }
 
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 }
 
@@ -2216,7 +2210,7 @@ MappingFE<dim, spacedim>::transform(
                                                               output);
         return;
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 }
 

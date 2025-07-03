@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2020 - 2023 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 #ifndef dealii_vector_tools_boundary_h
@@ -277,7 +276,7 @@ namespace VectorTools
    * are not set in the second operation on degrees of freedom that are
    * already constrained. This makes sure that the discretization remains
    * conforming as is needed. See the discussion on conflicting constraints in
-   * the module on @ref constraints.
+   * the topic on @ref constraints.
    *
    * For further information and details on the other function arguments, see
    * the interpolate_boundary_values() function with `std::map` arguments and
@@ -528,7 +527,7 @@ namespace VectorTools
    * are not set in the second operation on degrees of freedom that are
    * already constrained. This makes sure that the discretization remains
    * conforming as is needed. See the discussion on conflicting constraints in
-   * the module on
+   * the topic on
    * @ref constraints.
    *
    * If @p component_mapping is empty, it is assumed that the number of
@@ -577,8 +576,8 @@ namespace VectorTools
   /**
    * This function is an updated version of the
    * project_boundary_values_curl_conforming function. The intention is to fix
-   * a problem when using the previous function in conjunction with non-
-   * rectangular geometries (i.e. elements with non-rectangular faces). The
+   * a problem when using the previous function in conjunction with
+   * non-rectangular geometries (i.e. elements with non-rectangular faces). The
    * L2-projection method used has been taken from the paper "Electromagnetic
    * scattering simulation using an H (curl) conforming hp-finite element
    * method in three dimensions" by PD Ledger, K Morgan and O Hassan ( Int. J.
@@ -592,9 +591,9 @@ namespace VectorTools
    * <h4>Computing constraints</h4>
    *
    * To compute the constraints we use a projection method based upon the
-   * paper mentioned above. In 2d this is done in a single stage for the edge-
-   * based shape functions, regardless of the order of the finite element. In
-   * 3d this is done in two stages, edges first and then faces.
+   * paper mentioned above. In 2d this is done in a single stage for the
+   * edge-based shape functions, regardless of the order of the finite element.
+   * In 3d this is done in two stages, edges first and then faces.
    *
    * For each cell, each edge, $e$, is projected by solving the linear system
    * $Ax=b$ where $x$ is the vector of constraints on degrees of freedom on the
@@ -633,7 +632,7 @@ namespace VectorTools
    * the Dirichlet conditions should be set first, and then completed by
    * hanging node constraints, in order to make sure that the discretization
    * remains consistent. See the discussion on conflicting constraints in the
-   * module on
+   * topic on
    * @ref constraints.
    *
    * <h4>Arguments to this function</h4>
@@ -717,7 +716,7 @@ namespace VectorTools
    * the Dirichlet conditions should be set first, and then completed by
    * hanging node constraints, in order to make sure that the discretization
    * remains consistent. See the discussion on conflicting constraints in the
-   * module on
+   * topic on
    * @ref constraints.
    *
    * The argument @p first_vector_component denotes the first vector component

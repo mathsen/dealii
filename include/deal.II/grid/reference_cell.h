@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2020 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2020 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_tria_reference_cell_h
 #define dealii_tria_reference_cell_h
@@ -67,6 +66,34 @@ namespace internal
 
 
 /**
+ * Enum of different choices for istropic refinement.
+ * There are 3 different ways to refine a tetrahedral, here we save the
+ * different possibilities. It is different to RefinementPossibilites are these
+ * are options in the case that an isotropic refinement is conducted.
+ */
+enum class IsotropicRefinementChoice : std::uint8_t
+{
+  /**
+   * Decide where to perform a cut based on the shortest edge length.
+   */
+  isotropic_refinement = 0,
+  /**
+   * Perform a cut in the along the edge (6,8).
+   */
+  cut_tet_68 = 1,
+  /**
+   * Perform a cut in the along the edge (5,7).
+   */
+  cut_tet_57 = 2,
+  /**
+   * Perform a cut in the along the edge (4,9).
+   */
+  cut_tet_49 = 3,
+};
+
+
+
+/**
  * A type that describes the kinds of reference cells that can be
  * used.  This includes quadrilaterals and hexahedra (i.e.,
  * "hypercubes"), triangles and tetrahedra (simplices), and the
@@ -94,7 +121,7 @@ namespace internal
  * @ref GlossReferenceCell "reference cell"
  * glossary entry.
  *
- * @ingroup grid geomprimitives aniso reordering
+ * @ingroup grid geomprimitives reordering
  */
 class ReferenceCell
 {
@@ -307,6 +334,18 @@ public:
   face_indices() const;
 
   /**
+   * Return the number of refinement directions of the cell.
+   */
+  unsigned int
+  n_isotropic_refinement_choices() const;
+
+  /**
+   * Return the refinement possibility @p ref_choice.
+   */
+  IsotropicRefinementChoice
+  get_isotropic_refinement_choice(const unsigned int ref_choice) const;
+
+  /**
    * Return the number of cells one would get by isotropically
    * refining the current cell. Here, "isotropic refinement"
    * means that we subdivide in each "direction" of a cell.
@@ -319,6 +358,15 @@ public:
    */
   unsigned int
   n_isotropic_children() const;
+
+  /**
+   * Return the number of cells one would get by refining the
+   * current cell with the given refinement case.
+   */
+  template <int dim>
+  unsigned int
+  n_children(const RefinementCase<dim> ref_case =
+               RefinementCase<dim>::isotropic_refinement) const;
 
   /**
    * Return an object that can be thought of as an array containing all
@@ -713,10 +761,47 @@ public:
                                   const unsigned char       orientation) const;
 
   /**
+   * Return the inverse orientation. This is the value such that calling
+   * permute_by_combined_orientation() with <tt>o</tt> and then calling it again
+   * with get_inverse_combined_orientation(o) is the identity operation.
+   */
+  unsigned char
+  get_inverse_combined_orientation(const unsigned char orientation) const;
+
+  /**
    * Return a vector of faces a given @p vertex_index belongs to.
    */
   ArrayView<const unsigned int>
   faces_for_given_vertex(const unsigned int vertex_index) const;
+
+  /**
+   * Return a vector of line indices for all new faces required for isotropic
+   * refinement.
+   */
+  constexpr dealii::ndarray<unsigned int, 12, 4>
+  new_isotropic_child_face_lines(const unsigned int refinement_choice) const;
+
+  /**
+   * Return a vector of vertex indices for all new face lines required for
+   * isotropic refinement.
+   */
+  constexpr dealii::ndarray<unsigned int, 12, 4, 2>
+  new_isotropic_child_face_line_vertices(
+    const unsigned int refinement_choice) const;
+
+  /**
+   * Return a vector of face indices for all new cells required for isotropic
+   * refinement.
+   */
+  constexpr dealii::ndarray<unsigned int, 8, 6>
+  new_isotropic_child_cell_faces(const unsigned int refinement_choice) const;
+
+  /**
+   * Return a vector of vertex indices for all new cells required for isotropic
+   * refinement.
+   */
+  constexpr dealii::ndarray<unsigned int, 8, 4>
+  new_isotropic_child_cell_vertices(const unsigned int refinement_choice) const;
 
   /**
    * @}
@@ -863,11 +948,18 @@ private:
   constexpr ReferenceCell(const std::uint8_t kind);
 
   /**
+   * Table containing all 'vertex' permutations for a vertex. Defined
+   * analogously to line_vertex_permutations et al to make things work the same
+   * way in 1d.
+   */
+  static constexpr ndarray<unsigned int, 1, 1> vertex_vertex_permutations = {
+    {{{0}}}};
+
+  /**
    * Table containing all vertex permutations for a line.
    */
   static constexpr ndarray<unsigned int, 2, 2> line_vertex_permutations = {
     {{{1, 0}}, {{0, 1}}}};
-
 
   /**
    * Table containing all vertex permutations for a triangle.
@@ -1101,7 +1193,281 @@ ReferenceCell::faces_for_given_vertex(const unsigned int vertex) const
       case ReferenceCells::Hexahedron:
         return {&GeometryInfo<3>::vertex_to_face[vertex][0], 3};
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
+    }
+
+  return {};
+}
+
+
+constexpr dealii::ndarray<unsigned int, 12, 4>
+ReferenceCell::new_isotropic_child_face_lines(
+  const unsigned int refienement_choice) const
+{
+  // AssertIndexRange(refienement_choice, n_isotropic_refinement_choices());
+  const unsigned int X = numbers::invalid_unsigned_int;
+  switch (this->kind)
+    {
+      case ReferenceCells::Tetrahedron:
+        {
+          constexpr dealii::ndarray<unsigned int, 3, 12, 4> new_quad_lines_tet =
+            {{// new line is (6,8)
+              {{{{2, 3, 8, X}},
+                {{0, 9, 5, X}},
+                {{1, 6, 11, X}},
+                {{4, 10, 7, X}},
+                {{2, 12, 5, X}},
+                {{1, 9, 12, X}},
+                {{4, 8, 12, X}},
+                {{6, 12, 10, X}},
+                {{X, X, X, X}},
+                {{X, X, X, X}},
+                {{X, X, X, X}},
+                {{X, X, X, X}}}},
+              // new line is (5,7)
+              {{{{2, 3, 8, X}},
+                {{0, 9, 5, X}},
+                {{1, 6, 11, X}},
+                {{4, 10, 7, X}},
+                {{0, 3, 12, X}},
+                {{1, 12, 8, X}},
+                {{4, 12, 9, X}},
+                {{7, 11, 12, X}},
+                {{X, X, X, X}},
+                {{X, X, X, X}},
+                {{X, X, X, X}},
+                {{X, X, X, X}}}},
+              // new line is (4,9)
+              {{{{2, 3, 8, X}},
+                {{0, 9, 5, X}},
+                {{1, 6, 11, X}},
+                {{4, 10, 7, X}},
+                {{0, 12, 11, X}},
+                {{2, 6, 12, X}},
+                {{3, 12, 7, X}},
+                {{5, 10, 12, X}},
+                {{X, X, X, X}},
+                {{X, X, X, X}},
+                {{X, X, X, X}},
+                {{X, X, X, X}}}}}};
+          return new_quad_lines_tet[refienement_choice];
+        }
+
+      case ReferenceCells::Hexahedron:
+        {
+          constexpr dealii::ndarray<unsigned int, 12, 4> new_quad_lines_hex = {
+            {{{10, 28, 16, 24}},
+             {{28, 14, 17, 25}},
+             {{11, 29, 24, 20}},
+             {{29, 15, 25, 21}},
+             {{18, 26, 0, 28}},
+             {{26, 22, 1, 29}},
+             {{19, 27, 28, 4}},
+             {{27, 23, 29, 5}},
+             {{2, 24, 8, 26}},
+             {{24, 6, 9, 27}},
+             {{3, 25, 26, 12}},
+             {{25, 7, 27, 13}}}};
+          return new_quad_lines_hex;
+        }
+      default:
+        DEAL_II_NOT_IMPLEMENTED();
+    }
+
+  return {};
+}
+
+
+
+constexpr dealii::ndarray<unsigned int, 12, 4, 2>
+ReferenceCell::new_isotropic_child_face_line_vertices(
+  const unsigned int refienement_choice) const
+{
+  // AssertIndexRange(refienement_choice, n_isotropic_refinement_choices());
+  const unsigned int X = numbers::invalid_unsigned_int;
+  switch (this->kind)
+    {
+      case ReferenceCells::Tetrahedron:
+        {
+          constexpr dealii::ndarray<unsigned int, 3, 12, 4, 2> table_tet = {
+            {// new line is (6, 8)
+             {{{{{{6, 4}}, {{4, 7}}, {{7, 6}}, {{X, X}}}},
+               {{{{4, 5}}, {{5, 8}}, {{8, 4}}, {{X, X}}}},
+               {{{{5, 6}}, {{6, 9}}, {{9, 5}}, {{X, X}}}},
+               {{{{7, 8}}, {{8, 9}}, {{9, 7}}, {{X, X}}}},
+               {{{{4, 6}}, {{6, 8}}, {{8, 4}}, {{X, X}}}},
+               {{{{6, 5}}, {{5, 8}}, {{8, 6}}, {{X, X}}}},
+               {{{{8, 7}}, {{7, 6}}, {{6, 8}}, {{X, X}}}},
+               {{{{9, 6}}, {{6, 8}}, {{8, 9}}, {{X, X}}}},
+               {{{{X, X}}, {{X, X}}, {{X, X}}, {{X, X}}}},
+               {{{{X, X}}, {{X, X}}, {{X, X}}, {{X, X}}}},
+               {{{{X, X}}, {{X, X}}, {{X, X}}, {{X, X}}}},
+               {{{{X, X}}, {{X, X}}, {{X, X}}, {{X, X}}}}}},
+             // new line is (5, 7)
+             {{{{{{6, 4}}, {{4, 7}}, {{7, 6}}, {{X, X}}}},
+               {{{{4, 5}}, {{5, 8}}, {{8, 4}}, {{X, X}}}},
+               {{{{5, 6}}, {{6, 9}}, {{9, 5}}, {{X, X}}}},
+               {{{{7, 8}}, {{8, 9}}, {{9, 7}}, {{X, X}}}},
+               {{{{5, 4}}, {{4, 7}}, {{7, 5}}, {{X, X}}}},
+               {{{{6, 5}}, {{5, 7}}, {{7, 6}}, {{X, X}}}},
+               {{{{8, 7}}, {{7, 5}}, {{5, 8}}, {{X, X}}}},
+               {{{{7, 9}}, {{9, 5}}, {{5, 7}}, {{X, X}}}},
+               {{{{X, X}}, {{X, X}}, {{X, X}}, {{X, X}}}},
+               {{{{X, X}}, {{X, X}}, {{X, X}}, {{X, X}}}},
+               {{{{X, X}}, {{X, X}}, {{X, X}}, {{X, X}}}},
+               {{{{X, X}}, {{X, X}}, {{X, X}}, {{X, X}}}}}},
+             // new line is (4, 9)
+             {{{{{{6, 4}}, {{4, 7}}, {{7, 6}}, {{X, X}}}},
+               {{{{4, 5}}, {{5, 8}}, {{8, 4}}, {{X, X}}}},
+               {{{{5, 6}}, {{6, 9}}, {{9, 5}}, {{X, X}}}},
+               {{{{7, 8}}, {{8, 9}}, {{9, 7}}, {{X, X}}}},
+               {{{{5, 4}}, {{4, 9}}, {{9, 5}}, {{X, X}}}},
+               {{{{4, 6}}, {{6, 9}}, {{9, 4}}, {{X, X}}}},
+               {{{{7, 4}}, {{4, 9}}, {{9, 7}}, {{X, X}}}},
+               {{{{4, 8}}, {{8, 9}}, {{9, 4}}, {{X, X}}}},
+               {{{{X, X}}, {{X, X}}, {{X, X}}, {{X, X}}}},
+               {{{{X, X}}, {{X, X}}, {{X, X}}, {{X, X}}}},
+               {{{{X, X}}, {{X, X}}, {{X, X}}, {{X, X}}}},
+               {{{{X, X}}, {{X, X}}, {{X, X}}, {{X, X}}}}}}}};
+          return table_tet[refienement_choice];
+        }
+
+      case ReferenceCells::Hexahedron:
+        {
+          constexpr dealii::ndarray<unsigned int, 12, 4, 2> table_hex = {
+            {{{{{10, 22}}, {{24, 26}}, {{10, 24}}, {{22, 26}}}},
+             {{{{24, 26}}, {{11, 23}}, {{24, 11}}, {{26, 23}}}},
+             {{{{22, 14}}, {{26, 25}}, {{22, 26}}, {{14, 25}}}},
+             {{{{26, 25}}, {{23, 15}}, {{26, 23}}, {{25, 15}}}},
+             {{{{8, 24}}, {{20, 26}}, {{8, 20}}, {{24, 26}}}},
+             {{{{20, 26}}, {{12, 25}}, {{20, 12}}, {{26, 25}}}},
+             {{{{24, 9}}, {{26, 21}}, {{24, 26}}, {{9, 21}}}},
+             {{{{26, 21}}, {{25, 13}}, {{26, 25}}, {{21, 13}}}},
+             {{{{16, 20}}, {{22, 26}}, {{16, 22}}, {{20, 26}}}},
+             {{{{22, 26}}, {{17, 21}}, {{22, 17}}, {{26, 21}}}},
+             {{{{20, 18}}, {{26, 23}}, {{20, 26}}, {{18, 23}}}},
+             {{{{26, 23}}, {{21, 19}}, {{26, 21}}, {{23, 19}}}}}};
+          return table_hex;
+        }
+      default:
+        DEAL_II_NOT_IMPLEMENTED();
+    }
+
+  return {};
+}
+
+
+
+constexpr dealii::ndarray<unsigned int, 8, 6>
+ReferenceCell::new_isotropic_child_cell_faces(
+  const unsigned int refienement_choice) const
+{
+  // AssertIndexRange(refienement_choice, n_isotropic_refinement_choices());
+  const unsigned int X = numbers::invalid_unsigned_int;
+  switch (this->kind)
+    {
+      case ReferenceCells::Tetrahedron:
+        {
+          constexpr dealii::ndarray<unsigned int, 3, 8, 6> cell_quads_tet = {
+            {// new line is (6, 8)
+             {{{{8, 13, 16, 0, X, X}},
+               {{9, 12, 1, 21, X, X}},
+               {{10, 2, 17, 20, X, X}},
+               {{3, 14, 18, 22, X, X}},
+               {{11, 1, 4, 5, X, X}},
+               {{15, 0, 4, 6, X, X}},
+               {{19, 7, 6, 3, X, X}},
+               {{23, 5, 2, 7, X, X}}}},
+             // new line is (5, 7)
+             {{
+               {{8, 13, 16, 0, X, X}},
+               {{9, 12, 1, 21, X, X}},
+               {{10, 2, 17, 20, X, X}},
+               {{3, 14, 18, 22, X, X}},
+               {{11, 4, 0, 5, X, X}},
+               {{15, 4, 1, 6, X, X}},
+               {{19, 2, 5, 7, X, X}},
+               {{23, 6, 7, 3, X, X}},
+             }},
+             // new line is (4, 9)
+             {{
+               {{8, 13, 16, 0, X, X}},
+               {{9, 12, 1, 21, X, X}},
+               {{10, 2, 17, 20, X, X}},
+               {{3, 14, 18, 22, X, X}},
+               {{11, 4, 5, 2, X, X}},
+               {{15, 6, 7, 3, X, X}},
+               {{19, 5, 0, 6, X, X}},
+               {{23, 1, 4, 7, X, X}},
+             }}}};
+          return cell_quads_tet[refienement_choice];
+        }
+
+      case ReferenceCells::Hexahedron:
+        {
+          constexpr dealii::ndarray<unsigned int, 8, 6> cell_quads_hex = {{
+            {{12, 0, 20, 4, 28, 8}},  // bottom children
+            {{0, 16, 22, 6, 29, 9}},  //
+            {{13, 1, 4, 24, 30, 10}}, //
+            {{1, 17, 6, 26, 31, 11}}, //
+            {{14, 2, 21, 5, 8, 32}},  // top children
+            {{2, 18, 23, 7, 9, 33}},  //
+            {{15, 3, 5, 25, 10, 34}}, //
+            {{3, 19, 7, 27, 11, 35}}  //
+          }};
+          return cell_quads_hex;
+        }
+      default:
+        DEAL_II_NOT_IMPLEMENTED();
+    }
+
+  return {};
+}
+
+
+
+constexpr dealii::ndarray<unsigned int, 8, 4>
+ReferenceCell::new_isotropic_child_cell_vertices(
+  const unsigned int refienement_choice) const
+{
+  // AssertIndexRange(refienement_choice, n_isotropic_refinement_choices());
+
+  switch (this->kind)
+    {
+      case ReferenceCells::Tetrahedron:
+        {
+          constexpr dealii::ndarray<unsigned int, 3, 8, 4> cell_vertices_tet = {
+            {// new line is (6,8)
+             {{{{0, 4, 6, 7}},
+               {{4, 1, 5, 8}},
+               {{6, 5, 2, 9}},
+               {{7, 8, 9, 3}},
+               {{4, 5, 6, 8}},
+               {{4, 7, 8, 6}},
+               {{6, 9, 7, 8}},
+               {{5, 8, 9, 6}}}},
+             // new line is (5,7)
+             {{{{0, 4, 6, 7}},
+               {{4, 1, 5, 8}},
+               {{6, 5, 2, 9}},
+               {{7, 8, 9, 3}},
+               {{4, 5, 6, 7}},
+               {{4, 7, 8, 5}},
+               {{6, 9, 7, 5}},
+               {{5, 8, 9, 7}}}},
+             // new line is (4,9)
+             {{{{0, 4, 6, 7}},
+               {{4, 1, 5, 8}},
+               {{6, 5, 2, 9}},
+               {{7, 8, 9, 3}},
+               {{4, 5, 6, 9}},
+               {{4, 7, 8, 9}},
+               {{6, 9, 7, 4}},
+               {{5, 8, 9, 4}}}}}};
+          return cell_vertices_tet[refienement_choice];
+        }
+      default:
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return {};
@@ -1147,7 +1513,7 @@ ReferenceCell::get_dimension() const
       case ReferenceCells::Hexahedron:
         return 3;
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return numbers::invalid_unsigned_int;
@@ -1187,7 +1553,7 @@ ReferenceCell::n_vertices() const
       case ReferenceCells::Hexahedron:
         return 8;
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return numbers::invalid_unsigned_int;
@@ -1217,7 +1583,7 @@ ReferenceCell::n_lines() const
       case ReferenceCells::Hexahedron:
         return 12;
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return numbers::invalid_unsigned_int;
@@ -1337,10 +1703,10 @@ ReferenceCell::vertex(const unsigned int v) const
           break;
         }
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
   return Point<dim>();
 }
 
@@ -1367,7 +1733,7 @@ ReferenceCell::n_faces() const
       case ReferenceCells::Hexahedron:
         return 6;
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return numbers::invalid_unsigned_int;
@@ -1379,6 +1745,62 @@ inline std_cxx20::ranges::iota_view<unsigned int, unsigned int>
 ReferenceCell::face_indices() const
 {
   return {0U, n_faces()};
+}
+
+
+
+inline unsigned int
+ReferenceCell::n_isotropic_refinement_choices() const
+{
+  switch (this->kind)
+    {
+      case ReferenceCells::Vertex:
+        return 1;
+      case ReferenceCells::Line:
+        return 1;
+      case ReferenceCells::Triangle:
+        return 1;
+      case ReferenceCells::Quadrilateral:
+        return 1;
+      case ReferenceCells::Tetrahedron:
+        return 3;
+      case ReferenceCells::Pyramid:
+        return 1;
+      case ReferenceCells::Wedge:
+        return 1;
+      case ReferenceCells::Hexahedron:
+        return 1;
+      default:
+        DEAL_II_ASSERT_UNREACHABLE();
+    }
+
+  return numbers::invalid_unsigned_int;
+}
+
+
+
+inline IsotropicRefinementChoice
+ReferenceCell::get_isotropic_refinement_choice(
+  const unsigned int ref_choice) const
+{
+  AssertIndexRange(ref_choice, n_isotropic_refinement_choices());
+  switch (this->kind)
+    {
+      case ReferenceCells::Tetrahedron:
+        {
+          static constexpr ndarray<IsotropicRefinementChoice, 3>
+            isotropic_ref_choices = {{IsotropicRefinementChoice::cut_tet_68,
+                                      IsotropicRefinementChoice::cut_tet_57,
+                                      IsotropicRefinementChoice::cut_tet_49}};
+          return isotropic_ref_choices[ref_choice];
+        }
+      default:
+        {
+          DEAL_II_NOT_IMPLEMENTED();
+        }
+    }
+
+  return IsotropicRefinementChoice::isotropic_refinement;
 }
 
 
@@ -1401,17 +1823,29 @@ ReferenceCell::n_isotropic_children() const
       case ReferenceCells::Pyramid:
         // We haven't yet decided how to refine pyramids. Update this when we
         // have
-        Assert(false, ExcNotImplemented());
-        return numbers::invalid_unsigned_int;
+        return 0;
       case ReferenceCells::Wedge:
         return 8;
       case ReferenceCells::Hexahedron:
         return 8;
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_ASSERT_UNREACHABLE();
     }
 
   return numbers::invalid_unsigned_int;
+}
+
+
+
+template <int dim>
+unsigned int
+ReferenceCell::n_children(const RefinementCase<dim> ref_case) const
+{
+  // Use GeometryInfo here to keep it the single source of truth
+  if (this->is_hyper_cube())
+    return GeometryInfo<dim>::n_children(ref_case);
+  else
+    return this->n_isotropic_children();
 }
 
 
@@ -1469,7 +1903,7 @@ ReferenceCell::face_reference_cell(const unsigned int face_no) const
       case ReferenceCells::Hexahedron:
         return ReferenceCells::Quadrilateral;
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return ReferenceCells::Invalid;
@@ -1512,7 +1946,7 @@ ReferenceCell::child_cell_on_face(
       case ReferenceCells::Vertex:
       case ReferenceCells::Line:
         {
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
           break;
         }
       case ReferenceCells::Triangle:
@@ -1539,7 +1973,7 @@ ReferenceCell::child_cell_on_face(
       case ReferenceCells::Pyramid:
       case ReferenceCells::Wedge:
         {
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
           break;
         }
       case ReferenceCells::Hexahedron:
@@ -1556,7 +1990,7 @@ ReferenceCell::child_cell_on_face(
             face_rotation);
         }
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return numbers::invalid_unsigned_int;
@@ -1577,7 +2011,7 @@ ReferenceCell::standard_vertex_to_face_and_vertex_index(
     {
       case ReferenceCells::Vertex:
       case ReferenceCells::Line:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
         break;
       case ReferenceCells::Triangle:
         {
@@ -1618,7 +2052,7 @@ ReferenceCell::standard_vertex_to_face_and_vertex_index(
             vertex);
         }
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return {};
@@ -1639,7 +2073,7 @@ ReferenceCell::standard_line_to_face_and_line_index(
       case ReferenceCells::Triangle:
       case ReferenceCells::Quadrilateral:
         {
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
           break;
         }
       case ReferenceCells::Tetrahedron:
@@ -1681,7 +2115,7 @@ ReferenceCell::standard_line_to_face_and_line_index(
           return GeometryInfo<3>::standard_hex_line_to_quad_line_index(line);
         }
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return {};
@@ -1763,7 +2197,7 @@ ReferenceCell::line_to_cell_vertices(const unsigned int line,
         }
 
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return numbers::invalid_unsigned_int;
@@ -1785,7 +2219,7 @@ ReferenceCell::face_to_cell_lines(
     {
       case ReferenceCells::Vertex:
         {
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
           break;
         }
       case ReferenceCells::Line:
@@ -1849,7 +2283,7 @@ ReferenceCell::face_to_cell_lines(
             face, line, face_orientation, face_flip, face_rotation);
         }
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return numbers::invalid_unsigned_int;
@@ -1865,12 +2299,20 @@ ReferenceCell::face_to_cell_vertices(
 {
   AssertIndexRange(face, n_faces());
   AssertIndexRange(vertex, face_reference_cell(face).n_vertices());
+  // TODO: once the default orientation is switched to 0 then we can remove this
+  // special case for 1D.
+  if (get_dimension() == 1)
+    Assert(combined_face_orientation ==
+             ReferenceCell::default_combined_face_orientation(),
+           ExcMessage("In 1D, all faces must have the default orientation."));
+  else
+    AssertIndexRange(combined_face_orientation, n_face_orientations(face));
 
   switch (this->kind)
     {
       case ReferenceCells::Vertex:
         {
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
           break;
         }
       case ReferenceCells::Line:
@@ -1886,8 +2328,8 @@ ReferenceCell::face_to_cell_vertices(
           static constexpr ndarray<unsigned int, 3, 2> table = {
             {{{0, 1}}, {{1, 2}}, {{2, 0}}}};
 
-          return table[face][combined_face_orientation !=
-                                 reversed_combined_line_orientation() ?
+          return table[face][combined_face_orientation ==
+                                 default_combined_face_orientation() ?
                                vertex :
                                (1 - vertex)];
         }
@@ -1942,7 +2384,7 @@ ReferenceCell::face_to_cell_vertices(
             face, vertex, face_orientation, face_flip, face_rotation);
         }
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return numbers::invalid_unsigned_int;
@@ -1973,9 +2415,13 @@ ReferenceCell::standard_to_real_face_vertex(
   switch (this->kind)
     {
       case ReferenceCells::Vertex:
-      case ReferenceCells::Line:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
         break;
+      case ReferenceCells::Line:
+        Assert(face_orientation == default_combined_face_orientation(),
+               ExcMessage(
+                 "In 1D, all faces must have the default orientation."));
+        return vertex;
       case ReferenceCells::Triangle:
       case ReferenceCells::Quadrilateral:
         return line_vertex_permutations[face_orientation][vertex];
@@ -1996,10 +2442,10 @@ ReferenceCell::standard_to_real_face_vertex(
       case ReferenceCells::Hexahedron:
         return quadrilateral_vertex_permutations[face_orientation][vertex];
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
   return numbers::invalid_unsigned_int;
 }
 
@@ -2028,7 +2474,7 @@ ReferenceCell::standard_to_real_face_line(
       case ReferenceCells::Line:
       case ReferenceCells::Triangle:
       case ReferenceCells::Quadrilateral:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
         break;
       case ReferenceCells::Tetrahedron:
         return triangle_table[combined_face_orientation][line];
@@ -2074,7 +2520,7 @@ ReferenceCell::standard_to_real_face_line(
           return table[combined_face_orientation][line];
         }
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return numbers::invalid_unsigned_int;
@@ -2099,7 +2545,7 @@ namespace ReferenceCells
         case 3:
           return ReferenceCells::Tetrahedron;
         default:
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
       }
     return ReferenceCells::Invalid;
   }
@@ -2121,7 +2567,7 @@ namespace ReferenceCells
         case 3:
           return ReferenceCells::Hexahedron;
         default:
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
       }
     return ReferenceCells::Invalid;
   }
@@ -2196,7 +2642,7 @@ ReferenceCell::d_linear_shape_function(const Point<dim>  &xi,
               case 2:
                 return xi[std::min(1, dim - 1)];
               default:
-                Assert(false, ExcInternalError());
+                DEAL_II_ASSERT_UNREACHABLE();
             }
         }
       // see also BarycentricPolynomials<3>::compute_value
@@ -2214,7 +2660,7 @@ ReferenceCell::d_linear_shape_function(const Point<dim>  &xi,
               case 3:
                 return xi[std::min(2, dim - 1)];
               default:
-                Assert(false, ExcInternalError());
+                DEAL_II_ASSERT_UNREACHABLE();
             }
         }
       // see also ScalarLagrangePolynomialPyramid::compute_value()
@@ -2250,7 +2696,7 @@ ReferenceCell::d_linear_shape_function(const Point<dim>  &xi,
                  .d_linear_shape_function<1>(Point<1>(xi[std::min(2, dim - 1)]),
                                              i / 3);
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return 0.0;
@@ -2282,10 +2728,10 @@ ReferenceCell::d_linear_shape_function_gradient(const Point<dim>  &xi,
             case 2:
               return Point<dim>(+0.0, +1.0);
             default:
-              Assert(false, ExcInternalError());
+              DEAL_II_ASSERT_UNREACHABLE();
           }
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return Point<dim>(+0.0, +0.0, +0.0);
@@ -2315,7 +2761,7 @@ ReferenceCell::volume() const
       case ReferenceCells::Hexahedron:
         return 1;
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return 0.0;
@@ -2348,7 +2794,7 @@ ReferenceCell::barycenter() const
       case ReferenceCells::Hexahedron:
         return Point<dim>(1. / 2., 1. / 2., 1. / 2.);
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return Point<dim>();
@@ -2457,7 +2903,7 @@ ReferenceCell::contains_point(const Point<dim> &p, const double tolerance) const
           return true;
         }
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   return false;
@@ -2537,7 +2983,7 @@ ReferenceCell::unit_tangential_vectors(const unsigned int face_no,
           return table[face_no][i];
         }
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
 
@@ -2570,7 +3016,7 @@ ReferenceCell::unit_normal_vectors(const unsigned int face_no) const
                               unit_tangential_vectors<dim>(face_no, 1));
     }
 
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
 
   return {};
 }
@@ -2590,7 +3036,7 @@ ReferenceCell::n_face_orientations(const unsigned int face_no) const
   else if (face_reference_cell(face_no) == ReferenceCells::Triangle)
     return 6;
 
-  Assert(false, ExcInternalError());
+  DEAL_II_ASSERT_UNREACHABLE();
   return numbers::invalid_unsigned_int;
 }
 
@@ -2768,96 +3214,38 @@ ReferenceCell::get_combined_orientation(
                     "the number of vertices of the cell "
                     "referenced by this object."));
 
-  const auto v0_equals = [&](const std::initializer_list<const T> &list) {
-    Assert(list.size() == n_vertices(), ExcInternalError());
-    return std::equal(vertices_0.begin(), vertices_0.end(), std::begin(list));
+  auto compute_orientation = [&](const auto &table) {
+    for (unsigned char o = 0; o < table.size(); ++o)
+      {
+        bool match = true;
+        for (unsigned int j = 0; j < table[o].size(); ++j)
+          match = (match && vertices_0[j] == vertices_1[table[o][j]]);
+
+        if (match)
+          return o;
+      }
+
+    Assert(false, (internal::NoPermutation<T>(*this, vertices_0, vertices_1)));
+    return std::numeric_limits<unsigned char>::max();
   };
 
   switch (this->kind)
     {
       case ReferenceCells::Vertex:
-        // Things are always default-oriented in 1D
-        if (v0_equals({vertices_1[0]}))
+        // TODO: we can get rid of this special-case and use
+        // vertex_vertex_permutations once we make 0 the default orientation.
+        (void)vertex_vertex_permutations;
+        if (vertices_0[0] == vertices_1[0])
           return default_combined_face_orientation();
         break;
-
       case ReferenceCells::Line:
-        // line_orientation=true
-        if (v0_equals({vertices_1[0], vertices_1[1]}))
-          return default_combined_face_orientation();
-
-        // line_orientation=false
-        if (v0_equals({vertices_1[1], vertices_1[0]}))
-          return reversed_combined_line_orientation();
-        break;
+        return compute_orientation(line_vertex_permutations);
       case ReferenceCells::Triangle:
-        // face_orientation=true, face_rotation=false, face_flip=false
-        if (v0_equals({vertices_1[0], vertices_1[1], vertices_1[2]}))
-          return 1;
-
-        // face_orientation=true, face_rotation=true, face_flip=false
-        if (v0_equals({vertices_1[1], vertices_1[2], vertices_1[0]}))
-          return 5;
-
-        // face_orientation=true, face_rotation=false, face_flip=true
-        if (v0_equals({vertices_1[2], vertices_1[0], vertices_1[1]}))
-          return 3;
-
-        // face_orientation=false, face_rotation=false, face_flip=false
-        if (v0_equals({vertices_1[0], vertices_1[2], vertices_1[1]}))
-          return 0;
-
-        // face_orientation=false, face_rotation=true, face_flip=false
-        if (v0_equals({vertices_1[2], vertices_1[1], vertices_1[0]}))
-          return 2;
-
-        // face_orientation=false, face_rotation=false, face_flip=true
-        if (v0_equals({vertices_1[1], vertices_1[0], vertices_1[2]}))
-          return 4;
-        break;
+        return compute_orientation(triangle_vertex_permutations);
       case ReferenceCells::Quadrilateral:
-        // face_orientation=true, face_rotation=false, face_flip=false
-        if (v0_equals(
-              {vertices_1[0], vertices_1[1], vertices_1[2], vertices_1[3]}))
-          return 1;
-
-        // face_orientation=true, face_rotation=true, face_flip=false
-        if (v0_equals(
-              {vertices_1[2], vertices_1[0], vertices_1[3], vertices_1[1]}))
-          return 3;
-
-        // face_orientation=true, face_rotation=false, face_flip=true
-        if (v0_equals(
-              {vertices_1[3], vertices_1[2], vertices_1[1], vertices_1[0]}))
-          return 5;
-
-        // face_orientation=true, face_rotation=true, face_flip=true
-        if (v0_equals(
-              {vertices_1[1], vertices_1[3], vertices_1[0], vertices_1[2]}))
-          return 7;
-
-        // face_orientation=false, face_rotation=false, face_flip=false
-        if (v0_equals(
-              {vertices_1[0], vertices_1[2], vertices_1[1], vertices_1[3]}))
-          return 0;
-
-        // face_orientation=false, face_rotation=true, face_flip=false
-        if (v0_equals(
-              {vertices_1[2], vertices_1[3], vertices_1[0], vertices_1[1]}))
-          return 2;
-
-        // face_orientation=false, face_rotation=false, face_flip=true
-        if (v0_equals(
-              {vertices_1[3], vertices_1[1], vertices_1[2], vertices_1[0]}))
-          return 4;
-
-        // face_orientation=false, face_rotation=true, face_flip=true
-        if (v0_equals(
-              {vertices_1[1], vertices_1[0], vertices_1[3], vertices_1[2]}))
-          return 6;
-        break;
+        return compute_orientation(quadrilateral_vertex_permutations);
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
   Assert(false, (internal::NoPermutation<T>(*this, vertices_0, vertices_1)));
@@ -2899,71 +3287,73 @@ ReferenceCell::permute_by_combined_orientation(
   const ArrayView<const T> &vertices,
   const unsigned char       orientation) const
 {
-  Assert(vertices.size() == n_vertices(),
-         ExcMessage("The number of array elements must be equal to "
-                    "the number of vertices of the cell "
-                    "referenced by this object."));
+  AssertDimension(vertices.size(), n_vertices());
+  boost::container::small_vector<T, 8> result(n_vertices());
+
+  auto permute = [&](const auto &table) {
+    AssertIndexRange(orientation, table.size());
+    for (unsigned int j = 0; j < table[orientation].size(); ++j)
+      result[j] = vertices[table[orientation][j]];
+  };
 
   switch (this->kind)
     {
+      case ReferenceCells::Vertex:
+        // TODO: we can get rid of this special-case and use
+        // vertex_vertex_permutations once we make 0 the default orientation.
+        std::copy(vertices.begin(), vertices.end(), result.begin());
+        break;
       case ReferenceCells::Line:
-        switch (orientation)
-          {
-            case 1:
-              return {vertices[0], vertices[1]};
-            case 0:
-              return {vertices[1], vertices[0]};
-            default:
-              Assert(false, ExcNotImplemented());
-          }
+        permute(line_vertex_permutations);
         break;
       case ReferenceCells::Triangle:
-        switch (orientation)
-          {
-            case 1:
-              return {vertices[0], vertices[1], vertices[2]};
-            case 3:
-              return {vertices[1], vertices[2], vertices[0]};
-            case 5:
-              return {vertices[2], vertices[0], vertices[1]};
-            case 0:
-              return {vertices[0], vertices[2], vertices[1]};
-            case 2:
-              return {vertices[2], vertices[1], vertices[0]};
-            case 4:
-              return {vertices[1], vertices[0], vertices[2]};
-            default:
-              Assert(false, ExcNotImplemented());
-          }
+        permute(triangle_vertex_permutations);
         break;
       case ReferenceCells::Quadrilateral:
-        switch (orientation)
-          {
-            case 1:
-              return {vertices[0], vertices[1], vertices[2], vertices[3]};
-            case 3:
-              return {vertices[2], vertices[0], vertices[3], vertices[1]};
-            case 5:
-              return {vertices[3], vertices[2], vertices[1], vertices[0]};
-            case 7:
-              return {vertices[1], vertices[3], vertices[0], vertices[2]};
-            case 0:
-              return {vertices[0], vertices[2], vertices[1], vertices[3]};
-            case 2:
-              return {vertices[2], vertices[3], vertices[0], vertices[1]};
-            case 4:
-              return {vertices[3], vertices[1], vertices[2], vertices[0]};
-            case 6:
-              return {vertices[1], vertices[0], vertices[3], vertices[2]};
-            default:
-              Assert(false, ExcNotImplemented());
-          }
+        permute(quadrilateral_vertex_permutations);
         break;
       default:
-        AssertThrow(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 
-  return {};
+  return result;
+}
+
+
+
+inline unsigned char
+ReferenceCell::get_inverse_combined_orientation(
+  const unsigned char orientation) const
+{
+  switch (this->kind)
+    {
+      case ReferenceCells::Vertex:
+        // Things are always default-oriented in 1D
+        return orientation;
+
+      case ReferenceCells::Line:
+        // the 1d orientations are the identity and a flip: i.e., the identity
+        // and an involutory mapping
+        return orientation;
+
+      case ReferenceCells::Triangle:
+        {
+          AssertIndexRange(orientation, 6);
+          constexpr std::array<unsigned char, 6> inverses{{0, 1, 2, 5, 4, 3}};
+          return inverses[orientation];
+        }
+      case ReferenceCells::Quadrilateral:
+        {
+          AssertIndexRange(orientation, 8);
+          constexpr std::array<unsigned char, 8> inverses{
+            {0, 1, 2, 7, 4, 5, 6, 3}};
+          return inverses[orientation];
+        }
+      default:
+        DEAL_II_NOT_IMPLEMENTED();
+    }
+
+  return std::numeric_limits<unsigned char>::max();
 }
 
 

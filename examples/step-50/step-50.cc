@@ -1,17 +1,16 @@
-/* ---------------------------------------------------------------------
+/* ------------------------------------------------------------------------
  *
- * Copyright (C) 2019 - 2023 by the deal.II authors
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * Copyright (C) 2014 - 2024 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
- * The deal.II library is free software; you can use it, redistribute
- * it, and/or modify it under the terms of the GNU Lesser General
- * Public License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * The full text of the license can be found in the file LICENSE.md at
- * the top level directory of deal.II.
+ * Part of the source code is dual licensed under Apache-2.0 WITH
+ * LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+ * governing the source code and code contributions can be found in
+ * LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
  *
- * ---------------------------------------------------------------------
+ * ------------------------------------------------------------------------
  *
  * Authors: Thomas C. Clevenger, Clemson University
  *          Timo Heister, Clemson University
@@ -27,7 +26,6 @@
 #include <deal.II/base/conditional_ostream.h>
 #include <deal.II/base/data_out_base.h>
 #include <deal.II/base/index_set.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/base/parameter_handler.h>
@@ -107,7 +105,7 @@ namespace ChangeVectorTypes
     rwv.import_elements(in, VectorOperation::insert);
 #ifdef USE_PETSC_LA
     AssertThrow(false,
-                ExcMessage("CopyVectorTypes::copy() not implemented for "
+                ExcMessage("ChangeVectorTypes::copy() not implemented for "
                            "PETSc vector types."));
 #else
     out.import_elements(rwv, VectorOperation::insert);
@@ -124,7 +122,7 @@ namespace ChangeVectorTypes
 #ifdef USE_PETSC_LA
     (void)in;
     AssertThrow(false,
-                ExcMessage("CopyVectorTypes::copy() not implemented for "
+                ExcMessage("ChangeVectorTypes::copy() not implemented for "
                            "PETSc vector types."));
 #else
     rwv.reinit(in);
@@ -422,7 +420,7 @@ private:
 
   parallel::distributed::Triangulation<dim> triangulation;
   const MappingQ1<dim>                      mapping;
-  FE_Q<dim>                                 fe;
+  const FE_Q<dim>                           fe;
 
   DoFHandler<dim> dof_handler;
 
@@ -553,7 +551,7 @@ void LaplaceProblem<dim, degree>::setup_system()
         }
 
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 }
 
@@ -711,7 +709,7 @@ void LaplaceProblem<dim, degree>::setup_multigrid()
         }
 
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
 }
 
@@ -804,7 +802,7 @@ void LaplaceProblem<dim, degree>::assemble_multigrid()
 {
   TimerOutput::Scope timing(computing_timer, "Assemble multigrid");
 
-  QGauss<dim> quadrature_formula(degree + 1);
+  const QGauss<dim> quadrature_formula(degree + 1);
 
   FEValues<dim> fe_values(fe,
                           quadrature_formula,
@@ -1191,7 +1189,7 @@ void LaplaceProblem<dim, degree>::solve()
         }
 
       default:
-        Assert(false, ExcInternalError());
+        DEAL_II_ASSERT_UNREACHABLE();
     }
 
   pcout << "   Number of CG iterations:      " << solver_control.last_step()
@@ -1569,7 +1567,7 @@ int main(int argc, char *argv[])
             }
 
           default:
-            Assert(false, ExcMessage("This program only works in 2d and 3d."));
+            DEAL_II_NOT_IMPLEMENTED();
         }
     }
   catch (std::exception &exc)

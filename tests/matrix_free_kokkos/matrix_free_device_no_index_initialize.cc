@@ -1,26 +1,25 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2019 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2019 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
-// check that CUDAWrappers::FEEvaluation::submit_dof_value/get_dof_value
+// check that Portable::FEEvaluation::submit_dof_value/get_dof_value
 // works correctly.
 
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/manifold_lib.h>
 
-#include <deal.II/matrix_free/cuda_fe_evaluation.h>
+#include <deal.II/matrix_free/portable_fe_evaluation.h>
 
 #include "../tests.h"
 
@@ -37,19 +36,18 @@ public:
   static const unsigned int n_local_dofs = Utilities::pow(n_dofs_1d, dim);
   static const unsigned int n_q_points   = Utilities::pow(n_q_points_1d, dim);
 
-  MatrixFreeTest(const CUDAWrappers::MatrixFree<dim, Number> &data_in)
+  MatrixFreeTest(const Portable::MatrixFree<dim, Number> &data_in)
     : data(data_in){};
 
   DEAL_II_HOST_DEVICE void
-  operator()(
-    const unsigned int                                          cell,
-    const typename CUDAWrappers::MatrixFree<dim, Number>::Data *gpu_data,
-    CUDAWrappers::SharedData<dim, Number>                      *shared_data,
-    const Number                                               *src,
-    Number                                                     *dst) const
+  operator()(const unsigned int                                      cell,
+             const typename Portable::MatrixFree<dim, Number>::Data *gpu_data,
+             Portable::SharedData<dim, Number> *shared_data,
+             const Number                      *src,
+             Number                            *dst) const
   {
-    CUDAWrappers::FEEvaluation<dim, fe_degree, n_q_points_1d, 1, Number>
-      fe_eval(gpu_data, shared_data);
+    Portable::FEEvaluation<dim, fe_degree, n_q_points_1d, 1, Number> fe_eval(
+      gpu_data, shared_data);
 
     // set to unit vector
     auto fe_eval_ptr = &fe_eval;
@@ -93,7 +91,7 @@ public:
   };
 
 protected:
-  const CUDAWrappers::MatrixFree<dim, Number> &data;
+  const Portable::MatrixFree<dim, Number> &data;
 };
 
 template <int dim, int fe_degree, int n_q_points_1d, typename Number>
@@ -115,10 +113,10 @@ void
 do_test(const DoFHandler<dim>           &dof,
         const AffineConstraints<double> &constraints)
 {
-  CUDAWrappers::MatrixFree<dim, number> mf_data;
+  Portable::MatrixFree<dim, number> mf_data;
   {
     const QGauss<1> quad(fe_degree + 1);
-    typename CUDAWrappers::MatrixFree<dim, number>::AdditionalData data;
+    typename Portable::MatrixFree<dim, number>::AdditionalData data;
     data.mapping_update_flags = update_values | update_gradients |
                                 update_JxW_values | update_quadrature_points;
     mf_data.reinit(dof, constraints, quad, data);

@@ -1,17 +1,16 @@
-/* ---------------------------------------------------------------------
+/* ------------------------------------------------------------------------
  *
- * Copyright (C) 2021 - 2022 by the deal.II authors
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * Copyright (C) 2021 - 2024 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
- * The deal.II library is free software; you can use it, redistribute
- * it, and/or modify it under the terms of the GNU Lesser General
- * Public License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * The full text of the license can be found in the file LICENSE.md at
- * the top level directory of deal.II.
+ * Part of the source code is dual licensed under Apache-2.0 WITH
+ * LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+ * governing the source code and code contributions can be found in
+ * LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
  *
- * ---------------------------------------------------------------------
+ * ------------------------------------------------------------------------
  *
  * Author: Jean-Paul Pelteret, 2021
  */
@@ -80,7 +79,7 @@ namespace Step71
   // will be a simplified view as to what they *might* be doing in the
   // background. This description will be very much one designed to aid
   // understanding, and the reader is encouraged to view the @ref auto_symb_diff
-  // module documentation for a far more formal description into how these tools
+  // documentation topic for a far more formal description into how these tools
   // actually work.
   //
   // @sect4{An analytical function}
@@ -2319,7 +2318,7 @@ namespace Step71
       // The first derivative of the saturation function, noting that
       // $\frac{d \tanh(x)}{dx} = \text{sech}^{2}(x)$.
       const double dtanh_two_h_dot_h_div_h_sat_squ =
-        std::pow(1.0 / std::cosh(two_h_dot_h_div_h_sat_squ), 2.0);
+        Utilities::fixed_power<2>(1.0 / std::cosh(two_h_dot_h_div_h_sat_squ));
       const Tensor<1, dim> dtwo_h_dot_h_div_h_sat_squ_dH =
         2.0 * 2.0 / (this->get_mu_e_h_sat() * this->get_mu_e_h_sat()) * H;
 
@@ -3952,7 +3951,7 @@ namespace Step71
       // differentiable number type is hard-coded here, but with some clever
       // templating it is possible to select which framework to use at run time
       // (e.g., as selected through the parameter file). We'll simultaneously
-      // perform the experiments with the counterpary material law that was
+      // perform the experiments with the counterpart material law that was
       // fully implemented by hand, and check what it computes against our
       // assisted implementation.
       {

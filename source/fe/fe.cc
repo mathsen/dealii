@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 1998 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #include <deal.II/base/memory_consumption.h>
 #include <deal.II/base/qprojector.h>
@@ -140,10 +139,10 @@ FiniteElement<dim, spacedim>::FiniteElement(
        RefinementCase<dim>::all_refinement_cases())
     if (ref_case != RefinementCase<dim>::no_refinement)
       {
-        prolongation[ref_case - 1].resize(GeometryInfo<dim>::n_children(
+        prolongation[ref_case - 1].resize(this->reference_cell().n_children(
                                             RefinementCase<dim>(ref_case)),
                                           FullMatrix<double>());
-        restriction[ref_case - 1].resize(GeometryInfo<dim>::n_children(
+        restriction[ref_case - 1].resize(this->reference_cell().n_children(
                                            RefinementCase<dim>(ref_case)),
                                          FullMatrix<double>());
       }
@@ -306,7 +305,7 @@ FiniteElement<dim, spacedim>::reinit_restriction_and_prolongation_matrices(
     if (ref_case != RefinementCase<dim>::no_refinement)
       {
         const unsigned int nc =
-          GeometryInfo<dim>::n_children(RefinementCase<dim>(ref_case));
+          this->reference_cell().n_children(RefinementCase<dim>(ref_case));
 
         for (unsigned int i = 0; i < nc; ++i)
           {
@@ -338,8 +337,9 @@ FiniteElement<dim, spacedim>::get_restriction_matrix(
   Assert(refinement_case != RefinementCase<dim>::no_refinement,
          ExcMessage(
            "Restriction matrices are only available for refined cells!"));
-  AssertIndexRange(
-    child, GeometryInfo<dim>::n_children(RefinementCase<dim>(refinement_case)));
+  AssertIndexRange(child,
+                   this->reference_cell().n_children(
+                     RefinementCase<dim>(refinement_case)));
   // we use refinement_case-1 here. the -1 takes care of the origin of the
   // vector, as for RefinementCase<dim>::no_refinement (=0) there is no data
   // available and so the vector indices are shifted
@@ -361,8 +361,9 @@ FiniteElement<dim, spacedim>::get_prolongation_matrix(
   Assert(refinement_case != RefinementCase<dim>::no_refinement,
          ExcMessage(
            "Prolongation matrices are only available for refined cells!"));
-  AssertIndexRange(
-    child, GeometryInfo<dim>::n_children(RefinementCase<dim>(refinement_case)));
+  AssertIndexRange(child,
+                   this->reference_cell().n_children(
+                     RefinementCase<dim>(refinement_case)));
   // we use refinement_case-1 here. the -1 takes care
   // of the origin of the vector, as for
   // RefinementCase::no_refinement (=0) there is no
@@ -562,30 +563,20 @@ FiniteElement<dim, spacedim>::block_mask(
 
 template <int dim, int spacedim>
 unsigned int
-FiniteElement<dim, spacedim>::face_to_cell_index(const unsigned int face_index,
-                                                 const unsigned int face,
-                                                 const bool face_orientation,
-                                                 const bool face_flip,
-                                                 const bool face_rotation) const
+FiniteElement<dim, spacedim>::face_to_cell_index(
+  const unsigned int  face_index,
+  const unsigned int  face,
+  const unsigned char combined_orientation) const
 {
   AssertIndexRange(face_index, this->n_dofs_per_face(face));
   AssertIndexRange(face, this->reference_cell().n_faces());
 
-  // TODO: we could presumably solve the 3d case below using the
-  // adjust_quad_dof_index_for_face_orientation_table field. For the 2d case, we
-  // can't use adjust_line_dof_index_for_line_orientation_table since that array
-  // is not populated for elements with quadrilateral reference cells
-  // (presumably because we thought that there are no flipped edges in 2d, but
-  // these can happen in DoFTools::make_periodicity_constraints(), for example).
-  // so we would need to either fill this field, or rely on derived classes
-  // implementing this function, as we currently do
-
   // see the function's documentation for an explanation of this
   // assertion -- in essence, derived classes have to implement
   // an overloaded version of this function if we are to use any
-  // other than standard orientation
-  if ((face_orientation != true) || (face_flip != false) ||
-      (face_rotation != false))
+  // other than default (standard) orientation
+  if (combined_orientation !=
+      ReferenceCell::default_combined_face_orientation())
     Assert((this->n_dofs_per_line() <= 1) && (this->n_dofs_per_quad(face) <= 1),
            ExcMessage(
              "The function in this base class can not handle this case. "
@@ -593,7 +584,7 @@ FiniteElement<dim, spacedim>::face_to_cell_index(const unsigned int face_index,
              "an overloaded version but apparently hasn't done so. See "
              "the documentation of this function for more information."));
 
-  // we need to distinguish between DoFs on vertices, lines and in 3d quads.
+  // we need to distinguish between DoFs on vertices, lines and (in 3d) quads.
   // do so in a sequence of if-else statements
   if (face_index < this->get_first_face_line_index(face))
     // DoF is on a vertex
@@ -607,11 +598,7 @@ FiniteElement<dim, spacedim>::face_to_cell_index(const unsigned int face_index,
       // then get the number of this vertex on the cell and translate
       // this to a DoF number on the cell
       return (this->reference_cell().face_to_cell_vertices(
-                face,
-                face_vertex,
-                internal::combined_face_orientation(face_orientation,
-                                                    face_rotation,
-                                                    face_flip)) *
+                face, face_vertex, combined_orientation) *
                 this->n_dofs_per_vertex() +
               dof_index_on_vertex);
     }
@@ -627,12 +614,9 @@ FiniteElement<dim, spacedim>::face_to_cell_index(const unsigned int face_index,
       const unsigned int dof_index_on_line = index % this->n_dofs_per_line();
 
       return (this->get_first_line_index() +
-              this->reference_cell().face_to_cell_lines(
-                face,
-                face_line,
-                internal::combined_face_orientation(face_orientation,
-                                                    face_rotation,
-                                                    face_flip)) *
+              this->reference_cell().face_to_cell_lines(face,
+                                                        face_line,
+                                                        combined_orientation) *
                 this->n_dofs_per_line() +
               dof_index_on_line);
     }
@@ -654,11 +638,9 @@ FiniteElement<dim, spacedim>::face_to_cell_index(const unsigned int face_index,
 template <int dim, int spacedim>
 unsigned int
 FiniteElement<dim, spacedim>::adjust_quad_dof_index_for_face_orientation(
-  const unsigned int index,
-  const unsigned int face,
-  const bool         face_orientation,
-  const bool         face_flip,
-  const bool         face_rotation) const
+  const unsigned int  index,
+  const unsigned int  face,
+  const unsigned char combined_orientation) const
 {
   // general template for 1d and 2d: not
   // implemented. in fact, the function
@@ -685,10 +667,7 @@ FiniteElement<dim, spacedim>::adjust_quad_dof_index_for_face_orientation(
         this->n_dofs_per_quad(face),
     ExcInternalError());
   return index + adjust_quad_dof_index_for_face_orientation_table[table_n](
-                   index,
-                   internal::combined_face_orientation(face_orientation,
-                                                       face_rotation,
-                                                       face_flip));
+                   index, combined_orientation);
 }
 
 
@@ -696,23 +675,21 @@ FiniteElement<dim, spacedim>::adjust_quad_dof_index_for_face_orientation(
 template <int dim, int spacedim>
 unsigned int
 FiniteElement<dim, spacedim>::adjust_line_dof_index_for_line_orientation(
-  const unsigned int index,
-  const bool         line_orientation) const
+  const unsigned int  index,
+  const unsigned char combined_orientation) const
 {
-  // We orient quads (and 1D meshes are always oriented) so always skip those
-  // cases
-  //
-  // TODO - we may want to change this in the future: see also the notes in
-  // face_to_cell_index()
-  if (this->reference_cell() == ReferenceCells::Line ||
-      this->reference_cell() == ReferenceCells::Quadrilateral)
-    return index;
+  Assert(combined_orientation ==
+             ReferenceCell::default_combined_face_orientation() ||
+           combined_orientation ==
+             ReferenceCell::reversed_combined_line_orientation(),
+         ExcInternalError());
 
   AssertIndexRange(index, this->n_dofs_per_line());
   Assert(adjust_line_dof_index_for_line_orientation_table.size() ==
            this->n_dofs_per_line(),
          ExcInternalError());
-  if (line_orientation)
+  if (combined_orientation ==
+      ReferenceCell::default_combined_face_orientation())
     return index;
   else
     return index + adjust_line_dof_index_for_line_orientation_table[index];
@@ -728,7 +705,7 @@ FiniteElement<dim, spacedim>::prolongation_is_implemented() const
        RefinementCase<dim>::all_refinement_cases())
     if (ref_case != RefinementCase<dim>::no_refinement)
       for (unsigned int c = 0;
-           c < GeometryInfo<dim>::n_children(RefinementCase<dim>(ref_case));
+           c < this->reference_cell().n_children(RefinementCase<dim>(ref_case));
            ++c)
         {
           // make sure also the lazily initialized matrices are created
@@ -758,7 +735,7 @@ FiniteElement<dim, spacedim>::restriction_is_implemented() const
        RefinementCase<dim>::all_refinement_cases())
     if (ref_case != RefinementCase<dim>::no_refinement)
       for (unsigned int c = 0;
-           c < GeometryInfo<dim>::n_children(RefinementCase<dim>(ref_case));
+           c < this->reference_cell().n_children(RefinementCase<dim>(ref_case));
            ++c)
         {
           // make sure also the lazily initialized matrices are created
@@ -788,7 +765,7 @@ FiniteElement<dim, spacedim>::isotropic_prolongation_is_implemented() const
     RefinementCase<dim>::isotropic_refinement;
 
   for (unsigned int c = 0;
-       c < GeometryInfo<dim>::n_children(RefinementCase<dim>(ref_case));
+       c < this->reference_cell().n_children(RefinementCase<dim>(ref_case));
        ++c)
     {
       // make sure also the lazily initialized matrices are created
@@ -816,7 +793,7 @@ FiniteElement<dim, spacedim>::isotropic_restriction_is_implemented() const
     RefinementCase<dim>::isotropic_refinement;
 
   for (unsigned int c = 0;
-       c < GeometryInfo<dim>::n_children(RefinementCase<dim>(ref_case));
+       c < this->reference_cell().n_children(RefinementCase<dim>(ref_case));
        ++c)
     {
       // make sure also the lazily initialized matrices are created
@@ -920,7 +897,7 @@ FiniteElement<dim, spacedim>::interface_constraints_size() const
                   4 * this->n_dofs_per_quad(face_no),
                 this->n_dofs_per_face(face_no)};
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
     }
   return {numbers::invalid_unsigned_int, numbers::invalid_unsigned_int};
 }
@@ -983,7 +960,7 @@ std::vector<std::pair<unsigned int, unsigned int>>
 FiniteElement<dim, spacedim>::hp_vertex_dof_identities(
   const FiniteElement<dim, spacedim> &) const
 {
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
   return std::vector<std::pair<unsigned int, unsigned int>>();
 }
 
@@ -994,7 +971,7 @@ std::vector<std::pair<unsigned int, unsigned int>>
 FiniteElement<dim, spacedim>::hp_line_dof_identities(
   const FiniteElement<dim, spacedim> &) const
 {
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
   return std::vector<std::pair<unsigned int, unsigned int>>();
 }
 
@@ -1006,7 +983,7 @@ FiniteElement<dim, spacedim>::hp_quad_dof_identities(
   const FiniteElement<dim, spacedim> &,
   const unsigned int) const
 {
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
   return std::vector<std::pair<unsigned int, unsigned int>>();
 }
 
@@ -1018,7 +995,7 @@ FiniteElement<dim, spacedim>::compare_for_domination(
   const FiniteElement<dim, spacedim> &,
   const unsigned int) const
 {
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
   return FiniteElementDomination::neither_element_dominates;
 }
 
@@ -1219,7 +1196,7 @@ template <int dim, int spacedim>
 std::pair<Table<2, bool>, std::vector<unsigned int>>
 FiniteElement<dim, spacedim>::get_constant_modes() const
 {
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
   return std::pair<Table<2, bool>, std::vector<unsigned int>>(
     Table<2, bool>(this->n_components(), this->n_dofs_per_cell()),
     std::vector<unsigned int>(this->n_components()));
@@ -1240,7 +1217,7 @@ FiniteElement<dim, spacedim>::
                     "the glossary for a definition of generalized support "
                     "points). Consequently, the current function can not "
                     "be defined and is not implemented by the element."));
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
 }
 
 

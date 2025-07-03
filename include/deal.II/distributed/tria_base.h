@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2015 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_distributed_tria_base_h
 #define dealii_distributed_tria_base_h
@@ -211,7 +210,14 @@ namespace parallel
       const unsigned int level) const override;
 
     /**
-     * @copydoc deal.II/grid/tria.h Triangulation::get_boundary_ids()
+     * Return a vector containing all boundary indicators assigned to boundary
+     * faces of active cells of this Triangulation object. Note, that each
+     * boundary indicator is reported only once. The size of the return vector
+     * will represent the number of different indicators (which is greater or
+     * equal one).
+     *
+     * @see
+     * @ref GlossBoundaryIndicator "Glossary entry on boundary indicators"
      *
      * @note This function involves a global communication gathering all current
      *   IDs from all processes.
@@ -220,7 +226,16 @@ namespace parallel
     get_boundary_ids() const override;
 
     /**
-     * @copydoc deal.II/grid/tria.h Triangulation::get_manifold_ids()
+     * Return a vector containing all manifold indicators assigned to the
+     * objects of the active cells of this Triangulation. Note, that each
+     * manifold indicator is reported only once. The size of the return vector
+     * will represent the number of different indicators (which is greater or
+     * equal one).
+     *
+     * @ingroup manifold
+     *
+     * @see
+     * @ref GlossManifoldIndicator "Glossary entry on manifold indicators"
      *
      * @note This function involves a global communication gathering all current
      *   IDs from all processes.
@@ -286,6 +301,15 @@ namespace parallel
 
     virtual types::coarse_cell_id
     n_global_coarse_cells() const override;
+
+    /**
+     * Reset this triangulation to an empty state by deleting all data.
+     *
+     * Note that this operation is only allowed if no subscriptions to this
+     * object exist any more, such as DoFHandler objects using it.
+     */
+    virtual void
+    clear() override;
 
   protected:
     /**
@@ -370,9 +394,6 @@ namespace parallel
     virtual void
     update_number_cache();
 
-    /**
-     * @copydoc deal.II/grid/tria.h Triangulation::update_reference_cells()
-     */
     void
     update_reference_cells() override;
 
@@ -446,15 +467,6 @@ namespace parallel
                  smooth_grid = (dealii::Triangulation<dim, spacedim>::none),
       const bool check_for_distorted_cells = false);
 
-    /**
-     * Reset this triangulation into a virgin state by deleting all data.
-     *
-     * Note that this operation is only allowed if no subscriptions to this
-     * object exist any more, such as DoFHandler objects using it.
-     */
-    virtual void
-    clear() override;
-
     using cell_iterator =
       typename dealii::Triangulation<dim, spacedim>::cell_iterator;
 
@@ -493,16 +505,6 @@ namespace parallel
      * spacedim>::load.
      */
     using Triangulation<dim, spacedim>::load;
-
-
-    /**
-     * Same as the function above.
-     *
-     * @deprecated The autopartition parameter has been removed.
-     */
-    DEAL_II_DEPRECATED
-    virtual void
-    load(const std::string &filename, const bool autopartition) = 0;
   };
 
 } // namespace parallel

@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2005 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 #include <deal.II/base/array_view.h>
@@ -82,11 +81,11 @@ namespace internal
                 const typename dealii::Triangulation<dim,
                                                      spacedim>::cell_iterator
                              neighbor_cell_at_face = cell->neighbor(f);
-                const CellId neigbor_cell_id = neighbor_cell_at_face->id();
+                const CellId neighbor_cell_id = neighbor_cell_at_face->id();
 
                 // Only fix sign if the orientation is opposite and only do so
                 // on the face dofs on the cell with smaller cell_id.
-                if (((nn + f) % 2 == 0) && this_cell_id < neigbor_cell_id)
+                if (((nn + f) % 2 == 0) && this_cell_id < neighbor_cell_id)
                   for (unsigned int j = 0; j < fe.n_dofs_per_face(f); ++j)
                     {
                       const unsigned int cell_j = fe.face_to_cell_index(j, f);
@@ -188,7 +187,7 @@ FE_PolyTensor<dim, spacedim>::FE_PolyTensor(
   , mapping_kind({MappingKind::mapping_none})
   , poly_space(polynomials.clone())
 {
-  cached_point(0) = -1;
+  cached_point[0] = -1;
   // Set up the table converting
   // components to base
   // components. Since we have only
@@ -613,7 +612,7 @@ FE_PolyTensor<dim, spacedim>::fill_fe_values(
                 }
 
               default:
-                Assert(false, ExcNotImplemented());
+                DEAL_II_NOT_IMPLEMENTED();
             }
         }
 
@@ -756,7 +755,7 @@ FE_PolyTensor<dim, spacedim>::fill_fe_values(
                 }
 
               default:
-                Assert(false, ExcNotImplemented());
+                DEAL_II_NOT_IMPLEMENTED();
             }
         }
 
@@ -1030,7 +1029,7 @@ FE_PolyTensor<dim, spacedim>::fill_fe_values(
                 }
 
               default:
-                Assert(false, ExcNotImplemented());
+                DEAL_II_NOT_IMPLEMENTED();
             }
         }
 
@@ -1041,7 +1040,7 @@ FE_PolyTensor<dim, spacedim>::fill_fe_values(
             (mapping_kind == mapping_raviart_thomas) ||
             (mapping_kind == mapping_nedelec))))
         {
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
         }
     }
 }
@@ -1081,9 +1080,8 @@ FE_PolyTensor<dim, spacedim>::fill_fe_face_values(
   const auto offset =
     QProjector<dim>::DataSetDescriptor::face(this->reference_cell(),
                                              face_no,
-                                             cell->face_orientation(face_no),
-                                             cell->face_flip(face_no),
-                                             cell->face_rotation(face_no),
+                                             cell->combined_face_orientation(
+                                               face_no),
                                              n_q_points);
 
   // TODO: Size assertions
@@ -1252,7 +1250,7 @@ FE_PolyTensor<dim, spacedim>::fill_fe_face_values(
                 }
 
               default:
-                Assert(false, ExcNotImplemented());
+                DEAL_II_NOT_IMPLEMENTED();
             }
         }
 
@@ -1420,7 +1418,7 @@ FE_PolyTensor<dim, spacedim>::fill_fe_face_values(
                 }
 
               default:
-                Assert(false, ExcNotImplemented());
+                DEAL_II_NOT_IMPLEMENTED();
             }
         }
 
@@ -1718,14 +1716,14 @@ FE_PolyTensor<dim, spacedim>::fill_fe_face_values(
                 }
 
               default:
-                Assert(false, ExcNotImplemented());
+                DEAL_II_NOT_IMPLEMENTED();
             }
         }
 
       // third derivatives are not implemented
       if (fe_data.update_each & update_3rd_derivatives)
         {
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
         }
     }
 }
@@ -1765,9 +1763,8 @@ FE_PolyTensor<dim, spacedim>::fill_fe_subface_values(
     QProjector<dim>::DataSetDescriptor::subface(this->reference_cell(),
                                                 face_no,
                                                 sub_no,
-                                                cell->face_orientation(face_no),
-                                                cell->face_flip(face_no),
-                                                cell->face_rotation(face_no),
+                                                cell->combined_face_orientation(
+                                                  face_no),
                                                 n_q_points,
                                                 cell->subface_case(face_no));
 
@@ -1940,7 +1937,7 @@ FE_PolyTensor<dim, spacedim>::fill_fe_subface_values(
                 }
 
               default:
-                Assert(false, ExcNotImplemented());
+                DEAL_II_NOT_IMPLEMENTED();
             }
         }
 
@@ -2094,7 +2091,7 @@ FE_PolyTensor<dim, spacedim>::fill_fe_subface_values(
                 }
 
               default:
-                Assert(false, ExcNotImplemented());
+                DEAL_II_NOT_IMPLEMENTED();
             }
         }
 
@@ -2391,14 +2388,14 @@ FE_PolyTensor<dim, spacedim>::fill_fe_subface_values(
                 }
 
               default:
-                Assert(false, ExcNotImplemented());
+                DEAL_II_NOT_IMPLEMENTED();
             }
         }
 
       // third derivatives are not implemented
       if (fe_data.update_each & update_3rd_derivatives)
         {
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
         }
     }
 }
@@ -2497,7 +2494,7 @@ FE_PolyTensor<dim, spacedim>::requires_update_flags(
 
           default:
             {
-              Assert(false, ExcNotImplemented());
+              DEAL_II_NOT_IMPLEMENTED();
             }
         }
     }

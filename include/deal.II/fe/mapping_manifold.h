@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2016 - 2022 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2016 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_mapping_manifold_h
 #define dealii_mapping_manifold_h
@@ -168,18 +167,10 @@ public:
      */
     InternalData() = default;
 
-    /**
-     * Initialize the object's member variables related to cell data based on
-     * the given arguments.
-     *
-     * The function also calls compute_shape_function_values() to actually set
-     * the member variables related to the values and derivatives of the
-     * mapping shape functions.
-     */
-    void
-    initialize(const UpdateFlags      update_flags,
-               const Quadrature<dim> &quadrature,
-               const unsigned int     n_original_q_points);
+    // Documentation see Mapping::InternalDataBase.
+    virtual void
+    reinit(const UpdateFlags      update_flags,
+           const Quadrature<dim> &quadrature) override;
 
     /**
      * Initialize the object's member variables related to cell and face data
@@ -391,37 +382,6 @@ private:
 /*----------------------------------------------------------------------*/
 
 #ifndef DOXYGEN
-
-template <int dim, int spacedim>
-inline void
-MappingManifold<dim, spacedim>::InternalData::store_vertices(
-  const typename Triangulation<dim, spacedim>::cell_iterator &cell) const
-{
-  vertices.resize(GeometryInfo<dim>::vertices_per_cell);
-  for (const unsigned int i : GeometryInfo<dim>::vertex_indices())
-    vertices[i] = cell->vertex(i);
-  this->cell = cell;
-}
-
-
-template <int dim, int spacedim>
-inline void
-MappingManifold<dim, spacedim>::InternalData::
-  compute_manifold_quadrature_weights(const Quadrature<dim> &quad)
-{
-  cell_manifold_quadrature_weights.resize(
-    quad.size(), std::vector<double>(GeometryInfo<dim>::vertices_per_cell));
-  for (unsigned int q = 0; q < quad.size(); ++q)
-    {
-      for (const unsigned int i : GeometryInfo<dim>::vertex_indices())
-        {
-          cell_manifold_quadrature_weights[q][i] =
-            GeometryInfo<dim>::d_linear_shape_function(quad.point(q), i);
-        }
-    }
-}
-
-
 
 template <int dim, int spacedim>
 inline bool

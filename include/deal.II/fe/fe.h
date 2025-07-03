@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 1998 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_fe_h
 #define dealii_fe_h
@@ -297,7 +296,7 @@ class FESystem;
  * do with how they interact with mappings, quadrature, and the FEValues
  * class, you will also want to read through the
  * @ref FE_vs_Mapping_vs_FEValues
- * documentation module.
+ * documentation topic.
  *
  *
  * <h4>Interpolation matrices in one dimension</h4>
@@ -961,10 +960,11 @@ public:
   shape_3rd_derivative(const unsigned int i, const Point<dim> &p) const;
 
   /**
-   * Just like for shape_3rd_derivative(), but this function will be called
-   * when the shape function has more than one non-zero vector component. In
-   * that case, this function should return the gradient of the @p component-
-   * th vector component of the @p ith shape function at point @p p.
+   * Just like for shape_3rd_derivative(), but this function will be
+   * called when the shape function has more than one non-zero vector
+   * component. In that case, this function should return the gradient
+   * of the @p component-th vector component of the @p ith shape
+   * function at point @p p.
    */
   virtual Tensor<3, dim>
   shape_3rd_derivative_component(const unsigned int i,
@@ -998,8 +998,9 @@ public:
   /**
    * Just like for shape_4th_derivative(), but this function will be called
    * when the shape function has more than one non-zero vector component. In
-   * that case, this function should return the gradient of the @p component-
-   * th vector component of the @p ith shape function at point @p p.
+   * that case, this function should return the gradient of the
+   * @p component-th vector component of the @p ith shape function at point
+   * @p p.
    */
   virtual Tensor<4, dim>
   shape_4th_derivative_component(const unsigned int i,
@@ -1039,6 +1040,21 @@ public:
    * FiniteElement::ExcProjectionVoid. You can check whether this would happen
    * by first calling the restriction_is_implemented() or the
    * isotropic_restriction_is_implemented() function.
+   *
+   * @note The term "restriction" is also used in the definition of multigrid
+   *   methods, but in a different context. For the current function, we are
+   *   interested in the interpolation of a finite element function from
+   *   child cells to the parent cell, and this results in a situation where
+   *   you have a function that is constant on a fine mesh, the function
+   *   "restricted" to the coarse mesh will also be constant and have the same
+   *   value. In contrast, in the multigrid context, the restriction operation
+   *   is applied to residual (rather than solution) vectors, and is usually
+   *   chosen as the transpose of the prolongation operation. For the multigrid
+   *   restriction operation, one would consequently not typically expect
+   *   that it maps a constant function to a constant function. In other words,
+   *   the *meaning* of the term "restriction" in the current context and in
+   *   the multigrid context is quite different, and the two should not
+   *   be confused.
    */
   virtual const FullMatrix<double> &
   get_restriction_matrix(const unsigned int         child,
@@ -1426,7 +1442,7 @@ public:
    * @ref step_20 "step-20"
    * tutorial programs as well as in the
    * @ref vector_valued
-   * module.
+   * topic.
    */
   std::pair<unsigned int, unsigned int>
   system_to_component_index(const unsigned int index) const;
@@ -1458,19 +1474,16 @@ public:
                                  const unsigned int face_no = 0) const;
 
   /**
-   * For faces with non-standard face_orientation in 3d, the dofs on faces
-   * (quads) have to be permuted in order to be combined with the correct
-   * shape functions. Given a local dof @p index on a quad, return the local
-   * index, if the face has non-standard face_orientation, face_flip or
-   * face_rotation. In 2d and 1d there is no need for permutation and
-   * consequently an exception is thrown.
+   * Given a local dof @p index on a quad, return the local index accounting for
+   * the face orientation @p combined_orientation. This is only necessary in 3d:
+   * consequently, if this function is called in 1d or 2d then an exception is
+   * thrown.
    */
   unsigned int
-  adjust_quad_dof_index_for_face_orientation(const unsigned int index,
-                                             const unsigned int face_no,
-                                             const bool face_orientation,
-                                             const bool face_flip,
-                                             const bool face_rotation) const;
+  adjust_quad_dof_index_for_face_orientation(
+    const unsigned int  index,
+    const unsigned int  face_no,
+    const unsigned char combined_orientation) const;
 
   /**
    * Given an index in the natural ordering of indices on a face, return the
@@ -1497,15 +1510,8 @@ public:
    * index must be between zero and dofs_per_face.
    * @param face The number of the face this degree of freedom lives on. This
    * number must be between zero and GeometryInfo::faces_per_cell.
-   * @param face_orientation One part of the description of the orientation of
-   * the face. See
-   * @ref GlossFaceOrientation.
-   * @param face_flip One part of the description of the orientation of the
-   * face. See
-   * @ref GlossFaceOrientation.
-   * @param face_rotation One part of the description of the orientation of
-   * the face. See
-   * @ref GlossFaceOrientation.
+   * @param combined_orientation The combined orientation flag containing the
+   * orientation, rotation, and flip of the face. See @ref GlossFaceOrientation.
    * @return The index of this degree of freedom within the set of degrees of
    * freedom on the entire cell. The returned value will be between zero and
    * dofs_per_cell.
@@ -1527,22 +1533,25 @@ public:
    * freedom actually represent.
    */
   virtual unsigned int
-  face_to_cell_index(const unsigned int face_dof_index,
-                     const unsigned int face,
-                     const bool         face_orientation = true,
-                     const bool         face_flip        = false,
-                     const bool         face_rotation    = false) const;
+  face_to_cell_index(
+    const unsigned int  face_dof_index,
+    const unsigned int  face,
+    const unsigned char combined_orientation =
+      ReferenceCell::default_combined_face_orientation()) const;
 
   /**
-   * For lines with non-standard line_orientation in 3d, the dofs on lines
-   * have to be permuted in order to be combined with the correct shape
-   * functions. Given a local dof @p index on a line, return the local index,
-   * if the line has non-standard line_orientation. In 2d and 1d there is no
-   * need for permutation, so the given index is simply returned.
+   * Given a local dof @p index on a line and the orientation @p
+   * combined_orientation of that line, return the local dof which accounts for
+   * @p combined_orientation.
+   *
+   * @note In both 1d and 2d all-quadrilateral meshes all lines have the
+   * standard orientation. However, since 2d meshes may contain both
+   * quadrilaterals and triangles, this assumption cannot be made in this class.
    */
   unsigned int
-  adjust_line_dof_index_for_line_orientation(const unsigned int index,
-                                             const bool line_orientation) const;
+  adjust_line_dof_index_for_line_orientation(
+    const unsigned int  index,
+    const unsigned char combined_orientation) const;
 
   /**
    * Return in which of the vector components of this finite element the @p
@@ -1588,11 +1597,11 @@ public:
   is_primitive() const;
 
   /**
-   * Return whether the @p ith shape function is primitive in the sense that
-   * the shape function is non-zero in only one vector component. Non-
-   * primitive shape functions would then, for example, be those of divergence
-   * free ansatz spaces, in which the individual vector components are
-   * coupled.
+   * Return whether the @p ith shape function is primitive in the
+   * sense that the shape function is non-zero in only one vector
+   * component. Non-primitive shape functions would then, for example,
+   * be those of divergence free ansatz spaces, in which the
+   * individual vector components are coupled.
    *
    * The result of the function is @p true if and only if the result of
    * <tt>n_nonzero_components(i)</tt> is equal to one.
@@ -2141,18 +2150,20 @@ public:
    * For a given degree of freedom, return whether it is logically associated
    * with a vertex, line, quad or hex.
    *
-   * For instance, for continuous finite elements this coincides with the
-   * lowest dimensional object the support point of the degree of freedom lies
-   * on. To give an example, for $Q_1$ elements in 3d, every degree of freedom
-   * is defined by a shape function that we get by interpolating using support
-   * points that lie on the vertices of the cell. The support of these points
-   * of course extends to all edges connected to this vertex, as well as the
-   * adjacent faces and the cell interior, but we say that logically the
-   * degree of freedom is associated with the vertex as this is the lowest-
-   * dimensional object it is associated with. Likewise, for $Q_2$ elements in
-   * 3d, the degrees of freedom with support points at edge midpoints would
-   * yield a value of GeometryPrimitive::line from this function, whereas
-   * those on the centers of faces in 3d would return GeometryPrimitive::quad.
+   * For instance, for continuous finite elements this coincides with
+   * the lowest dimensional object the support point of the degree of
+   * freedom lies on. To give an example, for $Q_1$ elements in 3d,
+   * every degree of freedom is defined by a shape function that we
+   * get by interpolating using support points that lie on the
+   * vertices of the cell. The support of these points of course
+   * extends to all edges connected to this vertex, as well as the
+   * adjacent faces and the cell interior, but we say that logically
+   * the degree of freedom is associated with the vertex as this is
+   * the lowest-dimensional object it is associated with. Likewise,
+   * for $Q_2$ elements in 3d, the degrees of freedom with support
+   * points at edge midpoints would yield a value of
+   * GeometryPrimitive::line from this function, whereas those on the
+   * centers of faces in 3d would return GeometryPrimitive::quad.
    *
    * To make this more formal, the kind of object returned by this function
    * represents the object so that the support of the shape function
@@ -2476,13 +2487,11 @@ protected:
   std::vector<Table<2, int>> adjust_quad_dof_index_for_face_orientation_table;
 
   /**
-   * For lines with non-standard line_orientation in 3d, the dofs on lines
+   * For lines with non-standard orientation in 2d or 3d, the dofs on lines
    * have to be permuted in order to be combined with the correct shape
    * functions. Given a local dof @p index on a line, return the shift in the
    * local index, if the line has non-standard line_orientation, i.e.
-   * <code>old_index + shift = new_index</code>. In 2d and 1d there is no need
-   * for permutation so the vector is empty. In 3d it has the size of
-   * #dofs_per_line.
+   * <code>old_index + shift = new_index</code>.
    *
    * The constructor of this class fills this table with zeros, i.e.,
    * no permutation at all. Derived finite element classes have to
@@ -2595,10 +2604,11 @@ protected:
   const bool cached_primitivity;
 
   /**
-   * Return the size of interface constraint matrices. Since this is needed in
-   * every derived finite element class when initializing their size, it is
-   * placed into this function, to avoid having to recompute the dimension-
-   * dependent size of these matrices each time.
+   * Return the size of interface constraint matrices. Since this is
+   * needed in every derived finite element class when initializing
+   * their size, it is placed into this function, to avoid having to
+   * recompute the dimension-dependent size of these matrices each
+   * time.
    *
    * Note that some elements do not implement the interface constraints for
    * certain polynomial degrees. In this case, this function still returns the
@@ -2633,7 +2643,7 @@ protected:
    * An extensive discussion of the interaction between this function and
    * FEValues can be found in the
    * @ref FE_vs_Mapping_vs_FEValues
-   * documentation module.
+   * documentation topic.
    *
    * @see UpdateFlags
    */
@@ -2663,8 +2673,8 @@ protected:
    * last argument. This output argument is guaranteed to always be the same one
    * when used with the InternalDataBase object returned by this function. In
    * other words, the subdivision of scratch data and final data in the returned
-   * object and the @p output_data object is as follows: If data can be pre-
-   * computed on the reference cell in the exact form in which it will later
+   * object and the @p output_data object is as follows: If data can be
+   * pre-computed on the reference cell in the exact form in which it will later
    * be needed on a concrete cell, then this function should already emplace
    * it in the @p output_data object. An example are the values of shape
    * functions at quadrature points for the usual Lagrange elements which on a
@@ -2684,7 +2694,7 @@ protected:
    * An extensive discussion of the interaction between this function and
    * FEValues can be found in the
    * @ref FE_vs_Mapping_vs_FEValues
-   * documentation module. See also the documentation of the InternalDataBase
+   * documentation topic. See also the documentation of the InternalDataBase
    * class.
    *
    * @param[in] update_flags A set of UpdateFlags values that describe what
@@ -2692,9 +2702,10 @@ protected:
    * compute. This set of flags may also include information that the finite
    * element can not compute, e.g., flags that pertain to data produced by the
    * mapping. An implementation of this function needs to set up all data
-   * fields in the returned object that are necessary to produce the finite-
-   * element related data specified by these flags, and may already pre-
-   * compute part of this information as discussed above. Elements may want to
+   * fields in the returned object that are necessary to produce the
+   * finite-element related data specified by these flags, and may already
+   * pre-compute part of this information as discussed above. Elements may
+   * want to
    * store these update flags (or a subset of these flags) in
    * InternalDataBase::update_each so they know at the time when
    * FiniteElement::fill_fe_values() is called what they are supposed to
@@ -2711,10 +2722,10 @@ protected:
    * above. FEValues guarantees that this output object and the object
    * returned by the current function will always be used together.
    * @return A pointer to an object of a type derived from InternalDataBase
-   * and that derived classes can use to store scratch data that can be pre-
-   * computed, or for scratch arrays that then only need to be allocated once.
-   * The calling site assumes ownership of this object and will delete it when
-   * it is no longer necessary.
+   * and that derived classes can use to store scratch data that can be
+   * pre-computed, or for scratch arrays that then only need to be allocated
+   * once. The calling site assumes ownership of this object and will delete it
+   * when it is no longer necessary.
    */
   virtual std::unique_ptr<InternalDataBase>
   get_data(const UpdateFlags             update_flags,
@@ -2740,9 +2751,10 @@ protected:
    * compute. This set of flags may also include information that the finite
    * element can not compute, e.g., flags that pertain to data produced by the
    * mapping. An implementation of this function needs to set up all data
-   * fields in the returned object that are necessary to produce the finite-
-   * element related data specified by these flags, and may already pre-
-   * compute part of this information as discussed above. Elements may want to
+   * fields in the returned object that are necessary to produce the
+   * finite-element related data specified by these flags, and may already
+   * pre-compute part of this information as discussed above. Elements may
+   * want to
    * store these update flags (or a subset of these flags) in
    * InternalDataBase::update_each so they know at the time when
    * FiniteElement::fill_fe_face_values() is called what they are supposed to
@@ -2759,10 +2771,10 @@ protected:
    * discussed above. FEValues guarantees that this output object and the
    * object returned by the current function will always be used together.
    * @return A pointer to an object of a type derived from InternalDataBase
-   * and that derived classes can use to store scratch data that can be pre-
-   * computed, or for scratch arrays that then only need to be allocated once.
-   * The calling site assumes ownership of this object and will delete it when
-   * it is no longer necessary.
+   * and that derived classes can use to store scratch data that can be
+   * pre-computed, or for scratch arrays that then only need to be allocated
+   * once. The calling site assumes ownership of this object and will
+   * delete it when it is no longer necessary.
    */
   virtual std::unique_ptr<InternalDataBase>
   get_face_data(const UpdateFlags               update_flags,
@@ -2799,9 +2811,10 @@ protected:
    * compute. This set of flags may also include information that the finite
    * element can not compute, e.g., flags that pertain to data produced by the
    * mapping. An implementation of this function needs to set up all data
-   * fields in the returned object that are necessary to produce the finite-
-   * element related data specified by these flags, and may already pre-
-   * compute part of this information as discussed above. Elements may want to
+   * fields in the returned object that are necessary to produce the
+   * finite-element related data specified by these flags, and may already
+   * pre-compute part of this information as discussed above. Elements may
+   * want to
    * store these update flags (or a subset of these flags) in
    * InternalDataBase::update_each so they know at the time when
    * FiniteElement::fill_fe_subface_values() is called what they are supposed
@@ -2818,8 +2831,9 @@ protected:
    * discussed above. FEValues guarantees that this output object and the
    * object returned by the current function will always be used together.
    * @return A pointer to an object of a type derived from InternalDataBase
-   * and that derived classes can use to store scratch data that can be pre-
-   * computed, or for scratch arrays that then only need to be allocated once.
+   * and that derived classes can use to store scratch data that can be
+   * pre-computed, or for scratch arrays that then only need to be allocated
+   * once.
    * The calling site assumes ownership of this object and will delete it when
    * it is no longer necessary.
    */
@@ -2861,7 +2875,7 @@ protected:
    * An extensive discussion of the interaction between this function and
    * FEValues can be found in the
    * @ref FE_vs_Mapping_vs_FEValues
-   * documentation module.
+   * documentation topic.
    *
    * @param[in] cell The cell of the triangulation for which this function is
    * to compute a mapping from the reference cell to.

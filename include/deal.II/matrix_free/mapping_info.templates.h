@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2012 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_matrix_free_mapping_info_templates_h
 #define dealii_matrix_free_mapping_info_templates_h
@@ -598,6 +597,14 @@ namespace internal
 
 
 
+      /**
+       * This function computes and tabulates the mapping information for
+       * generic mappings on a range of cells by a call to FEValues with the
+       * respective UpdateFlags set. There is a specialized function
+       * mapping_q_compute_range function that provides a faster
+       * initialization for mappings derived from MappingQ and suitable
+       * quadrature formulas.
+       */
       template <int dim, typename Number, typename VectorizedArrayType>
       void
       initialize_cell_range(
@@ -985,9 +992,11 @@ namespace internal
 
 
       /**
-       * This invokes the FEValues part of the initialization of MappingQ,
-       * storing the resulting quadrature points and an initial representation
-       * of Jacobians in two arrays.
+       * This function is the preparatory step for the faster MappingQ-based
+       * setup of the data structures in Mapping Info, using FEValues as an
+       * initial query mechanism into MappingQ, storing the resulting
+       * quadrature points and an initial representation of the Jacobians in
+       * two arrays.
        */
       template <int dim>
       void
@@ -1141,10 +1150,11 @@ namespace internal
 
 
       /**
-       * This evaluates the mapping information on a range of cells calling
-       * into the tensor product interpolators of the matrix-free framework,
-       * using a polynomial expansion of the cell geometry in terms of
-       * MappingQ.
+       * This function computes and tabulates the mapping information for
+       * MappingQ-derived mappings on a range of cells calling into the tensor
+       * product evaluators of the matrix-free framework, using a
+       * polynomial expansion of the cell geometry underlying the MappingQ
+       * class.
        */
       template <int dim,
                 typename Number,
@@ -1152,13 +1162,15 @@ namespace internal
                 typename VectorizedDouble>
       void
       mapping_q_compute_range(
-        const unsigned int                 begin_cell,
-        const unsigned int                 end_cell,
-        const std::vector<GeometryType>   &cell_type,
-        const std::vector<bool>           &process_cell,
-        const UpdateFlags                  update_flags_cells,
-        const AlignedVector<double>       &plain_quadrature_points,
-        const ShapeInfo<VectorizedDouble> &shape_info,
+        const unsigned int                                        begin_cell,
+        const unsigned int                                        end_cell,
+        const dealii::Triangulation<dim>                         &tria,
+        const std::vector<std::pair<unsigned int, unsigned int>> &cell_array,
+        const std::vector<GeometryType>                          &cell_type,
+        const std::vector<bool>                                  &process_cell,
+        const UpdateFlags            update_flags_cells,
+        const AlignedVector<double> &plain_quadrature_points,
+        const ShapeInfo<double>     &shape_info,
         MappingInfoStorage<dim, dim, VectorizedArrayType> &my_data)
       {
         constexpr unsigned int n_lanes   = VectorizedArrayType::size();
@@ -1240,6 +1252,28 @@ namespace internal
                             jac[d][e] = 0.;
 
                     const VectorizedDouble jac_det = determinant(jac);
+
+#ifdef DEBUG
+                    for (unsigned int v = 0; v < n_lanes_d; ++v)
+                      {
+                        const typename Triangulation<dim>::cell_iterator
+                          cell_iterator(
+                            &tria,
+                            cell_array[cell * n_lanes + vv + v].first,
+                            cell_array[cell * n_lanes + vv + v].second);
+
+                        Assert(jac_det[v] >
+                                 1e-12 * Utilities::fixed_power<dim>(
+                                           cell_iterator->diameter() /
+                                           std::sqrt(double(dim))),
+                               (typename Mapping<dim>::ExcDistortedMappedCell(
+                                 cell_iterator->center(), jac_det[v], q)));
+                      }
+#else
+                    (void)tria;
+                    (void)cell_array;
+#endif
+
                     const Tensor<2, dim, VectorizedDouble> inv_jac =
                       transpose(invert(jac));
 
@@ -1571,6 +1605,14 @@ namespace internal
 
 
 
+      /**
+       * This function computes and tabulates the mapping information for
+       * generic mappings on a range of faces by a call to FEFaceValues with
+       * the respective UpdateFlags set. There is a specialized function
+       * mapping_q_compute_range function that provides a faster
+       * initialization for mappings derived from MappingQ and suitable
+       * quadrature formulas.
+       */
       template <int dim, typename Number, typename VectorizedArrayType>
       void
       initialize_face_range(
@@ -2070,10 +2112,11 @@ namespace internal
 
 
       /**
-       * This evaluates the mapping information on a range of cells calling
-       * into the tensor product interpolators of the matrix-free framework,
-       * using a polynomial expansion of the cell geometry in terms of
-       * MappingQ.
+       * This function computes and tabulates the mapping information for
+       * MappingQ-derived mappings on a range of faces calling into the tensor
+       * product face evaluators interpolators of the matrix-free framework,
+       * using a polynomial expansion of the cell geometry underlying the
+       * MappingQ class.
        */
       template <int dim,
                 typename Number,
@@ -2084,12 +2127,12 @@ namespace internal
         const unsigned int begin_face,
         const unsigned int end_face,
         const std::vector<FaceToCellTopology<VectorizedArrayType::size()>>
-                                          &faces,
-        const std::vector<GeometryType>   &face_type,
-        const std::vector<bool>           &process_face,
-        const UpdateFlags                  update_flags_faces,
-        const AlignedVector<double>       &plain_quadrature_points,
-        const ShapeInfo<VectorizedDouble> &shape_info,
+                                        &faces,
+        const std::vector<GeometryType> &face_type,
+        const std::vector<bool>         &process_face,
+        const UpdateFlags                update_flags_faces,
+        const AlignedVector<double>     &plain_quadrature_points,
+        const ShapeInfo<double>         &shape_info,
         MappingInfoStorage<dim - 1, dim, VectorizedArrayType> &my_data)
       {
         constexpr unsigned int n_lanes   = VectorizedArrayType::size();
@@ -2301,13 +2344,18 @@ namespace internal
                     boundary_form = cross_product_3d(tangential_vectors[0],
                                                      tangential_vectors[1]);
                   else
-                    Assert(false, ExcNotImplemented());
+                    DEAL_II_NOT_IMPLEMENTED();
 
                   const VectorizedDouble JxW =
                     boundary_form.norm() *
                     (face_type[face] <= affine ?
                        1. :
                        my_data.descriptor[0].quadrature.weight(q));
+
+#ifdef DEBUG
+                  for (unsigned int v = 0; v < n_lanes_d; ++v)
+                    Assert(JxW[v] > 0.0, ExcInternalError());
+#endif
 
                   store_vectorized_array(JxW,
                                          vv,
@@ -2697,7 +2745,7 @@ namespace internal
       // functions or the quadrature points; shape info is merely a vehicle to
       // return us the right interpolation matrices from the cell support
       // points to the cell and face quadrature points.
-      std::vector<ShapeInfo<VectorizedDouble>> shape_infos(cell_data.size());
+      std::vector<ShapeInfo<double>> shape_infos(cell_data.size());
       {
         FE_DGQ<dim> fe_geometry(mapping_degree);
         for (unsigned int my_q = 0; my_q < cell_data.size(); ++my_q)
@@ -2793,6 +2841,8 @@ namespace internal
                                                          VectorizedDouble>(
                 begin,
                 end,
+                tria,
+                cell_array,
                 cell_type,
                 process_cell,
                 update_flags_cells,
@@ -3215,7 +3265,7 @@ namespace internal
                           }
                       if (update_flags & update_jacobian_grads)
                         {
-                          Assert(false, ExcNotImplemented());
+                          DEAL_II_NOT_IMPLEMENTED();
                         }
                       if (update_flags & update_normal_vectors)
                         for (unsigned int d = 0; d < dim; ++d)
@@ -3268,7 +3318,7 @@ namespace internal
                           }
                       if (update_flags & update_jacobian_grads)
                         {
-                          Assert(false, ExcNotImplemented());
+                          DEAL_II_NOT_IMPLEMENTED();
                         }
                       if (update_flags & update_normal_vectors)
                         for (unsigned int q = 0; q < fe_val.n_quadrature_points;

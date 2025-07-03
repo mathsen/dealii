@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2022 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 1998 - 2023 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_function_h
 #define dealii_function_h
@@ -94,8 +93,8 @@ class TensorFunction;
  * or several points (i.e. vector_value(), vector_value_list()), will
  * <em>not</em> call the function returning one component at one point
  * repeatedly, once for each point and component. The reason is efficiency:
- * this would amount to too many virtual function calls. If you have vector-
- * valued functions, you should therefore also provide overloads of the
+ * this would amount to too many virtual function calls. If you have
+ * vector-valued functions, you should therefore also provide overloads of the
  * virtual functions for all components at a time.
  *
  * Also note, that unless only called a very small number of times, you should
@@ -186,8 +185,8 @@ public:
    * Virtual destructor; absolutely necessary in this case.
    *
    * This destructor is declared pure virtual, such that objects of this class
-   * cannot be created. Since all the other virtual functions have a pseudo-
-   * implementation to avoid overhead in derived classes, they can not be
+   * cannot be created. Since all the other virtual functions have a
+   * pseudo-implementation to avoid overhead in derived classes, they can not be
    * abstract. As a consequence, we could generate an object of this class
    * because none of this class's functions are abstract.
    *

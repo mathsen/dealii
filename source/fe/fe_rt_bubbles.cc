@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2018 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2018 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 #include <deal.II/base/qprojector.h>
@@ -176,7 +175,7 @@ FE_RT_Bubbles<dim>::initialize_support_points(const unsigned int deg)
   // This is the deg of the RT_Bubble element plus one.
   if (dim > 1)
     {
-      QGaussLobatto<dim - 1> face_points(deg + 1);
+      const QGaussLobatto<dim - 1> face_points(deg + 1);
       Assert(face_points.size() == this->n_dofs_per_face(face_no),
              ExcInternalError());
       for (unsigned int k = 0; k < this->n_dofs_per_face(face_no); ++k)
@@ -188,14 +187,12 @@ FE_RT_Bubbles<dim>::initialize_support_points(const unsigned int deg)
       for (unsigned int k = 0; k < this->n_dofs_per_face(face_no) *
                                      GeometryInfo<dim>::faces_per_cell;
            ++k)
-        this->generalized_support_points[k] = faces.point(
-          k + QProjector<dim>::DataSetDescriptor::face(this->reference_cell(),
-                                                       0,
-                                                       true,
-                                                       false,
-                                                       false,
-                                                       this->n_dofs_per_face(
-                                                         face_no)));
+        this->generalized_support_points[k] =
+          faces.point(k + QProjector<dim>::DataSetDescriptor::face(
+                            this->reference_cell(),
+                            0,
+                            ReferenceCell::default_combined_face_orientation(),
+                            this->n_dofs_per_face(face_no)));
 
       current =
         this->n_dofs_per_face(face_no) * GeometryInfo<dim>::faces_per_cell;
@@ -206,8 +203,8 @@ FE_RT_Bubbles<dim>::initialize_support_points(const unsigned int deg)
 
   // In the interior, we need anisotropic Gauss-Lobatto quadratures,
   // one for each direction
-  QGaussLobatto<1>      high(deg + 1);
-  std::vector<Point<1>> pts = high.get_points();
+  const QGaussLobatto<1> high(deg + 1);
+  std::vector<Point<1>>  pts = high.get_points();
   if (pts.size() > 2)
     {
       pts.erase(pts.begin());
@@ -215,7 +212,7 @@ FE_RT_Bubbles<dim>::initialize_support_points(const unsigned int deg)
     }
 
   std::vector<double> wts(pts.size(), 1);
-  Quadrature<1>       low(pts, wts);
+  const Quadrature<1> low(pts, wts);
 
   for (unsigned int d = 0; d < dim; ++d)
     {
@@ -237,7 +234,7 @@ FE_RT_Bubbles<dim>::initialize_support_points(const unsigned int deg)
                                                   ((d == 2) ? low : high));
             break;
           default:
-            Assert(false, ExcNotImplemented());
+            DEAL_II_NOT_IMPLEMENTED();
         }
 
       for (unsigned int k = 0; k < quadrature->size(); ++k)

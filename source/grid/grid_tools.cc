@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2001 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #include <deal.II/base/floating_point_comparator.h>
 #include <deal.II/base/mpi.h>
@@ -237,21 +236,6 @@ namespace GridTools
   }
 
 
-  template <int dim>
-  void
-  rotate(const double           angle,
-         const unsigned int     axis,
-         Triangulation<dim, 3> &triangulation)
-  {
-    Assert(axis < 3, ExcMessage("Invalid axis given!"));
-
-    Tensor<1, 3, double> vector;
-    vector[axis] = 1.;
-
-    transform(internal::Rotate3d(vector, angle), triangulation);
-  }
-
-
   template <int dim, int spacedim>
   void
   scale(const double                  scaling_factor,
@@ -304,7 +288,7 @@ namespace GridTools
                     const bool solve_for_absolute_positions)
   {
     if (dim == 1)
-      Assert(false, ExcNotImplemented());
+      DEAL_II_NOT_IMPLEMENTED();
 
     // first provide everything that is needed for solving a Laplace
     // equation.
@@ -323,7 +307,7 @@ namespace GridTools
 
     SparseMatrix<double> S(sparsity_pattern);
 
-    QGauss<dim> quadrature(4);
+    const QGauss<dim> quadrature(4);
 
     Assert(triangulation.all_reference_cells_are_hyper_cube(),
            ExcNotImplemented());
@@ -364,8 +348,8 @@ namespace GridTools
                       cell->vertex_dof_index(vertex_no, 0),
                       {},
                       (solve_for_absolute_positions ?
-                         map_iter->second(i) :
-                         map_iter->second(i) - vertex_point[i]));
+                         map_iter->second[i] :
+                         map_iter->second[i] - vertex_point[i]));
                   }
           }
       }
@@ -398,9 +382,9 @@ namespace GridTools
               cell->vertex_dof_index(vertex_no, 0);
             for (unsigned int i = 0; i < dim; ++i)
               if (solve_for_absolute_positions)
-                v(i) = us[i](dof_index);
+                v[i] = us[i](dof_index);
               else
-                v(i) += us[i](dof_index);
+                v[i] += us[i](dof_index);
 
             vertex_touched[cell->vertex_index(vertex_no)] = true;
           }
@@ -525,7 +509,7 @@ namespace GridTools
                   // first compute a random shift vector
                   Point<spacedim> shift_vector;
                   for (unsigned int d = 0; d < spacedim; ++d)
-                    shift_vector(d) = uniform_distribution(rng);
+                    shift_vector[d] = uniform_distribution(rng);
 
                   shift_vector *= factor * minimal_length[global_vertex_no] /
                                   std::sqrt(shift_vector.square());
@@ -562,7 +546,7 @@ namespace GridTools
                 // compute a random shift vector
                 Point<spacedim> shift_vector;
                 for (unsigned int d = 0; d < spacedim; ++d)
-                  shift_vector(d) = uniform_distribution(rng);
+                  shift_vector[d] = uniform_distribution(rng);
 
                 shift_vector *= factor * minimal_length[vertex] /
                                 std::sqrt(shift_vector.square());
@@ -1082,11 +1066,12 @@ namespace GridTools
     const Point<spacedim>                                             &position,
     const Mapping<dim, spacedim>                                      &mapping)
   {
-    const auto   vertices         = mapping.get_vertices(cell);
-    double       minimum_distance = position.distance_square(vertices[0]);
-    unsigned int closest_vertex   = 0;
+    const auto         vertices         = mapping.get_vertices(cell);
+    double             minimum_distance = position.distance_square(vertices[0]);
+    unsigned int       closest_vertex   = 0;
+    const unsigned int n_vertices       = cell->n_vertices();
 
-    for (unsigned int v = 1; v < cell->n_vertices(); ++v)
+    for (unsigned int v = 1; v < n_vertices; ++v)
       {
         const double vertex_distance = position.distance_square(vertices[v]);
         if (vertex_distance < minimum_distance)
@@ -1411,21 +1396,16 @@ namespace GridTools
   template <int dim, int spacedim>
   std::map<unsigned int, types::global_vertex_index>
   compute_local_to_global_vertex_index_map(
-    const parallel::distributed::Triangulation<dim, spacedim> &triangulation)
+    const Triangulation<dim, spacedim> &triangulation)
   {
     std::map<unsigned int, types::global_vertex_index>
       local_to_global_vertex_index;
 
 #ifndef DEAL_II_WITH_MPI
 
-    // without MPI, this function doesn't make sense because on cannot
-    // use parallel::distributed::Triangulation in any meaningful
-    // way
-    (void)triangulation;
-    Assert(false,
-           ExcMessage("This function does not make any sense "
-                      "for parallel::distributed::Triangulation "
-                      "objects if you do not have MPI enabled."));
+    // If we don't have MPI then all vertices are local
+    for (unsigned int i = 0; i < triangulation.n_vertices(); ++i)
+      local_to_global_vertex_index[i] = i;
 
 #else
 
@@ -2200,7 +2180,7 @@ namespace GridTools
         const std::vector<CellId> &,
         std::vector<types::subdomain_id> &)
       {
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
       }
     } // anonymous namespace
   }   // namespace internal
@@ -2219,7 +2199,7 @@ namespace GridTools
           const parallel::fullydistributed::Triangulation<dim, spacedim> *>(
           &triangulation) != nullptr)
       {
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
       }
     else if (const parallel::distributed::Triangulation<dim, spacedim>
                *parallel_tria = dynamic_cast<
@@ -2427,10 +2407,10 @@ namespace GridTools
         double objective = 0;
         for (unsigned int c = 0; c < object->n_children(); ++c)
           for (const unsigned int i : object->child(c)->vertex_indices())
-            objective +=
-              (child_alternating_forms[c][i] -
-               average_parent_alternating_form / std::pow(2., 1. * structdim))
-                .norm_square();
+            objective += (child_alternating_forms[c][i] -
+                          average_parent_alternating_form /
+                            Utilities::fixed_power<structdim>(2))
+                           .norm_square();
 
         return objective;
       }
@@ -3038,7 +3018,7 @@ namespace GridTools
             unsigned int boundary_face_counter = 0;
             for (auto f : cell->face_indices())
               if (cell->face(f)->at_boundary())
-                boundary_face_counter++;
+                ++boundary_face_counter;
             if (boundary_face_counter > dim)
               {
                 has_cells_with_more_than_dim_faces_on_boundary = true;
@@ -3050,14 +3030,14 @@ namespace GridTools
         if (has_cells_with_more_than_dim_faces_on_boundary)
           {
             tria.refine_global(1);
-            refinement_cycles++;
+            ++refinement_cycles;
           }
       }
 
     if (has_cells_with_dim_faces_on_boundary)
       {
         tria.refine_global(1);
-        refinement_cycles++;
+        ++refinement_cycles;
       }
     else
       {
@@ -3128,7 +3108,7 @@ namespace GridTools
           }
         else
           {
-            Assert(false, ExcNotImplemented());
+            DEAL_II_NOT_IMPLEMENTED();
           }
 
         if (angle_fraction > limit_angle_fraction)
@@ -3221,7 +3201,7 @@ namespace GridTools
               }
             else
               {
-                Assert(false, ExcNotImplemented());
+                DEAL_II_NOT_IMPLEMENTED();
               }
           }
       }
@@ -3477,7 +3457,7 @@ namespace GridTools
           else
             {
               // We should not get here. Throw an error.
-              Assert(false, ExcInternalError());
+              DEAL_II_ASSERT_UNREACHABLE();
             }
         }
     // Now make sure we send out the rest of the points that we did not find.
@@ -3676,6 +3656,7 @@ namespace GridTools
               ArborXWrappers::DistributedTree distributed_tree(
                 comm, global_bboxes[0]);
               std::vector<BoundingBox<spacedim>> query_bounding_boxes;
+              query_bounding_boxes.reserve(entities.size());
               for (const auto &entity : entities)
                 query_bounding_boxes.emplace_back(
                   BoundingBox<spacedim>(entity).create_extended(tolerance));
@@ -4105,10 +4086,17 @@ namespace GridTools
         const unsigned int                  n_points_1D,
         const Triangulation<dim, spacedim> &tria,
         const Mapping<dim, spacedim>       &mapping,
+        std::vector<Quadrature<spacedim>>  *mapped_quadratures_recv_comp,
         const bool consistent_numbering_of_sender_and_receiver) const
     {
       using CellIterator =
         typename Triangulation<dim, spacedim>::active_cell_iterator;
+
+      if (mapped_quadratures_recv_comp != nullptr)
+        {
+          AssertDimension(mapped_quadratures_recv_comp->size(), 0);
+          mapped_quadratures_recv_comp->reserve(recv_components.size());
+        }
 
       GridTools::internal::DistributedComputePointLocationsInternal<dim,
                                                                     spacedim>
@@ -4141,6 +4129,10 @@ namespace GridTools
                 result.recv_components.size(), // number of point
                 numbers::invalid_unsigned_int);
             }
+
+          // append quadrature
+          if (mapped_quadratures_recv_comp != nullptr)
+            mapped_quadratures_recv_comp->push_back(quad);
         }
 
       // since empty quadratures might be present we have to set the number
@@ -4781,32 +4773,6 @@ namespace GridTools
     // 1) determine for each vertex a vertex it coincides with and
     //    put it into a map
     {
-      static const int lookup_table_2d[2][2] =
-        //           flip:
-        {
-          {0, 1}, // false
-          {1, 0}  // true
-        };
-
-      static const int lookup_table_3d[2][2][2][4] =
-        //                   orientation flip  rotation
-        {{{
-            {0, 2, 1, 3}, // false       false false
-            {2, 3, 0, 1}  // false       false true
-          },
-          {
-            {3, 1, 2, 0}, // false       true  false
-            {1, 0, 3, 2}  // false       true  true
-          }},
-         {{
-            {0, 1, 2, 3}, // true        false false
-            {1, 3, 0, 2}  // true        false true
-          },
-          {
-            {3, 2, 1, 0}, // true        true  false
-            {2, 0, 3, 1}  // true        true  true
-          }}};
-
       // loop over all periodic face pairs
       for (const auto &pair : tria.get_periodic_face_map())
         {
@@ -4816,34 +4782,22 @@ namespace GridTools
           const auto face_a = pair.first.first->face(pair.first.second);
           const auto face_b =
             pair.second.first.first->face(pair.second.first.second);
-          const auto mask = pair.second.second;
+          const auto reference_cell      = pair.first.first->reference_cell();
+          const auto face_reference_cell = face_a->reference_cell();
+          const unsigned char combined_orientation = pair.second.second;
+          const unsigned char inverse_combined_orientation =
+            face_reference_cell.get_inverse_combined_orientation(
+              combined_orientation);
 
           AssertDimension(face_a->n_vertices(), face_b->n_vertices());
 
           // loop over all vertices on face
           for (unsigned int i = 0; i < face_a->n_vertices(); ++i)
             {
-              const bool face_orientation = mask[0];
-              const bool face_flip        = mask[1];
-              const bool face_rotation    = mask[2];
-
               // find the right local vertex index for the second face
-              unsigned int j = 0;
-              switch (dim)
-                {
-                  case 1:
-                    j = i;
-                    break;
-                  case 2:
-                    j = lookup_table_2d[face_flip][i];
-                    break;
-                  case 3:
-                    j = lookup_table_3d[face_orientation][face_flip]
-                                       [face_rotation][i];
-                    break;
-                  default:
-                    AssertThrow(false, ExcNotImplemented());
-                }
+              const unsigned int j =
+                reference_cell.standard_to_real_face_vertex(
+                  i, pair.first.second, inverse_combined_orientation);
 
               // get vertex indices and store in map
               const auto   vertex_a = face_a->vertex_index(i);
@@ -5025,7 +4979,7 @@ namespace GridTools
             vertex_list_reduced[local_vertex_count] =
               vertex_list_all[new_line_table[configuration][i]];
             local_remap[new_line_table[configuration][i]] = local_vertex_count;
-            local_vertex_count++;
+            ++local_vertex_count;
           }
 
       // write back vertices

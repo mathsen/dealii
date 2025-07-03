@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2022 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2013 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_tensor_product_polynomials_bubbles_h
 #define dealii_tensor_product_polynomials_bubbles_h
@@ -343,10 +342,10 @@ TensorProductPolynomialsBubbles<dim>::compute_derivative(
               // compute grad(4*\prod_{i=1}^d (x_i(1-x_i)))(p)
               for (unsigned j = 0; j < dim; ++j)
                 derivative_1[d] *=
-                  (d == j ? 4 * (1 - 2 * p(j)) : 4 * p(j) * (1 - p(j)));
+                  (d == j ? 4 * (1 - 2 * p[j]) : 4 * p[j] * (1 - p[j]));
               // and multiply with (2*x_i-1)^{r-1}
               for (unsigned int i = 0; i < q_degree - 1; ++i)
-                derivative_1[d] *= 2 * p(comp) - 1;
+                derivative_1[d] *= 2 * p[comp] - 1;
             }
 
           if (q_degree >= 2)
@@ -354,11 +353,11 @@ TensorProductPolynomialsBubbles<dim>::compute_derivative(
               // add \prod_{i=1}^d 4*(x_i(1-x_i))(p)
               double value = 1.;
               for (unsigned int j = 0; j < dim; ++j)
-                value *= 4 * p(j) * (1 - p(j));
+                value *= 4 * p[j] * (1 - p[j]);
               // and multiply with grad(2*x_i-1)^{r-1}
               double tmp = value * 2 * (q_degree - 1);
               for (unsigned int i = 0; i < q_degree - 2; ++i)
-                tmp *= 2 * p(comp) - 1;
+                tmp *= 2 * p[comp] - 1;
               derivative_1[comp] += tmp;
             }
 
@@ -373,21 +372,21 @@ TensorProductPolynomialsBubbles<dim>::compute_derivative(
           {
             for (unsigned int c = 0; c < dim; ++c)
               {
-                v[c][0] = 4 * p(c) * (1 - p(c));
-                v[c][1] = 4 * (1 - 2 * p(c));
+                v[c][0] = 4 * p[c] * (1 - p[c]);
+                v[c][1] = 4 * (1 - 2 * p[c]);
                 v[c][2] = -8;
               }
 
             double tmp = 1.;
             for (unsigned int i = 0; i < q_degree - 1; ++i)
-              tmp *= 2 * p(comp) - 1;
+              tmp *= 2 * p[comp] - 1;
             v[dim][0] = tmp;
 
             if (q_degree >= 2)
               {
                 double tmp = 2 * (q_degree - 1);
                 for (unsigned int i = 0; i < q_degree - 2; ++i)
-                  tmp *= 2 * p(comp) - 1;
+                  tmp *= 2 * p[comp] - 1;
                 v[dim][1] = tmp;
               }
             else
@@ -397,7 +396,7 @@ TensorProductPolynomialsBubbles<dim>::compute_derivative(
               {
                 double tmp = 4 * (q_degree - 2) * (q_degree - 1);
                 for (unsigned int i = 0; i < q_degree - 3; ++i)
-                  tmp *= 2 * p(comp) - 1;
+                  tmp *= 2 * p[comp] - 1;
                 v[dim][2] = tmp;
               }
             else
@@ -454,7 +453,7 @@ TensorProductPolynomialsBubbles<dim>::compute_derivative(
         }
       default:
         {
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
           return derivative;
         }
     }

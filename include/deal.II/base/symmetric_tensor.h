@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2005 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_symmetric_tensor_h
 #define dealii_symmetric_tensor_h
@@ -304,7 +303,7 @@ namespace internal
                     previous_indices[2],
                     new_index};
           default:
-            Assert(false, ExcInternalError());
+            DEAL_II_ASSERT_UNREACHABLE();
             return {};
         }
     }
@@ -796,55 +795,6 @@ public:
     const SymmetricTensor<rank_, dim, OtherNumber> &initializer);
 
   /**
-   * Return a pointer to the first element of the underlying storage.
-   *
-   * @deprecated This function suggests that the elements of a SymmetricTensor
-   *   object are stored as a contiguous array, but this is not in fact true
-   *   and one should not pretend that this so. As a consequence, this function
-   *   is deprecated.
-   */
-  DEAL_II_DEPRECATED
-  Number *
-  begin_raw();
-
-  /**
-   * Return a const pointer to the first element of the underlying storage.
-   *
-   * @deprecated This function suggests that the elements of a SymmetricTensor
-   *   object are stored as a contiguous array, but this is not in fact true
-   *   and one should not pretend that this so. As a consequence, this function
-   *   is deprecated.
-   */
-  DEAL_II_DEPRECATED
-  const Number *
-  begin_raw() const;
-
-  /**
-   * Return a pointer to the element past the end of the underlying storage.
-   *
-   * @deprecated This function suggests that the elements of a SymmetricTensor
-   *   object are stored as a contiguous array, but this is not in fact true
-   *   and one should not pretend that this so. As a consequence, this function
-   *   is deprecated.
-   */
-  DEAL_II_DEPRECATED
-  Number *
-  end_raw();
-
-  /**
-   * Return a const pointer to the element past the end of the underlying
-   * storage.
-   *
-   * @deprecated This function suggests that the elements of a SymmetricTensor
-   *   object are stored as a contiguous array, but this is not in fact true
-   *   and one should not pretend that this so. As a consequence, this function
-   *   is deprecated.
-   */
-  DEAL_II_DEPRECATED
-  const Number *
-  end_raw() const;
-
-  /**
    * Assignment operator from symmetric tensors with different underlying scalar
    * type.
    * This obviously requires that the @p OtherNumber type is convertible to
@@ -1095,7 +1045,7 @@ public:
    * clear() member functions of the standard library containers and of
    * several other classes within deal.II, which not only reset the values of
    * stored elements to zero, but release all memory and return the object
-   * into a virginial state. However, since the size of objects of the present
+   * into an empty state. However, since the size of objects of the present
    * type is determined by its template parameters, resizing is not an option,
    * and indeed the state where all elements have a zero value is the state
    * right after construction of such an object.
@@ -2067,7 +2017,7 @@ namespace internal
                     return dim + c;
 
               // should never get here:
-              Assert(false, ExcInternalError());
+              DEAL_II_ASSERT_UNREACHABLE();
               return 0;
             }
         }
@@ -2084,7 +2034,7 @@ namespace internal
     component_to_unrolled_index(const TableIndices<rank_> &indices)
     {
       (void)indices;
-      Assert(false, ExcNotImplemented());
+      DEAL_II_NOT_IMPLEMENTED();
       return numbers::invalid_unsigned_int;
     }
   } // namespace SymmetricTensorImplementation
@@ -2150,7 +2100,7 @@ namespace internal
           }
 
         default:
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
       }
 
     // The code should never reach here.
@@ -2198,7 +2148,7 @@ namespace internal
           }
 
         default:
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
       }
 
     // The code should never reach here.
@@ -2307,42 +2257,6 @@ SymmetricTensor<rank_, dim, Number>::operator[](
   const TableIndices<rank_> &indices)
 {
   return operator()(indices);
-}
-
-
-
-template <int rank_, int dim, typename Number>
-inline Number *
-SymmetricTensor<rank_, dim, Number>::begin_raw()
-{
-  return std::addressof(this->access_raw_entry(0));
-}
-
-
-
-template <int rank_, int dim, typename Number>
-inline const Number *
-SymmetricTensor<rank_, dim, Number>::begin_raw() const
-{
-  return std::addressof(this->access_raw_entry(0));
-}
-
-
-
-template <int rank_, int dim, typename Number>
-inline Number *
-SymmetricTensor<rank_, dim, Number>::end_raw()
-{
-  return begin_raw() + n_independent_components;
-}
-
-
-
-template <int rank_, int dim, typename Number>
-inline const Number *
-SymmetricTensor<rank_, dim, Number>::end_raw() const
-{
-  return begin_raw() + n_independent_components;
 }
 
 
@@ -2543,7 +2457,7 @@ namespace internal
                   return {d, e};
 
             // should never get here:
-            Assert(false, ExcInternalError());
+            DEAL_II_ASSERT_UNREACHABLE();
             return {0, 0};
         }
     }
@@ -2569,7 +2483,7 @@ namespace internal
                       0,
                       dealii::SymmetricTensor<rank_, dim, double>::
                         n_independent_components));
-      Assert(false, ExcNotImplemented());
+      DEAL_II_NOT_IMPLEMENTED();
       return TableIndices<rank_>();
     }
 
@@ -2742,7 +2656,7 @@ determinant(const SymmetricTensor<2, dim, Number> &t)
                   t.data[2] * t.data[3] * t.data[3]);
         }
       default:
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
         return internal::NumberType<Number>::value(0.0);
     }
 }
@@ -2939,35 +2853,9 @@ namespace internal
   {
     /**
      * Tridiagonalize a rank-2 symmetric tensor using the Householder method.
-     * The specialized algorithm implemented here is given in
-     * @code{.bib}
-     * @article{Kopp2008,
-     *   title       = {Efficient numerical diagonalization of hermitian 3x3
-     *                  matrices},
-     *   author      = {Kopp, J.},
-     *   journal     = {International Journal of Modern Physics C},
-     *   year        = {2008},
-     *   volume      = {19},
-     *   number      = {3},
-     *   pages       = {523--548},
-     *   doi         = {10.1142/S0129183108012303},
-     *   eprinttype  = {arXiv},
-     *   eprint      = {physics/0610206v3},
-     *   eprintclass = {physics.comp-ph},
-     *   url         =
-     * {https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html}
-     * }
-     * @endcode
+     * The specialized algorithm implemented here is given in @cite Kopp2008
      * and is based off of the generic algorithm presented in section 11.3.2 of
-     * @code{.bib}
-     * @book{Press2007,
-     *   title   = {Numerical recipes 3rd edition: The art of scientific
-     *              computing},
-     *   author  = {Press, W. H.},
-     *   journal = {Cambridge university press},
-     *   year    = {2007}
-     * }
-     * @endcode
+     * @cite Press2007.
      *
      * @param[in]  A This tensor to be tridiagonalized
      * @param[out] Q The orthogonal matrix effecting the transformation
@@ -2986,35 +2874,9 @@ namespace internal
     /**
      * Compute the eigenvalues and eigenvectors of a real-valued rank-2
      * symmetric tensor using the QL algorithm with implicit shifts.
-     * The specialized algorithm implemented here is given in
-     * @code{.bib}
-     * @article{Kopp2008,
-     *   title       = {Efficient numerical diagonalization of hermitian 3x3
-     *                  matrices},
-     *   author      = {Kopp, J.},
-     *   journal     = {International Journal of Modern Physics C},
-     *   year        = {2008},
-     *   volume      = {19},
-     *   number      = {3},
-     *   pages       = {523--548},
-     *   doi         = {10.1142/S0129183108012303},
-     *   eprinttype  = {arXiv},
-     *   eprint      = {physics/0610206v3},
-     *   eprintclass = {physics.comp-ph},
-     *   url         =
-     * {https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html}
-     * }
-     * @endcode
+     * The specialized algorithm implemented here is given in @cite Kopp2008
      * and is based off of the generic algorithm presented in section 11.4.3 of
-     * @code{.bib}
-     * @book{Press2007,
-     *   title   = {Numerical recipes 3rd edition: The art of scientific
-     *              computing},
-     *   author  = {Press, W. H.},
-     *   journal = {Cambridge university press},
-     *   year    = {2007}
-     * }
-     * @endcode
+     * @cite Press2007.
      *
      * @param[in] A The tensor of which the eigenvectors and eigenvalues are
      * to be computed.
@@ -3031,35 +2893,9 @@ namespace internal
     /**
      * Compute the eigenvalues and eigenvectors of a real-valued rank-2
      * symmetric tensor using the Jacobi algorithm.
-     * The specialized algorithm implemented here is given in
-     * @code{.bib}
-     * @article{Kopp2008,
-     *   title       = {Efficient numerical diagonalization of hermitian 3x3
-     *                  matrices},
-     *   author      = {Kopp, J.},
-     *   journal     = {International Journal of Modern Physics C},
-     *   year        = {2008},
-     *   volume      = {19},
-     *   number      = {3},
-     *   pages       = {523--548},
-     *   doi         = {10.1142/S0129183108012303},
-     *   eprinttype  = {arXiv},
-     *   eprint      = {physics/0610206v3},
-     *   eprintclass = {physics.comp-ph},
-     *   url         =
-     * {https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html}
-     * }
-     * @endcode
+     * The specialized algorithm implemented here is given in @cite Kopp2008
      * and is based off of the generic algorithm presented in section 11.4.3 of
-     * @code{.bib}
-     * @book{Press2007,
-     *   title   = {Numerical recipes 3rd edition: The art of scientific
-     *              computing},
-     *   author  = {Press, W. H.},
-     *   journal = {Cambridge university press},
-     *   year    = {2007}
-     * }
-     * @endcode
+     * @cite Press2007.
      *
      * @param[in] A The tensor of which the eigenvectors and eigenvalues are
      * to be computed.
@@ -3098,25 +2934,7 @@ namespace internal
      * eigenvalues and an analytical approach based on the cross-product for the
      * eigenvectors. If the computations are deemed too inaccurate then the
      * method falls back to ql_implicit_shifts. The specialized algorithm
-     * implemented here is given in
-     * @code{.bib}
-     * @article{Kopp2008,
-     *   title       = {Efficient numerical diagonalization of hermitian 3x3
-     *                  matrices},
-     *   author      = {Kopp, J.},
-     *   journal     = {International Journal of Modern Physics C},
-     *   year        = {2008},
-     *   volume      = {19},
-     *   number      = {3},
-     *   pages       = {523--548},
-     *   doi         = {10.1142/S0129183108012303},
-     *   eprinttype  = {arXiv},
-     *   eprint      = {physics/0610206v3},
-     *   eprintclass = {physics.comp-ph},
-     *   url         =
-     * {https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html}
-     * }
-     * @endcode
+     * implemented here is given in @cite Kopp2008.
      *
      * @param[in] A The tensor of which the eigenvectors and eigenvalues are
      * to be computed.
@@ -3160,25 +2978,7 @@ namespace internal
  * SymmetricTensor objects.
  *
  * The specialized algorithms utilized in computing the eigenvectors are
- * presented in
- * @code{.bib}
- * @article{Kopp2008,
- *   title       = {Efficient numerical diagonalization of hermitian 3x3
- *                  matrices},
- *   author      = {Kopp, J.},
- *   journal     = {International Journal of Modern Physics C},
- *   year        = {2008},
- *   volume      = {19},
- *   number      = {3},
- *   pages       = {523--548},
- *   doi         = {10.1142/S0129183108012303},
- *   eprinttype  = {arXiv},
- *   eprint      = {physics/0610206v3},
- *   eprintclass = {physics.comp-ph},
- *   url         =
- * {https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html}
- * }
- * @endcode
+ * presented in @cite Kopp2008.
  */
 enum struct SymmetricTensorEigenvectorMethod
 {
@@ -3220,25 +3020,7 @@ enum struct SymmetricTensorEigenvectorMethod
  * is sorted in descending order (determined by the eigenvalues).
  *
  * The specialized algorithms utilized in computing the eigenvectors are
- * presented in
- * @code{.bib}
- * @article{Kopp2008,
- *   title       = {Efficient numerical diagonalization of hermitian 3x3
- *                  matrices},
- *   author      = {Kopp, J.},
- *   journal     = {International Journal of Modern Physics C},
- *   year        = {2008},
- *   volume      = {19},
- *   number      = {3},
- *   pages       = {523--548},
- *   doi         = {10.1142/S0129183108012303},
- *   eprinttype  = {arXiv},
- *   eprint      = {physics/0610206v3},
- *   eprintclass = {physics.comp-ph},
- *   url         =
- * {https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html}
- * }
- * @endcode
+ * presented in @cite Kopp2008.
  *
  * @relatesalso SymmetricTensor
  */
@@ -3481,9 +3263,10 @@ positive_negative_split(const SymmetricTensor<2, dim, Number> &original_tensor)
     eigen_system = eigenvectors(original_tensor);
 
   std::pair<SymmetricTensor<2, dim, Number>, SymmetricTensor<2, dim, Number>>
-    postive_negative_tensors;
+    positive_negative_tensors;
 
-  auto &[positive_part_tensor, negative_part_tensor] = postive_negative_tensors;
+  auto &[positive_part_tensor, negative_part_tensor] =
+    positive_negative_tensors;
 
   positive_part_tensor = 0;
   for (unsigned int i = 0; i < dim; ++i)
@@ -3499,7 +3282,7 @@ positive_negative_split(const SymmetricTensor<2, dim, Number> &original_tensor)
                               symmetrize(outer_product(eigen_system[i].second,
                                                        eigen_system[i].second));
 
-  return postive_negative_tensors;
+  return positive_negative_tensors;
 }
 
 /**

@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2022 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2023 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_tria_objects_orientations_h
 #define dealii_tria_objects_orientations_h
@@ -109,24 +108,6 @@ namespace internal
       void
       set_combined_orientation(const unsigned int  object,
                                const unsigned char value);
-
-      /**
-       * Set the orientation bit of the object.
-       */
-      void
-      set_orientation(const unsigned int object, const bool value);
-
-      /**
-       * Set the rotate bit of the object.
-       */
-      void
-      set_rotation(const unsigned int object, const bool value);
-
-      /**
-       * Set the flip bit of the object.
-       */
-      void
-      set_flip(const unsigned int object, const bool value);
 
       /**
        * Read or write the data of this object to or from a stream for the
@@ -247,36 +228,6 @@ namespace internal
     {
       AssertIndexRange(object, n_stored_objects);
       flags[object] = value;
-    }
-
-
-
-    inline void
-    TriaObjectsOrientations::set_orientation(const unsigned int object,
-                                             const bool         value)
-    {
-      AssertIndexRange(object, n_stored_objects);
-      Utilities::set_bit(flags[object], 0, value);
-    }
-
-
-
-    inline void
-    TriaObjectsOrientations::set_rotation(const unsigned int object,
-                                          const bool         value)
-    {
-      AssertIndexRange(object, n_stored_objects);
-      Utilities::set_bit(flags[object], 1, value);
-    }
-
-
-
-    inline void
-    TriaObjectsOrientations::set_flip(const unsigned int object,
-                                      const bool         value)
-    {
-      AssertIndexRange(object, n_stored_objects);
-      Utilities::set_bit(flags[object], 2, value);
     }
 
 

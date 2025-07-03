@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2019 - 2020 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2020 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 /**
 @page changes_between_9_1_1_and_9_2_0 Changes between Version 9.1.1 and 9.2.0
@@ -735,7 +734,8 @@ inconvenience this causes.
 
  <li>
   New: The step-12 tutorial program has been changed to use
-  FEInterfaceValues. The old version of step-12 is still available as step-12b.
+  FEInterfaceValues. The old version of step-12 was still available
+  until deal.II 9.5 as step 12b.
   <br>
   (Timo Heister, 2019/08/27)
  </li>
@@ -743,7 +743,7 @@ inconvenience this causes.
  <li>
   New: The FEInterfaceValues class provides a new abstraction to assemble
   interface terms between two neighboring cells. This is commonly used in
-  Discontinous Galerkin methods.
+  Discontinuous Galerkin methods.
   <br>
   (Timo Heister, 2019/08/24)
  </li>

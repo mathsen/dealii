@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2019 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2019 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 #include <deal.II/base/memory_consumption.h>
@@ -351,7 +350,7 @@ namespace parallel
     DEAL_II_CXX20_REQUIRES((concepts::is_valid_dim_spacedim<dim, spacedim>))
     void Triangulation<dim, spacedim>::execute_coarsening_and_refinement()
     {
-      Assert(false, ExcNotImplemented());
+      DEAL_II_NOT_IMPLEMENTED();
     }
 
 
@@ -599,21 +598,6 @@ namespace parallel
       Assert(this->n_cells() == 0,
              ExcMessage("load() only works if the Triangulation is empty!"));
 
-      // Compute global offset for each rank.
-      unsigned int n_locally_owned_cells = this->n_locally_owned_active_cells();
-
-      unsigned int global_first_cell = 0;
-
-      int ierr = MPI_Exscan(&n_locally_owned_cells,
-                            &global_first_cell,
-                            1,
-                            MPI_UNSIGNED,
-                            MPI_SUM,
-                            this->mpi_communicator);
-      AssertThrowMPI(ierr);
-
-      global_first_cell *= sizeof(unsigned int);
-
 
       unsigned int version, numcpus, attached_count_fixed,
         attached_count_variable, n_global_active_cells;
@@ -629,8 +613,6 @@ namespace parallel
 
       AssertThrow(version == 4,
                   ExcMessage("Incompatible version found in .info file."));
-      Assert(this->n_global_active_cells() == n_global_active_cells,
-             ExcMessage("Number of global active cells differ!"));
 
       // Load description and construct the triangulation.
       {
@@ -710,6 +692,24 @@ namespace parallel
         this->create_triangulation(construction_data);
       }
 
+      // Compute global offset for each rank.
+      unsigned int n_locally_owned_cells = this->n_locally_owned_active_cells();
+
+      unsigned int global_first_cell = 0;
+
+      int ierr = MPI_Exscan(&n_locally_owned_cells,
+                            &global_first_cell,
+                            1,
+                            MPI_UNSIGNED,
+                            MPI_SUM,
+                            this->mpi_communicator);
+      AssertThrowMPI(ierr);
+
+      global_first_cell *= sizeof(unsigned int);
+
+      Assert(this->n_global_active_cells() == n_global_active_cells,
+             ExcMessage("Number of global active cells differ!"));
+
       // clear all of the callback data, as explained in the documentation of
       // register_data_attach()
       this->cell_attached_data.n_attached_data_sets = 0;
@@ -732,17 +732,6 @@ namespace parallel
 
       AssertThrow(false, ExcNeedsMPI());
 #endif
-    }
-
-
-
-    template <int dim, int spacedim>
-    DEAL_II_CXX20_REQUIRES((concepts::is_valid_dim_spacedim<dim, spacedim>))
-    void Triangulation<dim, spacedim>::load(const std::string &filename,
-                                            const bool         autopartition)
-    {
-      (void)autopartition;
-      load(filename);
     }
 
 

@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2012 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_mpi_h
 #define dealii_mpi_h
@@ -19,19 +18,17 @@
 #include <deal.II/base/config.h>
 
 #include <deal.II/base/array_view.h>
+#include <deal.II/base/init_finalize.h>
 #include <deal.II/base/mpi_stub.h>
 #include <deal.II/base/mpi_tags.h>
 #include <deal.II/base/numbers.h>
 #include <deal.II/base/template_constraints.h>
 #include <deal.II/base/utilities.h>
 
-#include <boost/signals2.hpp>
-
 #include <complex>
 #include <limits>
 #include <map>
 #include <numeric>
-#include <set>
 #include <vector>
 
 
@@ -371,7 +368,7 @@ namespace Utilities
       /**
        * Constructor of this class.
        */
-      explicit CollectiveMutex();
+      CollectiveMutex();
 
       /**
        * Destroy the mutex. Assumes the lock is not currently held.
@@ -539,45 +536,6 @@ namespace Utilities
        */
       bool get_was_called;
     };
-
-
-
-    /**
-     * If @p comm is an intracommunicator, this function returns a new
-     * communicator @p newcomm with communication group defined by the
-     * @p group argument. The function is only collective over the group of
-     * processes that actually want to create the communicator, i.e., that
-     * are named in the @p group argument. If multiple threads at a given
-     * process perform concurrent create_group() operations, the user must
-     * distinguish these operations by providing different @p tag or @p comm
-     * arguments.
-     *
-     * This function was introduced in the MPI-3.0 standard. If available,
-     * the corresponding function in the provided MPI implementation is used.
-     * Otherwise, the implementation follows the one described in the
-     * following publication:
-     * @code{.bib}
-     * @inproceedings{dinan2011noncollective,
-     *   title        = {Noncollective communicator creation in MPI},
-     *   author       = {Dinan, James and Krishnamoorthy, Sriram and Balaji,
-     *                   Pavan and Hammond, Jeff R and Krishnan, Manojkumar and
-     *                   Tipparaju, Vinod and Vishnu, Abhinav},
-     *   booktitle    = {European MPI Users' Group Meeting},
-     *   pages        = {282--291},
-     *   year         = {2011},
-     *   organization = {Springer}
-     * }
-     * @endcode
-     *
-     * @deprecated Use MPI_Comm_create_group directly
-     */
-#ifdef DEAL_II_WITH_MPI
-    DEAL_II_DEPRECATED int
-    create_group(const MPI_Comm   comm,
-                 const MPI_Group &group,
-                 const int        tag,
-                 MPI_Comm        *new_comm);
-#endif
 
     /**
      * Given the number of locally owned elements @p locally_owned_size,
@@ -988,7 +946,7 @@ namespace Utilities
 
     /**
      * Return sum, average, minimum, maximum, processor id of minimum and
-     * maximum as a collective operation of on the given MPI
+     * maximum as a @ref GlossCollectiveOperation "collective operation" of on the given MPI
      * @ref GlossMPICommunicator "communicator"
      * @p mpi_communicator. Each processor's value is given in @p my_value and
      * the result will be returned. The result is available on all machines.
@@ -1005,7 +963,7 @@ namespace Utilities
 
     /**
      * Same as above but returning the sum, average, minimum, maximum,
-     * process id of minimum and maximum as a collective operation on the
+     * process id of minimum and maximum as a @ref GlossCollectiveOperation "collective operation" on the
      * given MPI
      * @ref GlossMPICommunicator "communicator"
      * @p mpi_communicator for each entry of the vector.
@@ -1021,7 +979,7 @@ namespace Utilities
 
     /**
      * Same as above but returning the sum, average, minimum, maximum,
-     * process id of minimum and maximum as a collective operation on the
+     * process id of minimum and maximum as a @ref GlossCollectiveOperation "collective operation" on the
      * given MPI
      * @ref GlossMPICommunicator "communicator"
      * @p mpi_communicator for each entry of the ArrayView.
@@ -1080,7 +1038,7 @@ namespace Utilities
      * MPI processes at the beginning of the program because it uses
      * `MPI_COMM_WORLD` during initialization.
      */
-    class MPI_InitFinalize
+    class MPI_InitFinalize : public InitFinalize
     {
     public:
       /**
@@ -1137,78 +1095,7 @@ namespace Utilities
        * Destructor. Calls <tt>MPI_Finalize()</tt> in case this class owns the
        * MPI process.
        */
-      ~MPI_InitFinalize();
-
-      /**
-       * Register a reference to an MPI_Request
-       * on which we need to call `MPI_Wait` before calling `MPI_Finalize`.
-       *
-       * The object @p request needs to exist when MPI_Finalize is called, which means the
-       * request is typically statically allocated. Otherwise, you need to call
-       * unregister_request() before the request goes out of scope. Note that it
-       * is acceptable for a request to be already waited on (and consequently
-       * reset to MPI_REQUEST_NULL).
-       *
-       * It is acceptable to call this function more than once with the same
-       * instance (as it is done in the example below).
-       *
-       * Typically, this function is used by CollectiveMutex and not directly,
-       * but it can also be used directly like this:
-       * @code
-       * void my_fancy_communication()
-       * {
-       *   static MPI_Request request = MPI_REQUEST_NULL;
-       *   MPI_InitFinalize::register_request(request);
-       *   MPI_Wait(&request, MPI_STATUS_IGNORE);
-       *   // [some algorithm that is not safe to be executed twice in a row.]
-       *   MPI_IBarrier(comm, &request);
-       * }
-       * @endcode
-       */
-      static void
-      register_request(MPI_Request &request);
-
-      /**
-       * Unregister a request previously added using register_request().
-       */
-      static void
-      unregister_request(MPI_Request &request);
-
-      /**
-       * A structure that has boost::signal objects to register a call back
-       * to run after MPI init or finalize.
-       *
-       * For documentation on signals, see
-       * http://www.boost.org/doc/libs/release/libs/signals2 .
-       */
-      struct Signals
-      {
-        /**
-         * A signal that is triggered immediately after we have
-         * initialized the MPI context with <code>MPI_Init()</code>.
-         */
-        boost::signals2::signal<void()> at_mpi_init;
-
-        /**
-         * A signal that is triggered just before we close the MPI context
-         * with <code>MPI_Finalize()</code>. It can be used to deallocate
-         * statically allocated MPI resources that need to be deallocated
-         * before <code>MPI_Finalize()</code> is called.
-         */
-        boost::signals2::signal<void()> at_mpi_finalize;
-      };
-
-      static Signals signals;
-
-    private:
-      /**
-       * Requests to MPI_Wait before finalizing
-       */
-      static std::set<MPI_Request *> requests;
-
-#ifdef DEAL_II_WITH_PETSC
-      bool finalize_petscslepc;
-#endif
+      ~MPI_InitFinalize() = default;
     };
 
     /**
@@ -1416,6 +1303,23 @@ namespace Utilities
            const std::function<T(const T &, const T &)> &combiner,
            const unsigned int                            root_process = 0);
 
+
+    /**
+     * For each process $p$ on a communicator with $P$ processes, compute both
+     * the (exclusive) partial sum $\sum_{i=0}^{p-1} v_i$ and the total
+     * sum $\sum_{i=0}^{P-1} v_i$, and return these two values as a pair.
+     * The former is computed via the `MPI_Exscan` function where the partial
+     * sum is typically called "(exclusive) scan" of the values $v_p$ provided
+     * by the individual processes. The term "prefix sum" is also used.
+     *
+     * This function is only available if `T` is a type natively supported
+     * by MPI.
+     */
+    template <typename T, typename = std::enable_if_t<is_mpi_type<T> == true>>
+    std::pair<T, T>
+    partial_and_total_sum(const T &value, const MPI_Comm comm);
+
+
     /**
      * A function that combines values @p local_value from all processes
      * via a user-specified binary operation @p combiner and distributes the
@@ -1508,7 +1412,7 @@ namespace Utilities
      * owned indices, these indices will be treated correctly and the rank of
      * this process is returned for those entries.
      *
-     * @note This is a collective operation: all processes within the given
+     * @note This is a @ref GlossCollectiveOperation "collective operation": all processes within the given
      * communicator have to call this function. Since this function does not
      * use MPI_Alltoall or MPI_Allgather, but instead uses non-blocking
      * point-to-point communication instead, and only a single non-blocking
@@ -1534,7 +1438,7 @@ namespace Utilities
      * Compute the union of the input vectors @p vec of all processes in the
      *   MPI communicator @p comm.
      *
-     * @note This is a collective operation. The result will available on all
+     * @note This is a @ref GlossCollectiveOperation "collective operation". The result will available on all
      *   processes.
      */
     template <typename T>
@@ -1728,7 +1632,7 @@ namespace Utilities
      * not satisfied.
      */
     template <typename T>
-    const MPI_Datatype mpi_type_id_for_type =
+    inline const MPI_Datatype mpi_type_id_for_type =
       internal::MPIDataTypes::mpi_type_id(
         static_cast<std::remove_cv_t<std::remove_reference_t<T>> *>(nullptr));
 #endif
@@ -1967,6 +1871,44 @@ namespace Utilities
 
       return received_objects;
 #  endif // deal.II with MPI
+    }
+
+
+
+    template <typename T, typename>
+    std::pair<T, T>
+    partial_and_total_sum(const T &value, const MPI_Comm comm)
+    {
+#  ifndef DEAL_II_WITH_MPI
+      (void)comm;
+      return {0, value};
+#  else
+      if (Utilities::MPI::n_mpi_processes(comm) == 1)
+        return {0, value};
+      else
+        {
+          T prefix = {};
+
+          // First obtain every process's prefix sum:
+          int ierr =
+            MPI_Exscan(&value,
+                       &prefix,
+                       1,
+                       Utilities::MPI::mpi_type_id_for_type<decltype(value)>,
+                       MPI_SUM,
+                       comm);
+          AssertThrowMPI(ierr);
+
+          // Then we also need the total sum. We could obtain it by
+          // calling Utilities::MPI::sum(), but it is cheaper if we
+          // broadcast it from the last process, which can compute it
+          // from its own prefix sum plus its own value.
+          const T sum = Utilities::MPI::broadcast(
+            comm, prefix + value, Utilities::MPI::n_mpi_processes(comm) - 1);
+
+          return {prefix, sum};
+        }
+#  endif
     }
 
 

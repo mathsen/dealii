@@ -1,23 +1,23 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2009 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #include <deal.II/base/index_set.h>
 #include <deal.II/base/memory_consumption.h>
 #include <deal.II/base/mpi.h>
 
 #include <deal.II/lac/exceptions.h>
+#include <deal.II/lac/trilinos_tpetra_types.h>
 
 #include <vector>
 
@@ -40,8 +40,10 @@ DEAL_II_NAMESPACE_OPEN
 
 #  ifdef DEAL_II_TRILINOS_WITH_TPETRA
 
+template <typename NodeType>
 IndexSet::IndexSet(
-  Teuchos::RCP<const Tpetra::Map<int, types::signed_global_dof_index>> map)
+  const Teuchos::RCP<
+    const Tpetra::Map<int, types::signed_global_dof_index, NodeType>> &map)
   : is_compressed(true)
   , index_space_size(1 + map->getMaxAllGlobalIndex())
   , largest_range(numbers::invalid_unsigned_int)
@@ -406,7 +408,7 @@ IndexSet::get_view(const IndexSet &mask) const
                                           (own_it->end - own_it->begin));
               }
             else
-              Assert(false, ExcInternalError());
+              DEAL_II_ASSERT_UNREACHABLE();
 
       // We considered the overlap of these two intervals. It may of course
       // be that one of them overlaps with another one, but that can only
@@ -950,16 +952,18 @@ IndexSet::fill_index_vector(std::vector<size_type> &indices) const
 #ifdef DEAL_II_WITH_TRILINOS
 #  ifdef DEAL_II_TRILINOS_WITH_TPETRA
 
-Tpetra::Map<int, types::signed_global_dof_index>
+template <typename NodeType>
+Tpetra::Map<int, types::signed_global_dof_index, NodeType>
 IndexSet::make_tpetra_map(const MPI_Comm communicator,
                           const bool     overlapping) const
 {
-  return *make_tpetra_map_rcp(communicator, overlapping);
+  return *make_tpetra_map_rcp<NodeType>(communicator, overlapping);
 }
 
 
 
-Teuchos::RCP<Tpetra::Map<int, types::signed_global_dof_index>>
+template <typename NodeType>
+Teuchos::RCP<Tpetra::Map<int, types::signed_global_dof_index, NodeType>>
 IndexSet::make_tpetra_map_rcp(const MPI_Comm communicator,
                               const bool     overlapping) const
 {
@@ -996,7 +1000,7 @@ IndexSet::make_tpetra_map_rcp(const MPI_Comm communicator,
     overlapping ? false : is_ascending_and_one_to_one(communicator);
   if (linear)
     return Utilities::Trilinos::internal::make_rcp<
-      Tpetra::Map<int, types::signed_global_dof_index>>(
+      Tpetra::Map<int, types::signed_global_dof_index, NodeType>>(
       size(),
       n_elements(),
       0,
@@ -1005,7 +1009,7 @@ IndexSet::make_tpetra_map_rcp(const MPI_Comm communicator,
         communicator)
 #    else
       Utilities::Trilinos::internal::make_rcp<Teuchos::Comm<int>>()
-#    endif // DEAL_WITH_MPI
+#    endif // DEAL_II_WITH_MPI
     );
   else
     {
@@ -1016,7 +1020,7 @@ IndexSet::make_tpetra_map_rcp(const MPI_Comm communicator,
         int_indices);
 
       return Utilities::Trilinos::internal::make_rcp<
-        Tpetra::Map<int, types::signed_global_dof_index>>(
+        Tpetra::Map<int, types::signed_global_dof_index, NodeType>>(
         size(),
         arr_view,
         0,
@@ -1197,6 +1201,64 @@ IndexSet::memory_consumption() const
           sizeof(compress_mutex));
 }
 
+// explicit template instantiations
 
+#ifndef DOXYGEN
+#  ifdef DEAL_II_WITH_TRILINOS
+#    ifdef DEAL_II_TRILINOS_WITH_TPETRA
+
+template IndexSet::IndexSet(
+  const Teuchos::RCP<const Tpetra::Map<
+    int,
+    types::signed_global_dof_index,
+    LinearAlgebra::TpetraWrappers::TpetraTypes::NodeType<MemorySpace::Host>>>
+    &);
+
+#      if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP) || \
+        defined(KOKKOS_ENABLE_SYCL)
+template IndexSet::IndexSet(
+  const Teuchos::RCP<const Tpetra::Map<
+    int,
+    types::signed_global_dof_index,
+    LinearAlgebra::TpetraWrappers::TpetraTypes::NodeType<MemorySpace::Default>>>
+    &);
+#      endif
+
+template LinearAlgebra::TpetraWrappers::TpetraTypes::MapType<MemorySpace::Host>
+dealii::IndexSet::make_tpetra_map<
+  LinearAlgebra::TpetraWrappers::TpetraTypes::NodeType<MemorySpace::Host>>(
+  const MPI_Comm,
+  bool) const;
+
+#      if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP) || \
+        defined(KOKKOS_ENABLE_SYCL)
+template LinearAlgebra::TpetraWrappers::TpetraTypes::MapType<
+  MemorySpace::Default>
+dealii::IndexSet::make_tpetra_map<
+  LinearAlgebra::TpetraWrappers::TpetraTypes::NodeType<MemorySpace::Default>>(
+  const MPI_Comm,
+  bool) const;
+#      endif
+
+template Teuchos::RCP<
+  LinearAlgebra::TpetraWrappers::TpetraTypes::MapType<MemorySpace::Host>>
+dealii::IndexSet::make_tpetra_map_rcp<
+  LinearAlgebra::TpetraWrappers::TpetraTypes::NodeType<MemorySpace::Host>>(
+  const MPI_Comm,
+  bool) const;
+
+#      if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP) || \
+        defined(KOKKOS_ENABLE_SYCL)
+template Teuchos::RCP<
+  LinearAlgebra::TpetraWrappers::TpetraTypes::MapType<MemorySpace::Default>>
+dealii::IndexSet::make_tpetra_map_rcp<
+  LinearAlgebra::TpetraWrappers::TpetraTypes::NodeType<MemorySpace::Default>>(
+  const MPI_Comm,
+  bool) const;
+#      endif
+
+#    endif
+#  endif
+#endif
 
 DEAL_II_NAMESPACE_CLOSE

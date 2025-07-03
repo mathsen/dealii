@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2021 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2020 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #include <deal.II/base/function_tools.h>
 
@@ -1473,6 +1472,11 @@ namespace NonMatching
          * Check whether the shape functions are linear.
          */
         bool polynomials_are_hat_functions;
+
+        /**
+         * Linear FE_Q object for FE_Q_iso_Q1 path.
+         */
+        Lazy<std::unique_ptr<FE_Q<dim>>> fe_q1;
       };
 
 
@@ -1505,8 +1509,6 @@ namespace NonMatching
         const auto dof_handler_cell =
           cell->as_dof_handler_iterator(*dof_handler);
 
-        const FE_Q<dim> fe_q1(1);
-
         // Save the element and the local dof values, since this is what we need
         // to evaluate the function.
 
@@ -1525,8 +1527,13 @@ namespace NonMatching
                     &dof_handler_cell->get_fe()))
               {
                 this->n_subdivisions_per_line = fe_q_iso_q1->get_degree();
-                fe                            = &fe_q1;
-                local_dof_values_subcell.resize(fe_q1.n_dofs_per_cell());
+
+                fe = fe_q1
+                       .value_or_initialize(
+                         []() { return std::make_unique<FE_Q<dim>>(1); })
+                       .get();
+                local_dof_values_subcell.resize(
+                  fe_q1.value()->n_dofs_per_cell());
               }
             else
               this->n_subdivisions_per_line = numbers::invalid_unsigned_int;
@@ -1621,13 +1628,18 @@ namespace NonMatching
         if (!poly.empty() && component == 0)
           {
             // TODO: this could be extended to a component that is not zero
-            return dealii::internal::evaluate_tensor_product_value(
-              poly,
-              this->is_fe_q_iso_q1() ? local_dof_values_subcell :
-                                       local_dof_values,
-              this->is_fe_q_iso_q1() ? subcell_box.real_to_unit(point) : point,
-              polynomials_are_hat_functions,
-              this->is_fe_q_iso_q1() ? std::vector<unsigned int>() : renumber);
+            return this->is_fe_q_iso_q1() ?
+                     dealii::internal::evaluate_tensor_product_value(
+                       poly,
+                       make_array_view(local_dof_values_subcell),
+                       subcell_box.real_to_unit(point),
+                       polynomials_are_hat_functions) :
+                     dealii::internal::evaluate_tensor_product_value(
+                       poly,
+                       make_array_view(local_dof_values),
+                       point,
+                       polynomials_are_hat_functions,
+                       renumber);
           }
         else
           {
@@ -1654,15 +1666,20 @@ namespace NonMatching
         if (!poly.empty() && component == 0)
           {
             // TODO: this could be extended to a component that is not zero
-            return dealii::internal::evaluate_tensor_product_value_and_gradient(
-                     poly,
-                     this->is_fe_q_iso_q1() ? local_dof_values_subcell :
-                                              local_dof_values,
-                     this->is_fe_q_iso_q1() ? subcell_box.real_to_unit(point) :
-                                              point,
-                     polynomials_are_hat_functions,
-                     this->is_fe_q_iso_q1() ? std::vector<unsigned int>() :
-                                              renumber)
+            return (this->is_fe_q_iso_q1() ?
+                      dealii::internal::
+                        evaluate_tensor_product_value_and_gradient(
+                          poly,
+                          make_array_view(local_dof_values_subcell),
+                          subcell_box.real_to_unit(point),
+                          polynomials_are_hat_functions) :
+                      dealii::internal::
+                        evaluate_tensor_product_value_and_gradient(
+                          poly,
+                          make_array_view(local_dof_values),
+                          point,
+                          polynomials_are_hat_functions,
+                          renumber))
               .second;
           }
         else
@@ -1690,12 +1707,16 @@ namespace NonMatching
         if (!poly.empty() && component == 0)
           {
             // TODO: this could be extended to a component that is not zero
-            return dealii::internal::evaluate_tensor_product_hessian(
-              poly,
-              this->is_fe_q_iso_q1() ? local_dof_values_subcell :
-                                       local_dof_values,
-              this->is_fe_q_iso_q1() ? subcell_box.real_to_unit(point) : point,
-              this->is_fe_q_iso_q1() ? std::vector<unsigned int>() : renumber);
+            return this->is_fe_q_iso_q1() ?
+                     dealii::internal::evaluate_tensor_product_hessian(
+                       poly,
+                       make_array_view(local_dof_values_subcell),
+                       subcell_box.real_to_unit(point)) :
+                     dealii::internal::evaluate_tensor_product_hessian(
+                       poly,
+                       make_array_view(local_dof_values),
+                       point,
+                       renumber);
           }
         else
           {
@@ -1927,7 +1948,7 @@ namespace NonMatching
 
     const Point<dim> vertex0 =
       box.vertex(GeometryInfo<dim>::face_to_cell_vertices(face_index, 0));
-    const double coordinate_value = vertex0(face_normal_direction);
+    const double coordinate_value = vertex0[face_normal_direction];
 
     const Functions::CoordinateRestriction<dim - 1> face_restriction(
       level_set, face_normal_direction, coordinate_value);

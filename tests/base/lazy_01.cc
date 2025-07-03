@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2023 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2023 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 //
 // Test the ensure_initialized() and value_or_initialize() interface of
@@ -24,7 +23,6 @@
 
 #include "../tests.h"
 
-using namespace dealii;
 
 int
 main()
@@ -32,6 +30,8 @@ main()
   initlog();
 
   {
+    deallog << "Part 1:" << std::endl;
+
     Lazy<int> lazy_integer;
     deallog << "lazy_integer.has_value() = " << lazy_integer.has_value()
             << std::endl;
@@ -40,7 +40,15 @@ main()
       deallog << "[initializing object]" << std::endl;
       return 42;
     });
-    deallog << "lazy_integer.has_value() = " << lazy_integer.has_value()
+
+    // Lazy computes the result on a different task, which may be on a
+    // different thread. To avoid producing unreliable output, make
+    // sure we don't say
+    //   deallog << "lazy_integer.has_value() = " << lazy_integer.has_value()
+    // but the following, where the order of computation and output are
+    // clear and well defined:
+    deallog << "lazy_integer.has_value() = " +
+                 std::to_string(lazy_integer.has_value())
             << std::endl;
     deallog << "lazy_integer.value() = " << lazy_integer.value() << std::endl;
 
@@ -49,17 +57,20 @@ main()
       return -1;
     });
 
-    deallog << "lazy_integer.value() = " << lazy_integer.value() << std::endl;
+    deallog << "lazy_integer.value() = " + std::to_string(lazy_integer.value())
+            << std::endl;
   }
 
   {
+    deallog << "Part 2:" << std::endl;
+
     Lazy<int> lazy_integer;
 
-    deallog << "lazy_integer.value() = "
-            << lazy_integer.value_or_initialize([&]() {
-                 deallog << "... [initializing object] ... ";
-                 return 42;
-               })
+    deallog << "lazy_integer.value() = " +
+                 std::to_string(lazy_integer.value_or_initialize([&]() {
+                   deallog << "... [initializing object] ... " << std::endl;
+                   return 42;
+                 }))
             << std::endl;
   }
 

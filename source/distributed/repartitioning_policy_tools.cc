@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2021 - 2022 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2021 - 2023 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 #include <deal.II/base/mpi_compute_index_owner_internal.h>
@@ -304,29 +303,11 @@ namespace RepartitioningPolicyTools
     for (const auto &weight : weights)
       process_local_weight += weight;
 
-    // determine partial sum of weights of this process
-    std::uint64_t process_local_weight_offset = 0;
-
-    int ierr = MPI_Exscan(
-      &process_local_weight,
-      &process_local_weight_offset,
-      1,
-      Utilities::MPI::mpi_type_id_for_type<decltype(process_local_weight)>,
-      MPI_SUM,
-      tria->get_communicator());
-    AssertThrowMPI(ierr);
-
-    // total weight of all processes
-    std::uint64_t total_weight =
-      process_local_weight_offset + process_local_weight;
-
-    ierr =
-      MPI_Bcast(&total_weight,
-                1,
-                Utilities::MPI::mpi_type_id_for_type<decltype(total_weight)>,
-                n_subdomains - 1,
-                mpi_communicator);
-    AssertThrowMPI(ierr);
+    // determine partial sum of weights of this process, as well as the total
+    // weight
+    const auto [process_local_weight_offset, total_weight] =
+      Utilities::MPI::partial_and_total_sum(process_local_weight,
+                                            tria->get_communicator());
 
     // set up partition
     LinearAlgebra::distributed::Vector<double> partition(partitioner);

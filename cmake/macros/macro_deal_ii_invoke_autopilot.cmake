@@ -1,17 +1,16 @@
-## ---------------------------------------------------------------------
+## ------------------------------------------------------------------------
 ##
-## Copyright (C) 2012 - 2023 by the deal.II authors
+## SPDX-License-Identifier: LGPL-2.1-or-later
+## Copyright (C) 2012 - 2024 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
-## The deal.II library is free software; you can use it, redistribute
-## it, and/or modify it under the terms of the GNU Lesser General
-## Public License as published by the Free Software Foundation; either
-## version 2.1 of the License, or (at your option) any later version.
-## The full text of the license can be found in the file LICENSE.md at
-## the top level directory of deal.II.
+## Part of the source code is dual licensed under Apache-2.0 WITH
+## LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+## governing the source code and code contributions can be found in
+## LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 ##
-## ---------------------------------------------------------------------
+## ------------------------------------------------------------------------
 
 #
 # This file implements the DEAL_II_INVOKE_AUTOPILOT macro, which is
@@ -211,16 +210,16 @@ macro(deal_ii_invoke_autopilot)
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target runclean
     COMMAND ${CMAKE_COMMAND} -E remove_directory CMakeFiles
     COMMAND ${CMAKE_COMMAND} -E remove
-      CMakeCache.txt cmake_install.cmake Makefile
+      CMakeCache.txt cmake_install.cmake compile_commands.json Makefile
       build.ninja rules.ninja .ninja_deps .ninja_log
     COMMENT "distclean invoked"
     )
 
-  # Define a strip-comments target:
+  # Define a strip_comments target:
   find_package(Perl QUIET)
   if(PERL_FOUND)
     add_custom_target(strip_comments
-      COMMAND ${PERL_EXECUTABLE} -pi -e 's\#^[ \\t]*//.*\\n\#\#g;' ${TARGET_SRC}
+      COMMAND ${PERL_EXECUTABLE} -pi -e 's\#^[ \\t]*//.*\\n\#\#g;' ${CMAKE_SOURCE_DIR}/${TARGET_SRC}
       COMMENT "strip comments"
       )
   endif()

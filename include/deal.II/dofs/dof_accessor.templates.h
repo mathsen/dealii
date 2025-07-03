@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 1999 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_dof_accessor_templates_h
 #define dealii_dof_accessor_templates_h
@@ -481,7 +480,7 @@ namespace internal
       process_object_range(dealii::DoFInvalidAccessor<structdim, dim, spacedim>,
                            const unsigned int)
       {
-        Assert(false, ExcInternalError());
+        DEAL_II_ASSERT_UNREACHABLE();
 
         return {0, 0};
       }
@@ -1091,8 +1090,8 @@ namespace internal
         if (structdim == 3 && fe.max_dofs_per_quad() > 0)
           for (const auto face_no : accessor.face_indices())
             {
-              const auto combined_orientation = TriaAccessorImplementation::
-                Implementation::combined_face_orientation(accessor, face_no);
+              const auto combined_orientation =
+                accessor.combined_face_orientation(face_no);
               const unsigned int quad_index = accessor.quad_index(face_no);
               if (combined_orientation ==
                   ReferenceCell::default_combined_face_orientation())
@@ -1113,11 +1112,7 @@ namespace internal
                   fe_index,
                   [&](const auto d) {
                     return fe.adjust_quad_dof_index_for_face_orientation(
-                      d,
-                      face_no,
-                      accessor.face_orientation(face_no),
-                      accessor.face_flip(face_no),
-                      accessor.face_rotation(face_no));
+                      d, face_no, combined_orientation);
                   },
                   std::integral_constant<int, 2>(),
                   dof_indices_ptr,
@@ -1181,7 +1176,7 @@ namespace internal
             vertex_index,
             fe_index,
             [](const auto d) {
-              Assert(false, ExcInternalError());
+              DEAL_II_ASSERT_UNREACHABLE();
               return d;
             },
             std::integral_constant<int, 0>(),
@@ -1880,7 +1875,7 @@ DoFAccessor<0, 1, spacedim, level_dof_access>::set_dof_index(
   const types::global_dof_index /*index*/,
   const types::fe_index /*fe_index*/) const
 {
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
 }
 
 
@@ -2006,7 +2001,7 @@ inline bool
 DoFAccessor<0, 1, spacedim, level_dof_access>::fe_index_is_active(
   const types::fe_index /*fe_index*/) const
 {
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
   return false;
 }
 
@@ -2062,7 +2057,7 @@ inline typename dealii::internal::DoFHandlerImplementation::
   DoFAccessor<0, 1, spacedim, level_dof_access>::line(
     const unsigned int /*c*/) const
 {
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
   return typename dealii::internal::DoFHandlerImplementation::
     Iterators<1, spacedim, level_dof_access>::line_iterator();
 }
@@ -2075,7 +2070,7 @@ inline typename dealii::internal::DoFHandlerImplementation::
   DoFAccessor<0, 1, spacedim, level_dof_access>::quad(
     const unsigned int /*c*/) const
 {
-  Assert(false, ExcNotImplemented());
+  DEAL_II_NOT_IMPLEMENTED();
   return typename dealii::internal::DoFHandlerImplementation::
     Iterators<1, spacedim, level_dof_access>::quad_iterator();
 }
@@ -2961,7 +2956,7 @@ DoFCellAccessor<dimension_, space_dimension_, level_dof_access>::
     {
       global_matrix.add(dof_indices[i],
                         n_dofs,
-                        dof_indices.begin(),
+                        dof_indices.data(),
                         &local_matrix(i, 0));
       global_vector(dof_indices[i]) += local_vector(i);
     }

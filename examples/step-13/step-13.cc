@@ -1,17 +1,16 @@
-/* ---------------------------------------------------------------------
+/* ------------------------------------------------------------------------
  *
- * Copyright (C) 2001 - 2023 by the deal.II authors
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * Copyright (C) 2002 - 2024 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
- * The deal.II library is free software; you can use it, redistribute
- * it, and/or modify it under the terms of the GNU Lesser General
- * Public License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * The full text of the license can be found in the file LICENSE.md at
- * the top level directory of deal.II.
+ * Part of the source code is dual licensed under Apache-2.0 WITH
+ * LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+ * governing the source code and code contributions can be found in
+ * LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
  *
- * ---------------------------------------------------------------------
+ * ------------------------------------------------------------------------
  *
  * Author: Wolfgang Bangerth, University of Heidelberg, 2001, 2002
  */
@@ -24,7 +23,6 @@
 // roughly builds upon previous ones), then C++ standard headers:
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/table_handler.h>
 #include <deal.II/base/thread_management.h>
 #include <deal.II/base/work_stream.h>
@@ -92,7 +90,7 @@ namespace Step13
   // old one).  On a related note, you can reuse the evaluation classes for
   // other projects, solving different equations.
   //
-  // In order to improve separation of code into different modules, we put the
+  // In order to improve separation of code into different groups, we put the
   // evaluation classes into a namespace of their own. This makes it easier to
   // actually solve different equations in the same program, by assembling it
   // from existing building blocks. The reason for this is that classes for
@@ -710,7 +708,7 @@ namespace Step13
     // assemble both the matrix and the right hand side. These are
     // independent operations, and we should do this in parallel. To
     // this end, we use the concept of "tasks" that is discussed in
-    // the @ref threads documentation module. In essence, what we want
+    // the @ref threads documentation topic. In essence, what we want
     // to say "here is something that needs to be worked on, go do it
     // whenever a CPU core is available", then do something else, and
     // when we need the result of the first operation wait for its
@@ -1224,9 +1222,9 @@ namespace Step13
   {
     (void)component;
     AssertIndexRange(component, 1);
-    double q = p(0);
+    double q = p[0];
     for (unsigned int i = 1; i < dim; ++i)
-      q += std::sin(10 * p(i) + 5 * p(0) * p(0));
+      q += std::sin(10 * p[i] + 5 * p[0] * p[0]);
     const double exponential = std::exp(q);
     return exponential;
   }
@@ -1248,19 +1246,19 @@ namespace Step13
   {
     (void)component;
     AssertIndexRange(component, 1);
-    double q = p(0);
+    double q = p[0];
     for (unsigned int i = 1; i < dim; ++i)
-      q += std::sin(10 * p(i) + 5 * p(0) * p(0));
+      q += std::sin(10 * p[i] + 5 * p[0] * p[0]);
     const double u  = std::exp(q);
     double       t1 = 1, t2 = 0, t3 = 0;
     for (unsigned int i = 1; i < dim; ++i)
       {
-        t1 += std::cos(10 * p(i) + 5 * p(0) * p(0)) * 10 * p(0);
-        t2 += 10 * std::cos(10 * p(i) + 5 * p(0) * p(0)) -
-              100 * std::sin(10 * p(i) + 5 * p(0) * p(0)) * p(0) * p(0);
-        t3 += 100 * std::cos(10 * p(i) + 5 * p(0) * p(0)) *
-                std::cos(10 * p(i) + 5 * p(0) * p(0)) -
-              100 * std::sin(10 * p(i) + 5 * p(0) * p(0));
+        t1 += std::cos(10 * p[i] + 5 * p[0] * p[0]) * 10 * p[0];
+        t2 += 10 * std::cos(10 * p[i] + 5 * p[0] * p[0]) -
+              100 * std::sin(10 * p[i] + 5 * p[0] * p[0]) * p[0] * p[0];
+        t3 += 100 * std::cos(10 * p[i] + 5 * p[0] * p[0]) *
+                std::cos(10 * p[i] + 5 * p[0] * p[0]) -
+              100 * std::sin(10 * p[i] + 5 * p[0] * p[0]);
       };
     t1 = t1 * t1;
 

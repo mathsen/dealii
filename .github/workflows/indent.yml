@@ -14,7 +14,7 @@ jobs:
     # run the indent checks
 
     name: indent
-    runs-on: [ubuntu-20.04]
+    runs-on: [ubuntu-22.04]
 
     steps:
     - uses: actions/checkout@v4
@@ -50,7 +50,7 @@ jobs:
         ! [ -s doxygen.log ] || exit 1
         tar -czf doxygen_documentation.tar.gz doc/doxygen
     - name: archive documentation
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: doxygen_documentation.tar.gz
         path: build/doxygen_documentation.tar.gz

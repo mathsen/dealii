@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2023 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #include <deal.II/lac/petsc_communication_pattern.h>
 
@@ -89,12 +88,10 @@ namespace PETScWrappers
                                const IndexSet &ghost_indices,
                                const MPI_Comm  communicator)
   {
-    std::vector<types::global_dof_index> in_deal;
-    locally_owned_indices.fill_index_vector(in_deal);
+    const auto            in_deal = locally_owned_indices.get_index_vector();
     std::vector<PetscInt> in_petsc(in_deal.begin(), in_deal.end());
 
-    std::vector<types::global_dof_index> out_deal;
-    ghost_indices.fill_index_vector(out_deal);
+    const auto            out_deal = ghost_indices.get_index_vector();
     std::vector<PetscInt> out_petsc(out_deal.begin(), out_deal.end());
 
     std::vector<PetscInt> dummy;
@@ -129,7 +126,7 @@ namespace PETScWrappers
           }
         else
           has_invalid = true;
-        loc++;
+        ++loc;
       }
     if (!has_invalid)
       indices_has_loc.clear();
@@ -145,7 +142,7 @@ namespace PETScWrappers
           }
         else
           has_invalid = true;
-        loc++;
+        ++loc;
       }
     if (!has_invalid)
       indices_want_loc.clear();
@@ -204,8 +201,12 @@ namespace PETScWrappers
     const PetscInt *ranges;
     AssertPETSc(PetscLayoutGetRanges(layout, &ranges));
 
-    PetscInt    cnt   = 0;
+    PetscInt cnt = 0;
+#  if DEAL_II_PETSC_VERSION_GTE(3, 13, 0)
     PetscMPIInt owner = 0;
+#  else
+    PetscInt owner = 0;
+#  endif
     for (const auto idx : inidx)
       {
         // short-circuit the search if the last owner owns this index too
@@ -215,7 +216,7 @@ namespace PETScWrappers
           }
         remotes[cnt].rank  = owner;
         remotes[cnt].index = idx - ranges[owner];
-        cnt++;
+        ++cnt;
       }
 
     AssertPETSc(PetscSFCreate(communicator, &sf2));
@@ -397,9 +398,6 @@ namespace PETScWrappers
                       const IndexSet &larger_ghost_indices,
                       const MPI_Comm  communicator)
   {
-    std::vector<types::global_dof_index> local_indices;
-    locally_owned_indices.fill_index_vector(local_indices);
-
     ghost_indices_data = ghost_indices;
     ghost_indices_data.subtract_set(locally_owned_indices);
     ghost_indices_data.compress();
@@ -416,7 +414,9 @@ namespace PETScWrappers
       }
 
     ghost.reinit(locally_owned_indices, ghost_indices_data, communicator);
-    larger_ghost.reinit(local_indices, expanded_ghost_indices, communicator);
+    larger_ghost.reinit(locally_owned_indices.get_index_vector(),
+                        expanded_ghost_indices,
+                        communicator);
     n_ghost_indices_data   = ghost_indices_data.n_elements();
     n_ghost_indices_larger = larger_ghost_indices.n_elements();
   }

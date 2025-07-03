@@ -1,21 +1,20 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2019 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2019 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 
-// Test CUDAWrappers::MatrixFree::initialize_dof_vector.
+// Test Portable::MatrixFree::initialize_dof_vector.
 
 #include <deal.II/distributed/tria.h>
 
@@ -29,7 +28,7 @@
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/cuda_vector.h>
 
-#include <deal.II/matrix_free/cuda_matrix_free.h>
+#include <deal.II/matrix_free/portable_matrix_free.h>
 
 #include <deal.II/numerics/vector_tools.h>
 
@@ -86,11 +85,10 @@ test()
   AffineConstraints<double> constraints(relevant_set);
   constraints.close();
 
-  MappingQ<dim>                         mapping(fe_degree);
-  CUDAWrappers::MatrixFree<dim, Number> mf_data;
-  const QGauss<1>                       quad(fe_degree + 1);
-  typename CUDAWrappers::MatrixFree<dim, Number>::AdditionalData
-    additional_data;
+  MappingQ<dim>                     mapping(fe_degree);
+  Portable::MatrixFree<dim, Number> mf_data;
+  const QGauss<1>                   quad(fe_degree + 1);
+  typename Portable::MatrixFree<dim, Number>::AdditionalData additional_data;
   mf_data.reinit(mapping, dof, constraints, quad, additional_data);
 
   VectorType vector;

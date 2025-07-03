@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 1999 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_grid_in_h
 #define dealii_grid_in_h
@@ -305,7 +304,6 @@ struct CellData;
  *
  * @ingroup grid
  * @ingroup input
- * Pelteret 2015, Timo Heister 2015,  Krzysztof Bzowski, 2015
  */
 
 template <int dim, int spacedim = dim>
@@ -368,9 +366,8 @@ public:
   read(std::istream &in, Format format = Default);
 
   /**
-   * Open the file given by the string and call the previous function read().
-   * This function uses the PathSearch mechanism to find files. The file class
-   * used is <code>MESH</code>.
+   * Open the file given by the string and call the previous function
+   * read() taking a std::istream argument.
    */
   void
   read(const std::string &in, Format format = Default);
@@ -862,9 +859,11 @@ public:
                  << "Supported elements are: \n"
                  << "ELM-TYPE\n"
                  << "1 Line (2 nodes, 1 edge).\n"
+                 << "2 Triangle (3 nodes, 3 edges).\n"
                  << "3 Quadrilateral (4 nodes, 4 edges).\n"
+                 << "4 Tetrahedron (4 nodes, 6 edges, 4 faces) when in 3d.\n"
                  << "5 Hexahedron (8 nodes, 12 edges, 6 faces) when in 3d.\n"
-                 << "15 Point (1 node, ignored when read)");
+                 << "15 Point (1 node, ignored when read).");
 
 
   DeclException2(

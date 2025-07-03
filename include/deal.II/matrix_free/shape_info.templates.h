@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2012 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_matrix_free_shape_info_templates_h
 #define dealii_matrix_free_shape_info_templates_h
@@ -85,23 +84,23 @@ namespace internal
 
 
 
-    template <int dim>
+    template <int dim, int spacedim>
     void
     get_element_type_specific_information(
-      const FiniteElement<dim, dim> &fe_in,
-      const FiniteElement<dim, dim> &fe,
-      const unsigned int             base_element_number,
-      ElementType                   &element_type,
-      std::vector<unsigned int>     &scalar_lexicographic,
-      std::vector<unsigned int>     &lexicographic_numbering)
+      const FiniteElement<dim, spacedim> &fe_in,
+      const FiniteElement<dim, spacedim> &fe,
+      const unsigned int                  base_element_number,
+      ElementType                        &element_type,
+      std::vector<unsigned int>          &scalar_lexicographic,
+      std::vector<unsigned int>          &lexicographic_numbering)
     {
       element_type = tensor_general;
 
-      const auto fe_poly = dynamic_cast<const FE_Poly<dim, dim> *>(&fe);
+      const auto fe_poly = dynamic_cast<const FE_Poly<dim, spacedim> *>(&fe);
 
-      if (dynamic_cast<const FE_SimplexPoly<dim, dim> *>(&fe) != nullptr ||
-          dynamic_cast<const FE_WedgePoly<dim, dim> *>(&fe) != nullptr ||
-          dynamic_cast<const FE_PyramidPoly<dim, dim> *>(&fe) != nullptr)
+      if (dynamic_cast<const FE_SimplexPoly<dim, spacedim> *>(&fe) != nullptr ||
+          dynamic_cast<const FE_WedgePoly<dim, spacedim> *>(&fe) != nullptr ||
+          dynamic_cast<const FE_PyramidPoly<dim, spacedim> *>(&fe) != nullptr)
         {
           scalar_lexicographic.resize(fe.n_dofs_per_cell());
           for (unsigned int i = 0; i < scalar_lexicographic.size(); ++i)
@@ -116,14 +115,16 @@ namespace internal
                     Polynomials::PiecewisePolynomial<double>> *>(
                   &fe_poly->get_poly_space()) != nullptr))
         scalar_lexicographic = fe_poly->get_poly_space_numbering_inverse();
-      else if (const auto fe_dgp = dynamic_cast<const FE_DGP<dim> *>(&fe))
+      else if (const auto fe_dgp =
+                 dynamic_cast<const FE_DGP<dim, spacedim> *>(&fe))
         {
           scalar_lexicographic.resize(fe_dgp->n_dofs_per_cell());
           for (unsigned int i = 0; i < fe_dgp->n_dofs_per_cell(); ++i)
             scalar_lexicographic[i] = i;
           element_type = truncated_tensor;
         }
-      else if (const auto fe_q_dg0 = dynamic_cast<const FE_Q_DG0<dim> *>(&fe))
+      else if (const auto fe_q_dg0 =
+                 dynamic_cast<const FE_Q_DG0<dim, spacedim> *>(&fe))
         {
           scalar_lexicographic = fe_q_dg0->get_poly_space_numbering_inverse();
           element_type         = tensor_symmetric_plus_dg0;
@@ -133,7 +134,7 @@ namespace internal
           // FE_Nothing case -> nothing to do here
         }
       else
-        Assert(false, ExcNotImplemented());
+        DEAL_II_NOT_IMPLEMENTED();
 
       // Finally store the renumbering into the respective field
       if (fe_in.n_components() == 1)
@@ -191,7 +192,7 @@ namespace internal
         Assert(fe_name[template_starts + 1] ==
                  (dim == 1 ? '1' : (dim == 2 ? '2' : '3')),
                ExcInternalError());
-        fe_name[template_starts + 1] = std::to_string(dim_to).c_str()[0];
+        fe_name[template_starts + 1] = std::to_string(dim_to)[0];
       }
       return FETools::get_fe_by_name<dim_to, dim_to>(fe_name);
     }
@@ -238,9 +239,6 @@ namespace internal
                               const FiniteElement<dim, spacedim> &fe_in,
                               const unsigned int base_element_number)
     {
-      static_assert(dim == spacedim,
-                    "Currently, only the case dim=spacedim is implemented");
-
       // ShapeInfo for RT elements. Here, data is of size 2 instead of 1.
       // data[0] is univariate_shape_data in normal direction and
       // data[1] is univariate_shape_data in tangential direction
@@ -252,7 +250,7 @@ namespace internal
 
           const auto quad = quad_in.get_tensor_basis()[0];
 
-          const FiniteElement<dim> &fe =
+          const FiniteElement<dim, spacedim> &fe =
             fe_in.base_element(base_element_number);
           n_dimensions = dim;
           n_components = fe_in.n_components();
@@ -313,11 +311,11 @@ namespace internal
           return;
         }
       else if (quad_in.is_tensor_product() == false ||
-               dynamic_cast<const FE_SimplexPoly<dim, dim> *>(
+               dynamic_cast<const FE_SimplexPoly<dim, spacedim> *>(
                  &fe_in.base_element(base_element_number)) != nullptr ||
-               dynamic_cast<const FE_WedgePoly<dim, dim> *>(
+               dynamic_cast<const FE_WedgePoly<dim, spacedim> *>(
                  &fe_in.base_element(base_element_number)) != nullptr ||
-               dynamic_cast<const FE_PyramidPoly<dim, dim> *>(
+               dynamic_cast<const FE_PyramidPoly<dim, spacedim> *>(
                  &fe_in.base_element(base_element_number)) != nullptr)
         {
           // specialization for arbitrary finite elements and quadrature rules
@@ -377,8 +375,7 @@ namespace internal
                 const auto grad = fe.shape_grad(i, quad.point(q));
 
                 for (unsigned int d = 0; d < dim; ++d)
-                  shape_gradients[d * n_dofs * n_q_points + i * n_q_points +
-                                  q] = grad[d];
+                  shape_gradients[i * dim * n_q_points + q * dim + d] = grad[d];
               }
 
           {
@@ -428,10 +425,10 @@ namespace internal
                                           n_max_face_orientations,
                                           n_dofs * n_q_points_face_max});
 
-                shape_gradients_face.reinit({n_faces,
-                                             n_max_face_orientations,
-                                             dim,
-                                             n_dofs * n_q_points_face_max});
+                shape_gradients_face.reinit(
+                  {n_faces,
+                   n_max_face_orientations,
+                   dim * n_dofs * n_q_points_face_max});
 
                 for (unsigned int f = 0; f < n_faces; ++f)
                   {
@@ -467,8 +464,10 @@ namespace internal
                               const auto grad = fe.shape_grad(i, point);
 
                               for (unsigned int d = 0; d < dim; ++d)
-                                shape_gradients_face(
-                                  f, o, d, i * n_q_points_face + q) = grad[d];
+                                shape_gradients_face(f,
+                                                     o,
+                                                     i * dim * n_q_points_face +
+                                                       q * dim + d) = grad[d];
                             }
                       }
                   }
@@ -497,6 +496,84 @@ namespace internal
 
           univariate_shape_data.nodal_at_cell_boundaries = true;
 
+          const ReferenceCell reference_cell = fe.reference_cell();
+          if (reference_cell.is_simplex())
+            {
+              if (dim == 2)
+                dofs_per_component_on_face = fe.degree + 1;
+              else
+                dofs_per_component_on_face =
+                  (fe.degree + 1) * (fe.degree + 2) / 2;
+
+              face_to_cell_index_nodal.reinit(reference_cell.n_faces(),
+                                              dofs_per_component_on_face);
+
+
+              for (unsigned int face = 0; face < reference_cell.n_faces();
+                   ++face)
+                {
+                  // first get info from reference cell, i.e. the linear case
+                  unsigned int d = 0;
+                  for (; d < dim; ++d)
+                    face_to_cell_index_nodal[face][d] =
+                      reference_cell.face_to_cell_vertices(face, d, 1);
+
+                  // now fill the rest of the indices, start with the lines
+                  if (fe.degree == 2)
+                    for (; d < dofs_per_component_on_face; ++d)
+                      face_to_cell_index_nodal[face][d] =
+                        reference_cell.n_vertices() +
+                        reference_cell.face_to_cell_lines(face, d - dim, 1);
+
+                  // in the cubic case it is more complicated as more DoFs are
+                  // on the lines
+                  else if (fe.degree == 3)
+                    {
+                      for (unsigned int line = 0;
+                           d < dofs_per_component_on_face - 1;
+                           ++line, d += 2)
+                        {
+                          const unsigned int face_to_cell_lines =
+                            reference_cell.face_to_cell_lines(face, line, 1);
+                          // check the direction of the line
+                          // is it 0 -> 1 or 1 -> 0
+                          // as DoFs on the line are ordered differently
+                          if (reference_cell.line_to_cell_vertices(
+                                face_to_cell_lines, 0) ==
+                              reference_cell.face_to_cell_vertices(face,
+                                                                   line,
+                                                                   1))
+                            {
+                              face_to_cell_index_nodal[face][d] =
+                                reference_cell.n_vertices() +
+                                2 * face_to_cell_lines;
+                              face_to_cell_index_nodal[face][d + 1] =
+                                reference_cell.n_vertices() +
+                                2 * face_to_cell_lines + 1;
+                            }
+                          else
+                            {
+                              face_to_cell_index_nodal[face][d + 1] =
+                                reference_cell.n_vertices() +
+                                2 * face_to_cell_lines;
+                              face_to_cell_index_nodal[face][d] =
+                                reference_cell.n_vertices() +
+                                2 * face_to_cell_lines + 1;
+                            }
+                        }
+                      //  in 3D we also need the DoFs on the quads
+                      if (dim == 3)
+                        {
+                          face_to_cell_index_nodal
+                            [face][dofs_per_component_on_face - 1] =
+                              reference_cell.n_vertices() +
+                              2 * reference_cell.n_lines() + face;
+                        }
+                    }
+                  else if (fe.degree > 3)
+                    DEAL_II_NOT_IMPLEMENTED();
+                }
+            }
           // TODO: set up face_to_cell_index_nodal, face_to_cell_index_hermite,
           //  face_orientations
 
@@ -505,9 +582,10 @@ namespace internal
 
       const auto quad = quad_in.get_tensor_basis()[0];
 
-      const FiniteElement<dim> &fe = fe_in.base_element(base_element_number);
-      n_dimensions                 = dim;
-      n_components                 = fe_in.n_components();
+      const FiniteElement<dim, spacedim> &fe =
+        fe_in.base_element(base_element_number);
+      n_dimensions = dim;
+      n_components = fe_in.n_components();
 
       Assert(fe.n_components() == 1,
              ExcMessage("FEEvaluation only works for scalar finite elements."));
@@ -554,8 +632,8 @@ namespace internal
                                                      scalar_lexicographic,
                                                      0);
 
-      if (dim > 1 && (dynamic_cast<const FE_Q<dim> *>(&fe) ||
-                      dynamic_cast<const FE_Q_iso_Q1<dim> *>(&fe)))
+      if (dim > 1 && (dynamic_cast<const FE_Q<dim, spacedim> *>(&fe) ||
+                      dynamic_cast<const FE_Q_iso_Q1<dim, spacedim> *>(&fe)))
         {
           auto &subface_interpolation_matrix_0 =
             univariate_shape_data.subface_interpolation_matrices[0];
@@ -572,7 +650,8 @@ namespace internal
           subface_interpolation_matrix_scalar_0.resize(nn * nn);
           subface_interpolation_matrix_scalar_1.resize(nn * nn);
 
-          const bool is_feq = dynamic_cast<const FE_Q<dim> *>(&fe) != nullptr;
+          const bool is_feq =
+            dynamic_cast<const FE_Q<dim, spacedim> *>(&fe) != nullptr;
 
           std::vector<Point<1>> fe_q_points =
             is_feq ? QGaussLobatto<1>(nn).get_points() :
@@ -614,7 +693,7 @@ namespace internal
       if (element_type == tensor_general &&
           univariate_shape_data.check_and_set_shapes_symmetric())
         {
-          if (dynamic_cast<const FE_Q_iso_Q1<dim> *>(&fe) &&
+          if (dynamic_cast<const FE_Q_iso_Q1<dim, spacedim> *>(&fe) &&
               fe.tensor_degree() > 1)
             element_type = tensor_symmetric_no_collocation;
           else if (univariate_shape_data.check_shapes_collocation())
@@ -1152,9 +1231,6 @@ namespace internal
     bool
     ShapeInfo<Number>::is_supported(const FiniteElement<dim, spacedim> &fe)
     {
-      if (dim != spacedim)
-        return false;
-
       if (dynamic_cast<const FE_RaviartThomasNodal<dim> *>(&fe))
         return true;
 
@@ -1171,12 +1247,12 @@ namespace internal
                 dynamic_cast<const FE_Poly<dim, spacedim> *>(fe_ptr);
               // Simplices are a special case since the polynomial family is not
               // indicative of their support
-              if (dynamic_cast<const FE_SimplexPoly<dim, dim> *>(fe_poly_ptr) !=
-                    nullptr ||
-                  dynamic_cast<const FE_WedgePoly<dim, dim> *>(fe_poly_ptr) !=
-                    nullptr ||
-                  dynamic_cast<const FE_PyramidPoly<dim, dim> *>(fe_poly_ptr) !=
-                    nullptr)
+              if (dynamic_cast<const FE_SimplexPoly<dim, spacedim> *>(
+                    fe_poly_ptr) != nullptr ||
+                  dynamic_cast<const FE_WedgePoly<dim, spacedim> *>(
+                    fe_poly_ptr) != nullptr ||
+                  dynamic_cast<const FE_PyramidPoly<dim, spacedim> *>(
+                    fe_poly_ptr) != nullptr)
                 return true;
 
               if (dynamic_cast<const TensorProductPolynomials<

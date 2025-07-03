@@ -1,17 +1,16 @@
-/* ---------------------------------------------------------------------
+/* ------------------------------------------------------------------------
  *
- * Copyright (C) 2008 - 2023 by the deal.II authors
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * Copyright (C) 2008 - 2024 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
- * The deal.II library is free software; you can use it, redistribute
- * it, and/or modify it under the terms of the GNU Lesser General
- * Public License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * The full text of the license can be found in the file LICENSE.md at
- * the top level directory of deal.II.
+ * Part of the source code is dual licensed under Apache-2.0 WITH
+ * LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+ * governing the source code and code contributions can be found in
+ * LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
  *
- * ---------------------------------------------------------------------
+ * ------------------------------------------------------------------------
  *
  * Author: Wolfgang Bangerth, Texas A&M University, 2008
  */
@@ -21,7 +20,6 @@
 
 // As usual, we start by including some well-known files:
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/tensor_function.h>
@@ -48,7 +46,6 @@
 #include <deal.II/fe/fe_values.h>
 
 #include <deal.II/numerics/vector_tools.h>
-#include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/error_estimator.h>
 
@@ -128,9 +125,9 @@ namespace Step22
 
     const unsigned int degree;
 
-    Triangulation<dim> triangulation;
-    FESystem<dim>      fe;
-    DoFHandler<dim>    dof_handler;
+    Triangulation<dim>  triangulation;
+    const FESystem<dim> fe;
+    DoFHandler<dim>     dof_handler;
 
     AffineConstraints<double> constraints;
 
@@ -603,7 +600,7 @@ namespace Step22
     system_rhs            = 0;
     preconditioner_matrix = 0;
 
-    QGauss<dim> quadrature_formula(degree + 2);
+    const QGauss<dim> quadrature_formula(degree + 2);
 
     FEValues<dim> fe_values(fe,
                             quadrature_formula,
@@ -660,6 +657,7 @@ namespace Step22
     for (const auto &cell : dof_handler.active_cell_iterators())
       {
         fe_values.reinit(cell);
+
         local_matrix                = 0;
         local_preconditioner_matrix = 0;
         local_rhs                   = 0;

@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2008 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #include <deal.II/lac/trilinos_solver.h>
 
@@ -442,7 +441,7 @@ namespace TrilinosWrappers
           solver.SetAztecOption(AZ_solver, AZ_tfqmr);
           break;
         default:
-          Assert(false, ExcNotImplemented());
+          DEAL_II_NOT_IMPLEMENTED();
       }
 
     // Set the preconditioner
@@ -470,7 +469,7 @@ namespace TrilinosWrappers
     if (!status_test)
       {
         if (const ReductionControl *const reduction_control =
-              dynamic_cast<const ReductionControl *const>(&solver_control))
+              dynamic_cast<const ReductionControl *>(&solver_control))
           {
             status_test = std::make_unique<internal::TrilinosReductionControl>(
               reduction_control->max_steps(),
@@ -523,10 +522,10 @@ namespace TrilinosWrappers
     // compute it ourself.
     if (const internal::TrilinosReductionControl
           *const reduction_control_status =
-            dynamic_cast<const internal::TrilinosReductionControl *const>(
+            dynamic_cast<const internal::TrilinosReductionControl *>(
               status_test.get()))
       {
-        Assert(dynamic_cast<const ReductionControl *const>(&solver_control),
+        Assert(dynamic_cast<const ReductionControl *>(&solver_control),
                ExcInternalError());
 
         // Check to see if solver converged in one step
@@ -637,6 +636,13 @@ namespace TrilinosWrappers
 
 
 
+  SolverDirect::SolverDirect(const AdditionalData &data)
+    : solver_control(solver_control_own)
+    , additional_data(data.output_solver_details, data.solver_type)
+  {}
+
+
+
   SolverDirect::SolverDirect(SolverControl &cn, const AdditionalData &data)
     : solver_control(cn)
     , additional_data(data.output_solver_details, data.solver_type)
@@ -697,8 +703,35 @@ namespace TrilinosWrappers
   }
 
 
+
+  void
+  SolverDirect::initialize(const SparseMatrix &A, const AdditionalData &data)
+  {
+    this->additional_data = data;
+
+    this->initialize(A);
+  }
+
+
   void
   SolverDirect::solve(MPI::Vector &x, const MPI::Vector &b)
+  {
+    this->vmult(x, b);
+  }
+
+
+
+  void
+  SolverDirect::solve(
+    dealii::LinearAlgebra::distributed::Vector<double>       &x,
+    const dealii::LinearAlgebra::distributed::Vector<double> &b)
+  {
+    this->vmult(x, b);
+  }
+
+
+  void
+  SolverDirect::vmult(MPI::Vector &x, const MPI::Vector &b) const
   {
     // Assign the empty LHS vector to the Epetra_LinearProblem object
     linear_problem->SetLHS(&x.trilinos_vector());
@@ -726,9 +759,9 @@ namespace TrilinosWrappers
 
 
   void
-  SolverDirect::solve(
+  SolverDirect::vmult(
     dealii::LinearAlgebra::distributed::Vector<double>       &x,
-    const dealii::LinearAlgebra::distributed::Vector<double> &b)
+    const dealii::LinearAlgebra::distributed::Vector<double> &b) const
   {
     Epetra_Vector ep_x(View,
                        linear_problem->GetOperator()->OperatorDomainMap(),

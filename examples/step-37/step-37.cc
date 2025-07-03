@@ -1,17 +1,16 @@
-/* ---------------------------------------------------------------------
+/* ------------------------------------------------------------------------
  *
- * Copyright (C) 2009 - 2023 by the deal.II authors
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * Copyright (C) 2009 - 2024 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
- * The deal.II library is free software; you can use it, redistribute
- * it, and/or modify it under the terms of the GNU Lesser General
- * Public License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * The full text of the license can be found in the file LICENSE.md at
- * the top level directory of deal.II.
+ * Part of the source code is dual licensed under Apache-2.0 WITH
+ * LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+ * governing the source code and code contributions can be found in
+ * LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
  *
- * ---------------------------------------------------------------------
+ * ------------------------------------------------------------------------
  *
  * Authors: Katharina Kormann, Martin Kronbichler, Uppsala University,
  * 2009-2012, updated to MPI version with parallel vectors in 2016
@@ -171,7 +170,7 @@ namespace Step37
   // making sure that only cells are worked on that do not share any degree of
   // freedom (this makes the loop thread-safe when writing into destination
   // vectors). This is a more advanced strategy compared to the WorkStream
-  // class described in the @ref threads module. Of course, to not destroy
+  // class described in the @ref threads topic. Of course, to not destroy
   // thread-safety, we have to be careful when writing into class-global
   // structures.
   //
@@ -566,8 +565,8 @@ namespace Step37
   // columns in the local matrix and putting the entry 1 in the <i>i</i>th
   // slot and a zero entry in all other slots, i.e., we apply the cell-wise
   // differential operator on one unit vector at a time. The inner part
-  // invoking FEEvaluation::evaluate, the loop over quadrature points, and
-  // FEEvalution::integrate, is exactly the same as in the local_apply
+  // invoking FEEvaluation::evaluate(), the loop over quadrature points, and
+  // FEEvaluation::integrate(), is exactly the same as in the local_apply
   // function. Afterwards, we pick out the <i>i</i>th entry of the local
   // result and put it to a temporary storage (as we overwrite all entries in
   // the array behind FEEvaluation::get_dof_value() with the next loop
@@ -686,10 +685,10 @@ namespace Step37
     Triangulation<dim> triangulation;
 #endif
 
-    FE_Q<dim>       fe;
+    const FE_Q<dim> fe;
     DoFHandler<dim> dof_handler;
 
-    MappingQ1<dim> mapping;
+    const MappingQ1<dim> mapping;
 
     AffineConstraints<double> constraints;
     using SystemMatrixType =

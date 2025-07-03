@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2015 - 2022 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2015 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 #ifndef dealii_polynomials_rannacher_turek_h
@@ -163,27 +162,27 @@ namespace internal
                 *reinterpret_cast<Tensor<1, dim> *>(&derivative);
               if (i == 0)
                 {
-                  grad[0] = -2.5 + 3 * p(0);
-                  grad[1] = 1.5 - 3 * p(1);
+                  grad[0] = -2.5 + 3 * p[0];
+                  grad[1] = 1.5 - 3 * p[1];
                 }
               else if (i == 1)
                 {
-                  grad[0] = -0.5 + 3.0 * p(0);
-                  grad[1] = 1.5 - 3.0 * p(1);
+                  grad[0] = -0.5 + 3.0 * p[0];
+                  grad[1] = 1.5 - 3.0 * p[1];
                 }
               else if (i == 2)
                 {
-                  grad[0] = 1.5 - 3.0 * p(0);
-                  grad[1] = -2.5 + 3.0 * p(1);
+                  grad[0] = 1.5 - 3.0 * p[0];
+                  grad[1] = -2.5 + 3.0 * p[1];
                 }
               else if (i == 3)
                 {
-                  grad[0] = 1.5 - 3.0 * p(0);
-                  grad[1] = -0.5 + 3.0 * p(1);
+                  grad[0] = 1.5 - 3.0 * p[0];
+                  grad[1] = -0.5 + 3.0 * p[1];
                 }
               else
                 {
-                  Assert(false, ExcNotImplemented());
+                  DEAL_II_NOT_IMPLEMENTED();
                 }
               return derivative;
             }

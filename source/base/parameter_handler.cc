@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 1998 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 #include <deal.II/base/logstream.h>
@@ -165,7 +164,7 @@ namespace
                 c = 15 * 16;
                 break;
               default:
-                Assert(false, ExcInternalError());
+                DEAL_II_ASSERT_UNREACHABLE();
             }
           switch (s[i + 2])
             {
@@ -218,7 +217,7 @@ namespace
                 c += 15;
                 break;
               default:
-                Assert(false, ExcInternalError());
+                DEAL_II_ASSERT_UNREACHABLE();
             }
 
           u.push_back(static_cast<char>(c));
@@ -316,7 +315,7 @@ namespace
     current_section.sort(compare);
 
     // Now transverse subsections tree recursively.
-    for (auto &p : current_section)
+    for (const auto &p : current_section)
       {
         if ((is_parameter_node(p.second) == false) &&
             (is_alias_node(p.second) == false))
@@ -332,15 +331,17 @@ namespace
   }
 
   /**
-   * Demangle all parameters recursively and attach them to @p tree_out.
+   * Mangle (@p do_mangle = true) or demangle (@p do_mangle = false) all
+   * parameters recursively and attach them to @p tree_out.
    * @p is_parameter_or_alias_node indicates, whether a given node
    * @p tree_in is a parameter node or an alias node (as opposed to being
    * a subsection).
    */
   void
-  recursively_demangle(const boost::property_tree::ptree &tree_in,
-                       boost::property_tree::ptree       &tree_out,
-                       const bool is_parameter_or_alias_node = false)
+  recursively_mangle_or_demangle(const boost::property_tree::ptree &tree_in,
+                                 boost::property_tree::ptree       &tree_out,
+                                 const bool                         do_mangle,
+                                 const bool is_parameter_or_alias_node = false)
   {
     for (const auto &p : tree_in)
       {
@@ -355,11 +356,13 @@ namespace
             if (const auto val = p.second.get_value_optional<std::string>())
               temp.put_value<std::string>(*val);
 
-            recursively_demangle(p.second,
-                                 temp,
-                                 is_parameter_node(p.second) ||
-                                   is_alias_node(p.second));
-            tree_out.put_child(demangle(p.first), temp);
+            recursively_mangle_or_demangle(p.second,
+                                           temp,
+                                           do_mangle,
+                                           is_parameter_node(p.second) ||
+                                             is_alias_node(p.second));
+            tree_out.put_child(do_mangle ? mangle(p.first) : demangle(p.first),
+                               temp);
           }
       }
   }
@@ -566,7 +569,7 @@ ParameterHandler::parse_input(const std::string &filename,
                               const bool assert_mandatory_entries_are_found)
 {
   std::ifstream is(filename);
-  AssertThrow(is, PathSearch::ExcFileNotFound(filename, "ParameterHandler"));
+  AssertThrow(is, ExcFileNotOpen(filename));
 
   std::string file_ending = filename.substr(filename.find_last_of('.') + 1);
   boost::algorithm::to_lower(file_ending);
@@ -578,7 +581,9 @@ ParameterHandler::parse_input(const std::string &filename,
     parse_input_from_json(is, skip_undefined);
   else
     AssertThrow(false,
-                ExcMessage("Unknown input file name extension. Supported types "
+                ExcMessage("The given input file <" + filename +
+                           "> has a file name extension <" + file_ending +
+                           "> that is not recognized. Supported types "
                            "are .prm, .xml, and .json."));
 
   if (assert_mandatory_entries_are_found)
@@ -665,17 +670,25 @@ namespace
           }
         else
           {
-            // it must be a subsection
-            prm.enter_subsection(demangle(p.first));
-            read_xml_recursively(p.second,
-                                 (current_path.empty() ?
-                                    p.first :
-                                    current_path + path_separator + p.first),
-                                 path_separator,
-                                 patterns,
-                                 skip_undefined,
-                                 prm);
-            prm.leave_subsection();
+            try
+              {
+                // it must be a subsection
+                prm.enter_subsection(demangle(p.first), !skip_undefined);
+                read_xml_recursively(p.second,
+                                     (current_path.empty() ?
+                                        p.first :
+                                        current_path + path_separator +
+                                          p.first),
+                                     path_separator,
+                                     patterns,
+                                     skip_undefined,
+                                     prm);
+                prm.leave_subsection();
+              }
+            catch (const ParameterHandler::ExcEntryUndeclared &)
+              {
+                // ignore undeclared entry assert
+              }
           }
       }
   }
@@ -808,9 +821,14 @@ ParameterHandler::parse_input_from_json(std::istream &in,
     }
 
   // The xml function is reused to read in the xml into the parameter file.
-  // This means that only mangled files can be read.
+  // This function can only read mangled files. Therefore, we create a mangeled
+  // tree first.
+  boost::property_tree::ptree node_tree_mangled;
+  recursively_mangle_or_demangle(node_tree,
+                                 node_tree_mangled,
+                                 true /*do_mangle*/);
   read_xml_recursively(
-    node_tree, "", path_separator, patterns, skip_undefined, *this);
+    node_tree_mangled, "", path_separator, patterns, skip_undefined, *this);
 }
 
 
@@ -970,10 +988,20 @@ ParameterHandler::declare_alias(const std::string &existing_entry_name,
 
 
 void
-ParameterHandler::enter_subsection(const std::string &subsection)
+ParameterHandler::enter_subsection(const std::string &subsection,
+                                   const bool         create_path_if_needed)
 {
   // if necessary create subsection
-  if (!entries->get_child_optional(get_current_full_path(subsection)))
+  const auto path_exists =
+    entries->get_child_optional(get_current_full_path(subsection));
+
+  if (!create_path_if_needed)
+    {
+      AssertThrow(path_exists,
+                  ExcEntryUndeclared(get_current_full_path(subsection)));
+    }
+
+  if (!path_exists)
     entries->add_child(get_current_full_path(subsection),
                        boost::property_tree::ptree());
 
@@ -1342,9 +1370,11 @@ ParameterHandler::print_parameters(std::ostream     &out,
 
   if ((style & JSON) != 0)
     {
-      boost::property_tree::ptree current_entries_damangled;
-      recursively_demangle(current_entries, current_entries_damangled);
-      write_json(out, current_entries_damangled);
+      boost::property_tree::ptree current_entries_demangled;
+      recursively_mangle_or_demangle(current_entries,
+                                     current_entries_demangled,
+                                     false /*do_mangle*/);
+      write_json(out, current_entries_demangled);
       return out;
     }
 
@@ -1370,7 +1400,7 @@ ParameterHandler::print_parameters(std::ostream     &out,
     }
   else
     {
-      Assert(false, ExcNotImplemented());
+      DEAL_II_NOT_IMPLEMENTED();
     }
 
   // dive recursively into the subsections
@@ -1682,7 +1712,7 @@ ParameterHandler::recursively_print_parameters(
     }
   else
     {
-      Assert(false, ExcNotImplemented());
+      DEAL_II_NOT_IMPLEMENTED();
     }
 
 
@@ -1740,7 +1770,7 @@ ParameterHandler::recursively_print_parameters(
           }
         else
           {
-            Assert(false, ExcNotImplemented());
+            DEAL_II_NOT_IMPLEMENTED();
           }
 
         // then the contents of the subsection
@@ -1780,7 +1810,7 @@ ParameterHandler::recursively_print_parameters(
           }
         else
           {
-            Assert(false, ExcNotImplemented());
+            DEAL_II_NOT_IMPLEMENTED();
           }
       }
 }

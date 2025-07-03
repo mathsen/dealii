@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2017 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2017 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/grid_tools_cache.h>
@@ -66,7 +65,7 @@ namespace Particles
     , size_callback()
     , store_callback()
     , load_callback()
-    , handle(numbers::invalid_unsigned_int)
+    , tria_attached_data_index(numbers::invalid_unsigned_int)
     , tria_listeners()
   {
     reset_particle_container(particles);
@@ -90,7 +89,7 @@ namespace Particles
     , size_callback()
     , store_callback()
     , load_callback()
-    , handle(numbers::invalid_unsigned_int)
+    , tria_attached_data_index(numbers::invalid_unsigned_int)
     , triangulation_cache(
         std::make_unique<GridTools::Cache<dim, spacedim>>(triangulation,
                                                           mapping))
@@ -182,7 +181,7 @@ namespace Particles
 
     ghost_particles_cache.ghost_particles_by_domain =
       particle_handler.ghost_particles_cache.ghost_particles_by_domain;
-    handle = particle_handler.handle;
+    tria_attached_data_index = particle_handler.tria_attached_data_index;
   }
 
 
@@ -1127,10 +1126,11 @@ namespace Particles
     unsigned int i = 0;
     for (auto it = begin(); it != end(); ++it, ++i)
       {
+        Point<spacedim> &location = it->get_location();
         if (displace_particles)
-          it->set_location(it->get_location() + new_positions[i]);
+          location += new_positions[i];
         else
-          it->set_location(new_positions[i]);
+          location = new_positions[i];
       }
     sort_particles_into_subdomains_and_cells();
   }
@@ -1150,7 +1150,7 @@ namespace Particles
     Vector<double> new_position(spacedim);
     for (auto &particle : *this)
       {
-        Point<spacedim> particle_location = particle.get_location();
+        Point<spacedim> &particle_location = particle.get_location();
         function.vector_value(particle_location, new_position);
         if (displace_particles)
           for (unsigned int d = 0; d < spacedim; ++d)
@@ -1158,7 +1158,6 @@ namespace Particles
         else
           for (unsigned int d = 0; d < spacedim; ++d)
             particle_location[d] = new_position[d];
-        particle.set_location(particle_location);
       }
     sort_particles_into_subdomains_and_cells();
   }
@@ -1262,7 +1261,8 @@ namespace Particles
         for (const auto &p_unit : reference_locations)
           {
             if (numbers::is_finite(p_unit[0]) &&
-                GeometryInfo<dim>::is_inside_unit_cell(p_unit))
+                GeometryInfo<dim>::is_inside_unit_cell(p_unit,
+                                                       tolerance_inside_cell))
               particle->set_reference_location(p_unit);
             else
               particles_out_of_cell.push_back(particle);
@@ -1317,7 +1317,7 @@ namespace Particles
         &vertex_to_cell_centers =
           triangulation_cache->get_vertex_to_cell_centers_directions();
 
-      std::vector<unsigned int> neighbor_permutation;
+      std::vector<unsigned int> search_order;
 
       // Reuse these vectors below, but only with a single element.
       // Avoid resizing for every particle.
@@ -1346,53 +1346,70 @@ namespace Particles
           const unsigned int closest_vertex =
             GridTools::find_closest_vertex_of_cell<dim, spacedim>(
               current_cell, out_particle->get_location(), *mapping);
-          Tensor<1, spacedim> vertex_to_particle =
-            out_particle->get_location() - current_cell->vertex(closest_vertex);
-          vertex_to_particle /= vertex_to_particle.norm();
-
           const unsigned int closest_vertex_index =
             current_cell->vertex_index(closest_vertex);
-          const unsigned int n_neighbor_cells =
-            vertex_to_cells[closest_vertex_index].size();
 
-          neighbor_permutation.resize(n_neighbor_cells);
-          for (unsigned int i = 0; i < n_neighbor_cells; ++i)
-            neighbor_permutation[i] = i;
+          const auto &candidate_cells = vertex_to_cells[closest_vertex_index];
+          const unsigned int n_candidate_cells = candidate_cells.size();
 
-          const auto &cell_centers =
-            vertex_to_cell_centers[closest_vertex_index];
-          std::sort(neighbor_permutation.begin(),
-                    neighbor_permutation.end(),
-                    [&vertex_to_particle, &cell_centers](const unsigned int a,
-                                                         const unsigned int b) {
-                      return compare_particle_association(a,
-                                                          b,
-                                                          vertex_to_particle,
-                                                          cell_centers);
-                    });
+          // The order of searching through the candidate cells matters for
+          // performance reasons. Start with a simple order.
+          search_order.resize(n_candidate_cells);
+          for (unsigned int i = 0; i < n_candidate_cells; ++i)
+            search_order[i] = i;
 
-          // Search all of the cells adjacent to the closest vertex of the
-          // previous cell. Most likely we will find the particle in them.
-          for (unsigned int i = 0; i < n_neighbor_cells; ++i)
+          // If the particle is not on a vertex, we can do better by
+          // sorting the candidate cells by alignment with
+          // the vertex_to_particle direction.
+          Tensor<1, spacedim> vertex_to_particle =
+            out_particle->get_location() - current_cell->vertex(closest_vertex);
+
+          // Only do this if the particle is not on a vertex, otherwise we
+          // cannot normalize
+          if (vertex_to_particle.norm_square() >
+              1e4 * std::numeric_limits<double>::epsilon() *
+                std::numeric_limits<double>::epsilon() *
+                vertex_to_cell_centers[closest_vertex_index][0].norm_square())
             {
-              typename std::set<typename Triangulation<dim, spacedim>::
-                                  active_cell_iterator>::const_iterator cell =
-                vertex_to_cells[closest_vertex_index].begin();
+              vertex_to_particle /= vertex_to_particle.norm();
+              const auto &vertex_to_cells =
+                vertex_to_cell_centers[closest_vertex_index];
 
-              std::advance(cell, neighbor_permutation[i]);
-              mapping->transform_points_real_to_unit_cell(*cell,
+              std::sort(search_order.begin(),
+                        search_order.end(),
+                        [&vertex_to_particle,
+                         &vertex_to_cells](const unsigned int a,
+                                           const unsigned int b) {
+                          return compare_particle_association(
+                            a, b, vertex_to_particle, vertex_to_cells);
+                        });
+            }
+
+          // Search all of the candidate cells according to the determined
+          // order. Most likely we will find the particle in them.
+          for (unsigned int i = 0; i < n_candidate_cells; ++i)
+            {
+              typename std::set<
+                typename Triangulation<dim, spacedim>::active_cell_iterator>::
+                const_iterator candidate_cell = candidate_cells.begin();
+
+              std::advance(candidate_cell, search_order[i]);
+              mapping->transform_points_real_to_unit_cell(*candidate_cell,
                                                           real_locations,
                                                           reference_locations);
 
-              if (GeometryInfo<dim>::is_inside_unit_cell(
-                    reference_locations[0]))
+              if (GeometryInfo<dim>::is_inside_unit_cell(reference_locations[0],
+                                                         tolerance_inside_cell))
                 {
-                  current_cell = *cell;
+                  current_cell = *candidate_cell;
                   found_cell   = true;
                   break;
                 }
             }
 
+          // If we did not find a cell the particle is not in a neighbor of
+          // its old cell. Look for the new cell in the whole local domain.
+          // This case should be rare.
           if (!found_cell)
             {
               // For some clang-based compilers and boost versions the call to
@@ -1403,9 +1420,7 @@ namespace Particles
 #if defined(DEAL_II_WITH_BOOST_BUNDLED) ||                \
   !(defined(__clang_major__) && __clang_major__ >= 16) || \
   BOOST_VERSION >= 108100
-              // The particle is not in a neighbor of the old cell.
-              // Look for the new cell in the whole local domain.
-              // This case is rare.
+
               std::vector<std::pair<Point<spacedim>, unsigned int>>
                 closest_vertex_in_domain;
               triangulation_cache->get_used_vertices_rtree().query(
@@ -1433,7 +1448,7 @@ namespace Particles
                     cell, real_locations, reference_locations);
 
                   if (GeometryInfo<dim>::is_inside_unit_cell(
-                        reference_locations[0]))
+                        reference_locations[0], tolerance_inside_cell))
                     {
                       current_cell = cell;
                       found_cell   = true;
@@ -1851,7 +1866,7 @@ namespace Particles
                         parallel_triangulation->get_communicator(),
                         &(requests[send_ops]));
             AssertThrowMPI(ierr);
-            send_ops++;
+            ++send_ops;
           }
 
       for (unsigned int i = 0; i < n_neighbors; ++i)
@@ -1866,7 +1881,7 @@ namespace Particles
                         parallel_triangulation->get_communicator(),
                         &(requests[send_ops + recv_ops]));
             AssertThrowMPI(ierr);
-            recv_ops++;
+            ++recv_ops;
           }
       const int ierr =
         MPI_Waitall(send_ops + recv_ops, requests.data(), MPI_STATUSES_IGNORE);
@@ -2009,7 +2024,7 @@ namespace Particles
                         parallel_triangulation->get_communicator(),
                         &(requests[send_ops]));
             AssertThrowMPI(ierr);
-            send_ops++;
+            ++send_ops;
           }
 
       for (unsigned int i = 0; i < neighbors.size(); ++i)
@@ -2024,7 +2039,7 @@ namespace Particles
                         parallel_triangulation->get_communicator(),
                         &(requests[send_ops + recv_ops]));
             AssertThrowMPI(ierr);
-            recv_ops++;
+            ++recv_ops;
           }
       const int ierr =
         MPI_Waitall(send_ops + recv_ops, requests.data(), MPI_STATUSES_IGNORE);
@@ -2168,32 +2183,8 @@ namespace Particles
 
   template <int dim, int spacedim>
   void
-  ParticleHandler<dim, spacedim>::register_store_callback_function()
-  {
-    register_data_attach();
-  }
-
-
-
-  template <int dim, int spacedim>
-  void
   ParticleHandler<dim, spacedim>::register_data_attach()
   {
-    parallel::DistributedTriangulationBase<dim, spacedim>
-      *distributed_triangulation =
-        const_cast<parallel::DistributedTriangulationBase<dim, spacedim> *>(
-          dynamic_cast<
-            const parallel::DistributedTriangulationBase<dim, spacedim> *>(
-            &(*triangulation)));
-    (void)distributed_triangulation;
-
-    Assert(
-      distributed_triangulation != nullptr,
-      ExcMessage(
-        "Mesh refinement in a non-distributed triangulation is not supported "
-        "by the ParticleHandler class. Either insert particles after mesh "
-        "creation and do not refine afterwards, or use a distributed triangulation."));
-
     const auto callback_function =
       [this](const typename Triangulation<dim, spacedim>::cell_iterator
                              &cell_iterator,
@@ -2201,8 +2192,10 @@ namespace Particles
         return this->pack_callback(cell_iterator, cell_status);
       };
 
-    handle = distributed_triangulation->register_data_attach(
-      callback_function, /*returns_variable_size_data=*/true);
+    tria_attached_data_index =
+      const_cast<Triangulation<dim, spacedim> *>(&*triangulation)
+        ->register_data_attach(callback_function,
+                               /*returns_variable_size_data=*/true);
   }
 
 
@@ -2228,34 +2221,9 @@ namespace Particles
 
   template <int dim, int spacedim>
   void
-  ParticleHandler<dim, spacedim>::register_load_callback_function(
-    const bool serialization)
-  {
-    notify_ready_to_unpack(serialization);
-  }
-
-
-
-  template <int dim, int spacedim>
-  void
   ParticleHandler<dim, spacedim>::notify_ready_to_unpack(
     const bool serialization)
   {
-    parallel::DistributedTriangulationBase<dim, spacedim>
-      *distributed_triangulation =
-        const_cast<parallel::DistributedTriangulationBase<dim, spacedim> *>(
-          dynamic_cast<
-            const parallel::DistributedTriangulationBase<dim, spacedim> *>(
-            &(*triangulation)));
-    (void)distributed_triangulation;
-
-    Assert(
-      distributed_triangulation != nullptr,
-      ExcMessage(
-        "Mesh refinement in a non-distributed triangulation is not supported "
-        "by the ParticleHandler class. Either insert particles after mesh "
-        "creation and do not refine afterwards, or use a distributed triangulation."));
-
     // First prepare container for insertion
     clear();
 
@@ -2267,7 +2235,7 @@ namespace Particles
       register_data_attach();
 
     // Check if something was stored and load it
-    if (handle != numbers::invalid_unsigned_int)
+    if (tria_attached_data_index != numbers::invalid_unsigned_int)
       {
         const auto callback_function =
           [this](const typename Triangulation<dim, spacedim>::cell_iterator
@@ -2278,11 +2246,11 @@ namespace Particles
             this->unpack_callback(cell_iterator, cell_status, range_iterator);
           };
 
-        distributed_triangulation->notify_ready_to_unpack(handle,
-                                                          callback_function);
+        const_cast<Triangulation<dim, spacedim> *>(&*triangulation)
+          ->notify_ready_to_unpack(tria_attached_data_index, callback_function);
 
         // Reset handle and update global numbers.
-        handle = numbers::invalid_unsigned_int;
+        tria_attached_data_index = numbers::invalid_unsigned_int;
         update_cached_numbers();
       }
   }
@@ -2336,7 +2304,7 @@ namespace Particles
           break;
 
         default:
-          Assert(false, ExcInternalError());
+          DEAL_II_ASSERT_UNREACHABLE();
           break;
       }
 
@@ -2366,7 +2334,19 @@ namespace Particles
           &(*data_range.begin()) + (data_range.end() - data_range.begin()));
 
         while (data < end)
-          insert_particle(data, cell_to_store_particles);
+          {
+            const void *old_data = data;
+            const auto  x = insert_particle(data, cell_to_store_particles);
+
+            // Ensure that the particle read exactly as much data as
+            // it promised it needs to store its data
+            const void *new_data = data;
+            (void)old_data;
+            (void)new_data;
+            (void)x;
+            AssertDimension((const char *)new_data - (const char *)old_data,
+                            x->serialized_size_in_bytes());
+          }
 
         Assert(data == end,
                ExcMessage(
@@ -2418,12 +2398,8 @@ namespace Particles
               {
                 bool found_new_cell = false;
 
-                for (unsigned int child_index = 0;
-                     child_index < GeometryInfo<dim>::max_children_per_cell;
-                     ++child_index)
+                for (const auto &child : cell->child_iterators())
                   {
-                    const typename Triangulation<dim, spacedim>::cell_iterator
-                      child = cell->child(child_index);
                     Assert(child->is_locally_owned(), ExcInternalError());
 
                     try
@@ -2431,25 +2407,27 @@ namespace Particles
                         const Point<dim> p_unit =
                           mapping->transform_real_to_unit_cell(
                             child, particle->get_location());
-                        if (GeometryInfo<dim>::is_inside_unit_cell(p_unit,
-                                                                   1e-12))
+                        if (GeometryInfo<dim>::is_inside_unit_cell(
+                              p_unit, tolerance_inside_cell))
                           {
                             found_new_cell = true;
                             particle->set_reference_location(p_unit);
 
-                            // if the particle is not in child 0, we stored the
-                            // handle in the wrong place; move the handle and
-                            // redo the loop; otherwise move on to next particle
-                            if (child_index != 0)
+                            // if the particle is not in the cell we stored it
+                            // in above, its handle is in the wrong place
+                            if (child != cell_to_store_particles)
                               {
+                                // move handle into correct cell
                                 insert_particle(cache->particles[i], child);
-
+                                // remove handle by replacing it with last one
                                 cache->particles[i] = cache->particles.back();
-                                cache->particles.resize(
-                                  cache->particles.size() - 1);
+                                cache->particles.pop_back();
+                                // no loop increment, we need to process
+                                // the new i-th particle.
                               }
                             else
                               {
+                                // move on to next particle
                                 ++i;
                                 ++particle;
                               }
@@ -2471,8 +2449,11 @@ namespace Particles
                     // and move on.
                     signals.particle_lost(particle,
                                           particle->get_surrounding_cell());
+                    if (cache->particles[i] !=
+                        PropertyPool<dim, spacedim>::invalid_handle)
+                      property_pool->deregister_particle(cache->particles[i]);
                     cache->particles[i] = cache->particles.back();
-                    cache->particles.resize(cache->particles.size() - 1);
+                    cache->particles.pop_back();
                   }
               }
             // clean up in case child 0 has no particle left
@@ -2485,7 +2466,7 @@ namespace Particles
           break;
 
         default:
-          Assert(false, ExcInternalError());
+          DEAL_II_ASSERT_UNREACHABLE();
           break;
       }
   }

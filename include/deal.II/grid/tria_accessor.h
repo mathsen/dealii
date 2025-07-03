@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 1998 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_tria_accessor_h
 #define dealii_tria_accessor_h
@@ -117,13 +116,13 @@ namespace internal
         void
         operator++() const
         {
-          Assert(false, ExcInternalError());
+          DEAL_II_ASSERT_UNREACHABLE();
         }
 
         void
         operator--() const
         {
-          Assert(false, ExcInternalError());
+          DEAL_II_ASSERT_UNREACHABLE();
         }
       };
     };
@@ -1161,8 +1160,6 @@ public:
    * the value you are trying to set makes sense under the current
    * circumstances.
    *
-   * @ingroup boundary
-   *
    * @see
    * @ref GlossBoundaryIndicator "Glossary entry on boundary indicators"
    */
@@ -1194,8 +1191,6 @@ public:
    * the result of not using the correct function in the results section of
    * step-49.
    *
-   * @ingroup boundary
-   *
    * @see
    * @ref GlossBoundaryIndicator "Glossary entry on boundary indicators"
    */
@@ -1217,7 +1212,7 @@ public:
    *
    * As explained in the
    * @ref manifold
-   * module, the process involved in finding the appropriate manifold
+   * topic, the process involved in finding the appropriate manifold
    * description involves querying both the manifold or boundary
    * indicators. See there for more information.
    */
@@ -1357,7 +1352,7 @@ public:
   set_user_pointer(void *p) const;
 
   /**
-   * Reset the user pointer to a @p nullptr pointer. See
+   * Reset the user pointer to `nullptr`. See
    * @ref GlossUserData
    * for more information.
    */
@@ -1366,14 +1361,16 @@ public:
 
   /**
    * Access the value of the user pointer. It is in the responsibility of the
-   * user to make sure that the pointer points to something useful. You should
-   * use the new style cast operator to maintain a minimum of type safety,
-   * e.g.
+   * user to make sure that the pointer points to something useful and always
+   * requires casting to a known type, e.g.,
    *
-   * @note User pointers and user indices are mutually exclusive. Therefore,
-   * you can only use one of them, unless you call
-   * Triangulation::clear_user_data() in between. <tt>A
-   * *a=static_cast<A*>(cell->user_pointer());</tt>.
+   * @code
+   * auto *a = static_cast<A*>(cell->user_pointer());
+   * @endcode
+   *
+   * @note User pointers and user indices are mutually exclusive. Therefore, you
+   * can only use one of them, unless you call Triangulation::clear_user_data()
+   * in between.
    *
    * See
    * @ref GlossUserData
@@ -1819,10 +1816,8 @@ private:
 
   /**
    * Set the combined face orientation (i.e., the integer that uniquely encodes
-   * the orientation, flip, and rotation).
-   *
-   * It is only possible to set the face_orientation of cells in 3d (i.e.
-   * <code>structdim==3 && dim==3</code>).
+   * the orientation, flip, and rotation). This function is only implemented for
+   * objects which have faces, i.e., for structdim == dim.
    *
    * @ingroup reordering
    */
@@ -1914,8 +1909,8 @@ class TriaAccessor<0, dim, spacedim>
 public:
   /**
    * Dimension of the space the object represented by this accessor lives in.
-   * For example, if this accessor represents a quad that is part of a two-
-   * dimensional surface in four-dimensional space, then this value is four.
+   * For example, if this accessor represents a quad that is part of a
+   * two-dimensional surface in four-dimensional space, then this value is four.
    */
   static constexpr unsigned int space_dimension = spacedim;
 
@@ -2326,8 +2321,8 @@ class TriaAccessor<0, 1, spacedim>
 public:
   /**
    * Dimension of the space the object represented by this accessor lives in.
-   * For example, if this accessor represents a quad that is part of a two-
-   * dimensional surface in four-dimensional space, then this value is four.
+   * For example, if this accessor represents a quad that is part of a
+   * two-dimensional surface in four-dimensional space, then this value is four.
    */
   static constexpr unsigned int space_dimension = spacedim;
 
@@ -2683,7 +2678,7 @@ public:
   set_user_pointer(void *p) const;
 
   /**
-   * Reset the user pointer to a @p nullptr pointer. See
+   * Reset the user pointer to `nullptr`. See
    * @ref GlossUserData
    * for more information.
    */
@@ -2947,8 +2942,6 @@ public:
    * the value you are trying to set makes sense under the current
    * circumstances.
    *
-   * @ingroup boundary
-   *
    * @see
    * @ref GlossBoundaryIndicator "Glossary entry on boundary indicators"
    */
@@ -2965,12 +2958,10 @@ public:
   set_manifold_id(const types::manifold_id);
 
   /**
-   * Set the boundary indicator of this object and all of its lower-
-   * dimensional sub-objects.  Since this object only represents a single
+   * Set the boundary indicator of this object and all of its
+   * lower-dimensional sub-objects.  Since this object only represents a single
    * vertex, there are no lower-dimensional object and this function is
    * equivalent to calling set_boundary_id() with the same argument.
-   *
-   * @ingroup boundary
    *
    * @see
    * @ref GlossBoundaryIndicator "Glossary entry on boundary indicators"
@@ -2979,8 +2970,8 @@ public:
   set_all_boundary_ids(const types::boundary_id) const;
 
   /**
-   * Set the manifold indicator of this object and all of its lower-
-   * dimensional sub-objects.  Since this object only represents a single
+   * Set the manifold indicator of this object and all of its
+   * lower-dimensional sub-objects.  Since this object only represents a single
    * vertex, there are no lower-dimensional object and this function is
    * equivalent to calling set_manifold_id() with the same argument.
    *
@@ -3634,6 +3625,27 @@ public:
   clear_refine_flag() const;
 
   /**
+   * Return the @p IsotropicRefinementChoices this cell was flagged to be refined
+   * with.
+   */
+  std::uint8_t
+  refine_choice() const;
+
+  /**
+   * Set the @p IsotropicRefinementChoices this cell is flagged to be refined
+   * with.
+   */
+  void
+  set_refine_choice(const std::uint8_t refinement_choice = static_cast<char>(
+                      IsotropicRefinementChoice::isotropic_refinement)) const;
+
+  /**
+   * Clear the @p IsotropicRefinementChoices flag.
+   */
+  void
+  clear_refine_choice() const;
+
+  /**
    * Modify the refinement flag of the cell to ensure (at least) the given
    * refinement case @p face_refinement_case at face <tt>face_no</tt>, taking
    * into account orientation, flip and rotation of the face. Return, whether
@@ -3723,8 +3735,8 @@ public:
   set_material_id(const types::material_id new_material_id) const;
 
   /**
-   * Set the material id of this cell and all its children (and grand-
-   * children, and so on) to the given value.
+   * Set the material id of this cell and all its children (and
+   * grand-children, and so on) to the given value.
    *
    * See the
    * @ref GlossMaterialId "glossary"
@@ -3858,7 +3870,10 @@ public:
    */
 
   /**
-   * Return the orientation of this cell.
+   * Return the orientation of this cell. This function always returns
+   * `true` if `dim==spacedim`. It can return `true` or `false` if
+   * `dim==spacedim-1`. The function cannot be called (and will abort
+   * with an error) if called for `dim<spacedim-1`.
    *
    * For the meaning of this flag, see
    * @ref GlossDirectionFlag.
@@ -3944,7 +3959,7 @@ public:
    * @ref GlossGhostCell "glossary"
    * and the
    * @ref distributed
-   * module for more information.
+   * topic for more information.
    *
    * @post The returned value is equal to <code>!is_ghost() &&
    * !is_artificial()</code>.
@@ -3981,7 +3996,7 @@ public:
    * @ref GlossGhostCell "glossary"
    * and the
    * @ref distributed
-   * module for more information.
+   * topic for more information.
    *
    * @post The returned value is equal to <code>!is_locally_owned() &&
    * !is_artificial()</code>.
@@ -4024,7 +4039,7 @@ public:
    * @ref GlossArtificialCell "glossary"
    * and the
    * @ref distributed
-   * module for more information.
+   * topic for more information.
    *
    * @post The returned value is equal to <code>!is_ghost() &&
    * !is_locally_owned()</code>.
@@ -4172,7 +4187,11 @@ private:
   set_parent(const unsigned int parent_index);
 
   /**
-   * Set the orientation of this cell.
+   * Set the orientation of this cell. This function can only be
+   * called if the argument is `true` if `dim==spacedim`. It can be
+   * called with either `true` or `false` if `dim==spacedim-1`. The
+   * function cannot be called (and will abort with an error) if called
+   * for `dim<spacedim-1`.
    *
    * For the meaning of this flag, see
    * @ref GlossDirectionFlag.

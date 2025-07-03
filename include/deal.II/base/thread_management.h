@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2000 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_thread_management_h
 #define dealii_thread_management_h
@@ -23,6 +22,10 @@
 #include <deal.II/base/multithread_info.h>
 #include <deal.II/base/mutex.h>
 #include <deal.II/base/template_constraints.h>
+
+#ifdef DEAL_II_WITH_TASKFLOW
+#  include <taskflow/taskflow.hpp>
+#endif
 
 #include <atomic>
 #include <functional>
@@ -390,7 +393,7 @@ namespace Threads
     struct maybe_make_ref
     {
       static T
-      act(T &t)
+      act(const T &t)
       {
         return t;
       }
@@ -462,21 +465,22 @@ namespace Threads
    * run things in the background when there is no immediate need for the
    * result, or if there are other things that could well be done in parallel.
    * Whenever the result of that background task is needed, one can call either
-   * join() to just wait for the task to finish, or return_value() to obtain the
-   * value that was returned by the function that was run on that background
-   * task.
+   * Threads::Task::join() to just wait for the task to finish, or
+   * Threads::Task::return_value() to obtain the value that was returned by the
+   * function that was run on that background task. In both of these cases, one
+   * continues to reference the *operation* (namely, the Task object) that was
+   * in charge of computing the returned value. An alternative is to use the
+   * Threads::TaskResult class that references the *object* being computed
+   * rather than the task that computes it.
    *
-   * This class is conceptually similar to the
+   * This class is related to, but semantically not the same as, the
    * [`std::future`](https://en.cppreference.com/w/cpp/thread/future) class that
    * is returned by
    * [`std::async`](https://en.cppreference.com/w/cpp/thread/async) (which is
    * itself similar to what Threads::new_task() does). The principal conceptual
-   * difference is that one can only call `std::future::get()` once, whereas one
-   * can call Threads::Task::return_value() as many times as desired. It is,
-   * thus, comparable to the
-   * [`std::shared_future`](https://en.cppreference.com/w/cpp/thread/shared_future)
-   * class. However, `std::shared_future` can not be used for types that can not
-   * be copied -- a particular restriction for `std::unique_ptr`, for example.
+   * difference is that `std::future` references the *returned object* (like
+   * Threads::TaskResult) whereas the current object references the task that
+   * computes that result.
    *
    * @ingroup threads
    */
@@ -499,7 +503,10 @@ namespace Threads
     {
       if (MultithreadInfo::n_threads() > 1)
         {
-#ifdef DEAL_II_WITH_TBB
+#ifdef DEAL_II_WITH_TASKFLOW
+          task_data = std::make_shared<TaskData>(
+            MultithreadInfo::get_taskflow_executor().async(function_object));
+#elif defined(DEAL_II_WITH_TBB)
           // Create a promise object and from it extract a future that
           // we can use to refer to the outcome of the task. For reasons
           // explained below, we can't just create a std::promise object,
@@ -940,7 +947,42 @@ namespace Threads
           return;
         else
           {
-#ifdef DEAL_II_WITH_TBB
+#ifdef DEAL_II_WITH_TASKFLOW
+            // We want to call executor.corun_until() to keep scheduling tasks
+            // until the task we are waiting for has actually finished. The
+            // problem is that TaskFlow documents that you can only call
+            // corun_until() on a worker of the executor. In other words, we
+            // can call it from *inside* other tasks, but not from the main
+            // thread (or other threads that might have been created outside
+            // of TaskFlow).
+            //
+            // Fortunately, we can check whether we are on a worker thread:
+            if (MultithreadInfo::get_taskflow_executor().this_worker_id() >= 0)
+              MultithreadInfo::get_taskflow_executor().corun_until([this]() {
+                return (future.wait_for(std::chrono::seconds(0)) ==
+                        std::future_status::ready);
+              });
+            else
+              // We are on a thread not managed by TaskFlow. In that case, we
+              // can simply stop the current thread to wait for the task to
+              // finish (i.e., for the std::future object to become ready). We
+              // can do this because we need not fear that this leads to a
+              // deadlock: The current threads is waiting for completion of a
+              // task that is running on a completely different set of
+              // threads, and so not making any progress here can not deprive
+              // these other threads of the ability to schedule their tasks.
+              //
+              // Indeed, this is even true if the current thread is a worker
+              // of one executor and we are waiting for a task running on a
+              // different executor: The current task being stopped may block
+              // the current executor from scheduling more tasks, but it is
+              // unrelated to the tasks of the scheduler for which we are
+              // waiting for something, and so that other executor will
+              // eventually get arond to scheduling the task we are waiting
+              // for, at which point the current task will also complete.
+              future.wait();
+
+#elif defined(DEAL_II_WITH_TBB)
             // If we build on the TBB, then we can't just wait for the
             // std::future object to get ready. Apparently the TBB happily
             // enqueues a task into an arena and then just sits on it without
@@ -948,6 +990,25 @@ namespace Threads
             // task. The way to avoid this is to add the task to a
             // tbb::task_group, and then here wait for the single task
             // associated with that task group.
+            //
+            // This also makes sense from another perspective. Imagine that
+            // we allow at most N threads, and that we create N+1 tasks in such
+            // a way that the first N all wait for the (N+1)st task to finish.
+            // (See the multithreading/task_17 test for an example.) If they
+            // all just sit in their std::future::wait() function, nothing
+            // is ever going to happen because the scheduler sees that N tasks
+            // are currently running and is never informed that all they're
+            // doing is wait for another task to finish. What *needs* to
+            // happen is that the wait() or join() function goes back into
+            // the scheduler to make sure the scheduler knows that these
+            // tasks are not actually using CPU time on the thread they're
+            // working on, and that it is time to run other tasks on the
+            // same thread -- this is the way we can eventually get that
+            // (N+1)st task executed, which then unblocks the other N threads.
+            // (Note that this also implies that multiple tasks can be
+            // executing on the same thread at the same time -- not
+            // concurrently, of course, but with one executing and the others
+            // currently waiting for other tasks to finish.)
             //
             // If we get here, we know for a fact that atomically
             // (because under a lock), no other thread has so far
@@ -1306,8 +1367,6 @@ namespace Threads
    * the calls that add subtasks. Otherwise, there might be a deadlock. In
    * other words, a Task object should never passed on to another task for
    * calling the join() method.
-   *
-   * @ingroup tasks
    */
   template <typename RT = void>
   class TaskGroup
@@ -1371,7 +1430,7 @@ namespace Threads
     void
     join_all() const
     {
-      for (auto &t : tasks)
+      for (const auto &t : tasks)
         t.join();
     }
 

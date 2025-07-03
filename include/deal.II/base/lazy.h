@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2023 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2023 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_lazy_h
 #define dealii_lazy_h
@@ -76,6 +75,54 @@ DEAL_II_NAMESPACE_OPEN
  *   Lazy<FullMatrix<double>> prolongation_matrix;
  * };
  * ```
+ *
+ * @note Conceptually, this class is not so different from
+ *   [std::future](https://en.cppreference.com/w/cpp/thread/future), which
+ *   can also be used to represent a possibly-not-yet-available value on which
+ *   one can wait when used with the "deferred" policy of
+ *   [std::async](https://en.cppreference.com/w/cpp/thread/async).
+ *   In particular, the following code could be used in place
+ *   of the one above:
+ * ```
+ * template<...>
+ * class FE
+ * {
+ * public:
+ *   FE () {
+ *     prolongation_matrix = std::async(std::launch::deferred,
+ *       [&](){
+ *       // Some expensive operation initializing the prolongation matrix
+ *       // that we only want to perform once and when necessary.
+ *       });
+ *   }
+ *
+ *   FullMatrix<double> get_prolongation_matrix() const
+ *   {
+ *     return prolongation_matrix.get();
+ *   }
+ *
+ * private:
+ *   std::future<FullMatrix<double>> prolongation_matrix;
+ * };
+ * ```
+ *   The difference to what Lazy does is that for Lazy, the action must be
+ *   specified in the place where we want to access the deferred computation's
+ *   result. In contrast, in the scheme with `std::future` and `std::async`,
+ *   the action has to be provided at the point where the `std::future`
+ *   object is initialized. Both are valid approaches and, depending on
+ *   context, can usefully be employed. The difference is simply in what
+ *   kind of information the provided lambda function can capture: Is it
+ *   the environment available at the time the constructor is run, or the
+ *   environment available at the time the access function is run. The latter
+ *   has the advantage that the information captured is always up to date,
+ *   whereas in the scheme with `std::async`, one has to be careful not to
+ *   capture information in the lambda function that could be changed by later
+ *   calls to member functions but before the lambda function is finally
+ *   evaluated in the getter function. (There is another difference:
+ *   `std::future::get()` can only be called once, as the function returns
+ *   the computed object by value and may move the object out of its internal
+ *   storage. As a consequence, the call to `FE::get_prolongation_matrix()`
+ *   is only valid the first time around. Lazy does not have this restriction.)
  *
  * @dealiiConceptRequires{std::is_move_constructible_v<T> &&
                           std::is_move_assignable_v<T >}
@@ -185,7 +232,7 @@ public:
    * Return a reference to the contained object.
    *
    * @pre The object has been initialized with a call to
-   * ensure_initialized() or value_or_initialized().
+   * ensure_initialized() or value_or_initialize().
    */
   T &
   value();

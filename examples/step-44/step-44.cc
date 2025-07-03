@@ -1,18 +1,17 @@
-/* ---------------------------------------------------------------------
+/* ------------------------------------------------------------------------
  *
- * Copyright (C) 2010 - 2023 by the deal.II authors and
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * Copyright (C) 2011 - 2024 by the deal.II authors and
  *                              & Jean-Paul Pelteret and Andrew McBride
  *
  * This file is part of the deal.II library.
  *
- * The deal.II library is free software; you can use it, redistribute
- * it, and/or modify it under the terms of the GNU Lesser General
- * Public License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * The full text of the license can be found in the file LICENSE.md at
- * the top level directory of deal.II.
+ * Part of the source code is dual licensed under Apache-2.0 WITH
+ * LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+ * governing the source code and code contributions can be found in
+ * LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
  *
- * ---------------------------------------------------------------------
+ * ------------------------------------------------------------------------
  *
  * Authors: Jean-Paul Pelteret, University of Cape Town,
  *          Andrew McBride, University of Erlangen-Nuremberg, 2010
@@ -817,7 +816,7 @@ namespace Step44
   private:
     // In the private section of this class, we first forward declare a number
     // of objects that are used in parallelizing work using the WorkStream
-    // object (see the @ref threads module for more information on this).
+    // object (see the @ref threads topic for more information on this).
     //
     // We declare such structures for the computation of tangent (stiffness)
     // matrix and right hand side vector, static condensation, and for updating
@@ -1140,7 +1139,7 @@ namespace Step44
   // assemble the tangent matrix and right hand side vector, the static
   // condensation contributions, and update data stored at the quadrature points
   // using TBB. Our main tool for this is the WorkStream class (see the @ref
-  // threads module for more information).
+  // threads topic for more information).
 
   // Firstly we deal with the tangent matrix and right-hand side assembly
   // structures. The PerTaskData object stores local contributions to the global
@@ -1862,7 +1861,7 @@ namespace Step44
             const double det_F_qp   = lqph[q_point]->get_det_F();
             const double J_tilde_qp = lqph[q_point]->get_J_tilde();
             const double the_error_qp_squared =
-              std::pow((det_F_qp - J_tilde_qp), 2);
+              Utilities::fixed_power<2>((det_F_qp - J_tilde_qp));
             const double JxW = fe_values.JxW(q_point);
 
             dil_L2_error += the_error_qp_squared * JxW;
@@ -3220,7 +3219,7 @@ namespace Step44
     Vector<double> soln(solution_n.size());
     for (unsigned int i = 0; i < soln.size(); ++i)
       soln(i) = solution_n(i);
-    MappingQEulerian<dim> q_mapping(degree, dof_handler, soln);
+    const MappingQEulerian<dim> q_mapping(degree, dof_handler, soln);
     data_out.build_patches(q_mapping, degree);
 
     std::ofstream output("solution-" + std::to_string(dim) + "d-" +

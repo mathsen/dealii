@@ -126,7 +126,7 @@ MATHJAX_EXTENSIONS     = TeX/AMSmath TeX/AMSsymbols
 HTML_COLORSTYLE_HUE    = 220
 HTML_COLORSTYLE_SAT    = 200
 HTML_EXTRA_STYLESHEET  = @CMAKE_CURRENT_SOURCE_DIR@/stylesheet.css
-LAYOUT_FILE            = @CMAKE_CURRENT_SOURCE_DIR@/DoxygenLayout.xml
+LAYOUT_FILE            = @CMAKE_CURRENT_BINARY_DIR@/DoxygenLayout.xml
 
 
 #---------------------------------------------------------------------------
@@ -190,8 +190,10 @@ PREDEFINED             = DOXYGEN=1 \
                          DEAL_II_ADOLC_WITH_ADVANCED_BRANCHING=1 \
                          DEAL_II_ADOLC_WITH_ATRIG_ERF=1 \
                          DEAL_II_ADOLC_WITH_TAPELESS_REFCOUNTING=1 \
+                         DEAL_II_CXX20_REQUIRES(x)= \
                          DEAL_II_DEPRECATED_EARLY= \
                          DEAL_II_DEPRECATED_EARLY_WITH_COMMENT(x)= \
+                         DEAL_II_DEPRECATED_WITH_COMMENT(x)= \
                          DEAL_II_WITH_ARBORX=1 \
                          DEAL_II_ARBORX_WITH_MPI=1 \
                          DEAL_II_WITH_ARPACK=1 \
@@ -241,6 +243,7 @@ PREDEFINED             = DOXYGEN=1 \
                          DEAL_II_SYMENGINE_WITH_LLVM=1 \
                          DEAL_II_WITH_TBB=1 \
                          DEAL_II_WITH_TRILINOS=1 \
+                         DEAL_II_TRILINOS_WITH_AMESOS2=1 \
                          DEAL_II_TRILINOS_WITH_EPETRAEXT=1 \
                          DEAL_II_TRILINOS_WITH_MUELU=1 \
                          DEAL_II_TRILINOS_WITH_NOX=1 \

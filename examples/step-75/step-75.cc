@@ -1,17 +1,16 @@
-/* ---------------------------------------------------------------------
+/* ------------------------------------------------------------------------
  *
- * Copyright (C) 2021 - 2023 by the deal.II authors
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * Copyright (C) 2021 - 2024 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
- * The deal.II library is free software; you can use it, redistribute
- * it, and/or modify it under the terms of the GNU Lesser General
- * Public License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * The full text of the license can be found in the file LICENSE.md at
- * the top level directory of deal.II.
+ * Part of the source code is dual licensed under Apache-2.0 WITH
+ * LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+ * governing the source code and code contributions can be found in
+ * LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
  *
- * ---------------------------------------------------------------------
+ * ------------------------------------------------------------------------
  *
  * Authors: Marc Fehling, Colorado State University, 2021
  *          Peter Munch, Technical University of Munich and Helmholtz-Zentrum
@@ -377,7 +376,7 @@ namespace Step75
   template <int dim, typename number>
   number LaplaceOperator<dim, number>::el(unsigned int, unsigned int) const
   {
-    Assert(false, ExcNotImplemented());
+    DEAL_II_NOT_IMPLEMENTED();
     return 0;
   }
 
@@ -638,14 +637,14 @@ namespace Step75
   // particular the operators, and the transfer operator as a
   // MGTransferGlobalCoarsening object.
   template <typename VectorType, typename OperatorType, int dim>
-  void solve_with_gmg(SolverControl                   &solver_control,
-                      const OperatorType              &system_matrix,
-                      VectorType                      &dst,
-                      const VectorType                &src,
-                      const MultigridParameters       &mg_data,
-                      const hp::MappingCollection<dim> mapping_collection,
-                      const DoFHandler<dim>           &dof_handler,
-                      const hp::QCollection<dim>      &quadrature_collection)
+  void solve_with_gmg(SolverControl                    &solver_control,
+                      const OperatorType               &system_matrix,
+                      VectorType                       &dst,
+                      const VectorType                 &src,
+                      const MultigridParameters        &mg_data,
+                      const hp::MappingCollection<dim> &mapping_collection,
+                      const DoFHandler<dim>            &dof_handler,
+                      const hp::QCollection<dim>       &quadrature_collection)
   {
     // Create a DoFHandler and operator for each multigrid level,
     // as well as, create transfer operators. To be able to
@@ -733,7 +732,7 @@ namespace Step75
               {
                 if (cell->is_locally_owned())
                   cell->set_active_fe_index(cell_other->active_fe_index());
-                cell_other++;
+                ++cell_other;
               }
           }
         else // coarse level
@@ -758,7 +757,7 @@ namespace Step75
 
                     cell->set_active_fe_index(fe_index_for_degree[next_degree]);
                   }
-                cell_other++;
+                ++cell_other;
               }
           }
 

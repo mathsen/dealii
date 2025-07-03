@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 2014 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 
 #ifndef dealii_aligned_vector_h
@@ -359,7 +358,7 @@ public:
    * Swaps the given vector with the calling vector.
    */
   void
-  swap(AlignedVector<T> &vec);
+  swap(AlignedVector<T> &vec) noexcept;
 
   /**
    * Return whether the vector is empty, i.e., its size is zero.
@@ -1965,7 +1964,7 @@ AlignedVector<T>::replicate_across_communicator(const MPI_Comm     communicator,
 
 template <class T>
 inline void
-AlignedVector<T>::swap(AlignedVector<T> &vec)
+AlignedVector<T>::swap(AlignedVector<T> &vec) noexcept
 {
   // Swap the data in the 'elements' objects. Then also make sure that
   // their respective deleter objects point to the right place.

@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2023 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 1998 - 2024 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_exceptions_h
 #define dealii_exceptions_h
@@ -48,7 +47,7 @@ DEAL_II_NAMESPACE_OPEN
  *
  * See the
  * @ref Exceptions
- * module for more details on this class and what can be done with classes
+ * topic for more details on this class and what can be done with classes
  * derived from it.
  *
  * @ingroup Exceptions
@@ -1094,10 +1093,18 @@ namespace StandardExceptions
   DeclExceptionMsg(ExcGhostsPresent,
                    "You are trying an operation on a vector that is only "
                    "allowed if the vector has no ghost elements, but the "
-                   "vector you are operating on does have ghost elements. "
-                   "Specifically, vectors with ghost elements are read-only "
+                   "vector you are operating on does have ghost elements."
+                   "\n\n"
+                   "Specifically, there are two kinds of operations that "
+                   "are typically not allowed on vectors with ghost elements. "
+                   "First, vectors with ghost elements are read-only "
                    "and cannot appear in operations that write into these "
-                   "vectors."
+                   "vectors. Second, reduction operations (such as computing "
+                   "the norm of a vector, or taking dot products between "
+                   "vectors) are not allowed to ensure that each vector "
+                   "element is counted only once (as opposed to once for "
+                   "the owner of the element plus once for each process "
+                   "on which the element is stored as a ghost copy)."
                    "\n\n"
                    "See the glossary entry on 'Ghosted vectors' for more "
                    "information.");
@@ -1527,7 +1534,7 @@ namespace deal_II_exceptions
  *
  * A more detailed description can be found in the
  * @ref Exceptions
- * module. It is first used in step-5 and step-6.
+ * topic. It is first used in step-5 and step-6.
  * See also the <tt>ExceptionBase</tt> class for more information.
  *
  * @note Active in DEBUG mode only
@@ -1657,7 +1664,7 @@ namespace deal_II_exceptions
  *
  * A more detailed description can be found in the
  * @ref Exceptions
- * module, in the discussion about the corner case at the bottom of the page.
+ * topic, in the discussion about the corner case at the bottom of the page.
  *
  * @note This and similar macro names are examples of preprocessor definitions
  * in the deal.II library that are not prefixed by a string that likely makes
@@ -1711,7 +1718,7 @@ namespace deal_II_exceptions
  *
  * A more detailed description can be found in the
  * @ref Exceptions
- * module. It is first used in step-9 and step-13.
+ * topic. It is first used in step-9 and step-13.
  * See also the <tt>ExceptionBase</tt> class for more information.
  *
  * @note This and similar macro names are examples of preprocessor definitions
@@ -1761,6 +1768,164 @@ namespace deal_II_exceptions
       }                                                                  \
     while (false)
 #endif /*ifdef DEAL_II_HAVE_BUILTIN_EXPECT*/
+
+
+/**
+ * `DEAL_II_NOT_IMPLEMENTED` is a macro (that looks like a function call
+ * when used as in `DEAL_II_NOT_IMPLEMENTED();`) that is used to raise an
+ * error in places where a piece of code is not yet implemented. If a code
+ * runs into such a place, it will be aborted with an error message that
+ * explains the situation, along with a backtrace of how the code ended
+ * up in this place. Alternatively, if
+ * deal_II_exceptions::internals::ExceptionHandling::abort_or_throw_on_exception
+ * is set to ExceptionHandling::throw_on_exception, then the corresponding
+ * error is thrown as a C++ exception that can be caught (though in
+ * many cases codes will then find it difficult to do what they wanted
+ * to do).
+ *
+ * This macro is first used in step-8 of the tutorial.
+ *
+ * A typical case where it is used would look as follows: Assume that we want
+ * to implement a function that describes the right hand side of an equation
+ * that corresponds to a known solution (i.e., we want to use the "Method
+ * of manufactured solutions", see step-7). We have computed the right
+ * hand side that corresponds to the 1d and 2d solutions, but we have been
+ * too lazy so far to do the calculations for the 3d case, perhaps because
+ * we first want to test correctness in 1d and 2d before moving on to the 3d
+ * case. We could then write this right hand side as follows (the specific
+ * formulas in the `return` statements are not important):
+ * @code
+ *   template <int dim>
+ *   double right_hand_side (const Point<dim> &x)
+ *   {
+ *     if (dim==1)
+ *       return x[0]*std::sin(x[0]);
+ *     else if (dim==2)
+ *       return x[0]*std::sin(x[0])*std::sin(x[1];
+ *     else
+ *       DEAL_II_NOT_IMPLEMENTED();
+ *   }
+ * @endcode
+ * Here, the call to `DEAL_II_NOT_IMPLEMENTED()` simply indicates that we
+ * haven't gotten around to filling in this code block. If someone ends up
+ * running the program in 3d, execution will abort in the location with an
+ * error message that indicates where this happened and why.
+ */
+#define DEAL_II_NOT_IMPLEMENTED()                                \
+  ::dealii::deal_II_exceptions::internals::issue_error_noreturn( \
+    ::dealii::deal_II_exceptions::internals::ExceptionHandling:: \
+      abort_or_throw_on_exception,                               \
+    __FILE__,                                                    \
+    __LINE__,                                                    \
+    __PRETTY_FUNCTION__,                                         \
+    nullptr,                                                     \
+    nullptr,                                                     \
+    ::dealii::StandardExceptions::ExcNotImplemented())
+
+
+/**
+ * `DEAL_II_ASSERT_UNREACHABLE` is a macro (that looks like a function call
+ * when used as in `DEAL_II_ASSERT_UNREACHABLE();`) that is used to raise an
+ * error in places where the programmer believed that execution should
+ * never get to. If a code
+ * runs into such a place, it will be aborted with an error message that
+ * explains the situation, along with a backtrace of how the code ended
+ * up in this place. Alternatively, if
+ * deal_II_exceptions::internals::ExceptionHandling::abort_or_throw_on_exception
+ * is set to ExceptionHandling::throw_on_exception, then the corresponding
+ * error is thrown as a C++ exception that can be caught (though in
+ * many cases codes will then find it difficult to do what they wanted
+ * to do).
+ *
+ * A typical case where it is used would look as follows. In many cases,
+ * one has a finite enumeration of things that can happen, and one runs
+ * through those in a sequence of `if`-`else` blocks, or perhaps
+ * with a `switch` selection and a number of `case` statements. Of
+ * course, if the code is correct, if all possible cases are handled,
+ * nothing terrible can happen -- though perhaps it is worth making sure
+ * that we have really covered all cases by using `DEAL_II_ASSERT_UNREACHABLE()`
+ * as the *last* case. Here is an example:
+ * @code
+ *   enum OutputFormat { vtk, vtu };
+ *
+ *   void write_output (const OutputFormat format)
+ *   {
+ *     if (format == vtk)
+ *       {
+ *         ... write in VTK format ...
+ *       }
+ *     else // must not clearly be VTU format
+ *       {
+ *         ... write in VTU format ...
+ *       }
+ *   }
+ * @endcode
+ * The issue here is "Are we really sure it is VTU format if we end up in
+ * the `else` block"? There are two reasons that should make us suspicious.
+ * First, the authors of the code may later have expanded the list of options
+ * in the `OutputFormat` enum, but forgotten to also update the
+ * `write_output()` function. We may then end up in the `else` branch even
+ * though the argument indicates the now possible third option that was added
+ * to `OutputFormat`. The second possibility to consider is that enums are
+ * really just fancy ways of using integers; from a language perspective, it
+ * is allowed to pass *any* integer to `write_output()`, even values that do
+ * not match either `vtk` or `vtu`. This is then clearly a bug in the program,
+ * but one that we are better off if we catch it as early as possible.
+ *
+ * We can guard against both cases by writing the code as follows instead:
+ * @code
+ *   enum OutputFormat { vtk, vtu };
+ *
+ *   void write_output (const OutputFormat format)
+ *   {
+ *     if (format == vtk)
+ *       {
+ *         ... write in VTK format ...
+ *       }
+ *     else if (format == vtu)
+ *       {
+ *         ... write in VTU format ...
+ *       }
+ *     else // we shouldn't get here, but if we did, abort the program now!
+ *       DEAL_II_ASSERT_UNREACHABLE();
+ *   }
+ * @endcode
+ *
+ * This macro is first used in step-7, where we show another example of
+ * a context where it is frequently used.
+ */
+#define DEAL_II_ASSERT_UNREACHABLE()                             \
+  ::dealii::deal_II_exceptions::internals::issue_error_noreturn( \
+    ::dealii::deal_II_exceptions::internals::ExceptionHandling:: \
+      abort_or_throw_on_exception,                               \
+    __FILE__,                                                    \
+    __LINE__,                                                    \
+    __PRETTY_FUNCTION__,                                         \
+    nullptr,                                                     \
+    nullptr,                                                     \
+    ::dealii::StandardExceptions::ExcMessage(                    \
+      "The program has hit a line of code that the programmer "  \
+      "marked with the macro DEAL_II_ASSERT_UNREACHABLE() to "   \
+      "indicate that the program should never reach this "       \
+      "location. You will have to find out (best done in a "     \
+      "debugger) why that happened. Typical reasons include "    \
+      "passing invalid arguments to functions (for example, if " \
+      "a function takes an 'enum' with two possible values "     \
+      "as argument, but you call the function with a third "     \
+      "value), or if the programmer of the code that triggered " \
+      "the error believed that a variable can only have "        \
+      "specific values, but either that assumption is wrong "    \
+      "or the computation of that value is buggy."               \
+      "\n\n"                                                     \
+      "In those latter conditions, where some internal "         \
+      "assumption is not satisfied, there may not be very "      \
+      "much you can do if you encounter such an exception, "     \
+      "since it indicates an error in deal.II, not in your "     \
+      "own program. If that is the situation you encounter, "    \
+      "try to come up with "                                     \
+      "the smallest possible program that still demonstrates "   \
+      "the error and contact the deal.II mailing lists with it " \
+      "to obtain help."))
 
 
 namespace deal_II_exceptions

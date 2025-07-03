@@ -1,17 +1,16 @@
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2021 by the deal.II authors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// Copyright (C) 1998 - 2023 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
-// The deal.II library is free software; you can use it, redistribute
-// it, and/or modify it under the terms of the GNU Lesser General
-// Public License as published by the Free Software Foundation; either
-// version 2.1 of the License, or (at your option) any later version.
-// The full text of the license can be found in the file LICENSE.md at
-// the top level directory of deal.II.
+// Part of the source code is dual licensed under Apache-2.0 WITH
+// LLVM-exception OR LGPL-2.1-or-later. Detailed license information
+// governing the source code and code contributions can be found in
+// LICENSE.md and CONTRIBUTING.md at the top level directory of deal.II.
 //
-// ---------------------------------------------------------------------
+// ------------------------------------------------------------------------
 
 #ifndef dealii_smartpointer_h
 #define dealii_smartpointer_h
@@ -160,8 +159,16 @@ public:
   operator=(const SmartPointer<T, P> &tt);
 
   /**
-   * Delete the object pointed to and set the pointer to zero.
+   * Delete the object pointed to and set the pointer to nullptr. Note
+   * that unlike what the documentation of the class describes, *this
+   * function actually deletes the object pointed to*. That is, this
+   * function assumes a SmartPointer's ownership of the object pointed to.
+   *
+   * @deprecated This function is deprecated. It does not use the
+   * semantics we usually use for this class, and its use is surely
+   * going to be confusing.
    */
+  DEAL_II_DEPRECATED
   void
   clear();
 
@@ -333,16 +340,19 @@ template <typename T, typename P>
 inline SmartPointer<T, P> &
 SmartPointer<T, P>::operator=(T *tt)
 {
-  // optimize if no real action is
-  // requested
+  // optimize if no real action is requested
   if (t == tt)
     return *this;
 
+  // Let us unsubscribe from the current object
   if (pointed_to_object_is_alive && t != nullptr)
     t->unsubscribe(&pointed_to_object_is_alive, id);
+
+  // Then reset to the new object, and subscribe to it
   t = tt;
   if (tt != nullptr)
-    tt->subscribe(&pointed_to_object_is_alive, id);
+    t->subscribe(&pointed_to_object_is_alive, id);
+
   return *this;
 }
 
@@ -359,11 +369,14 @@ SmartPointer<T, P>::operator=(const SmartPointer<T, Q> &tt)
   if (&tt == this)
     return *this;
 
+  // Let us unsubscribe from the current object
   if (pointed_to_object_is_alive && t != nullptr)
     t->unsubscribe(&pointed_to_object_is_alive, id);
-  t = static_cast<T *>(tt);
+
+  // Then reset to the new object, and subscribe to it
+  t = (tt != nullptr ? tt.get() : nullptr);
   if (tt.pointed_to_object_is_alive && tt != nullptr)
-    tt->subscribe(&pointed_to_object_is_alive, id);
+    t->subscribe(&pointed_to_object_is_alive, id);
   return *this;
 }
 
@@ -379,11 +392,15 @@ SmartPointer<T, P>::operator=(const SmartPointer<T, P> &tt)
   if (&tt == this)
     return *this;
 
+  // Let us unsubscribe from the current object
   if (pointed_to_object_is_alive && t != nullptr)
     t->unsubscribe(&pointed_to_object_is_alive, id);
-  t = static_cast<T *>(tt);
+
+  // Then reset to the new object, and subscribe to it
+  t = (tt != nullptr ? tt.get() : nullptr);
   if (tt.pointed_to_object_is_alive && tt != nullptr)
-    tt->subscribe(&pointed_to_object_is_alive, id);
+    t->subscribe(&pointed_to_object_is_alive, id);
+
   return *this;
 }
 
